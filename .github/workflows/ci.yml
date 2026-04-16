@@ -30,7 +30,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           extensions: mbstring, pdo_mysql, bcmath, gd, zip
           coverage: none
 
@@ -68,7 +68,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
 
       - name: Check syntax
         run: find app config routes -name "*.php" -exec php -l {} \; | grep -v "No syntax errors" || true
