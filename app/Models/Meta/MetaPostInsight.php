@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Models\Meta;
+
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Per-post/reel/story insights (Facebook + Instagram).
+ *
+ * @property int         $id
+ * @property string      $source
+ * @property string      $source_id
+ * @property string      $post_id
+ * @property string|null $post_type
+ * @property string|null $message
+ * @property string|null $permalink_url
+ * @property string|null $media_url
+ * @property \Carbon\Carbon|null $created_at_meta
+ * @property int|null    $impressions
+ * @property int|null    $reach
+ * @property int|null    $likes
+ * @property int|null    $comments
+ * @property int|null    $shares
+ * @property int|null    $saves
+ * @property int|null    $video_views
+ * @property int|null    $clicks
+ * @property int|null    $exits
+ * @property int|null    $replies
+ * @property int|null    $taps_forward
+ * @property int|null    $taps_back
+ * @property int|null    $plays
+ * @property \Carbon\Carbon|null $synced_at
+ * @property \Carbon\Carbon|null $created_at
+ * @property \Carbon\Carbon|null $updated_at
+ */
+class MetaPostInsight extends Model
+{
+    protected $table = 'meta_post_insights';
+
+    protected $fillable = [
+        'source',
+        'source_id',
+        'post_id',
+        'post_type',
+        'message',
+        'permalink_url',
+        'media_url',
+        'created_at_meta',
+        'impressions',
+        'reach',
+        'likes',
+        'comments',
+        'shares',
+        'saves',
+        'video_views',
+        'clicks',
+        'exits',
+        'replies',
+        'taps_forward',
+        'taps_back',
+        'plays',
+        'synced_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'created_at_meta' => 'datetime',
+            'synced_at'       => 'datetime',
+        ];
+    }
+}
