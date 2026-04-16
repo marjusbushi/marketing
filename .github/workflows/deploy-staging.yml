@@ -22,14 +22,17 @@ jobs:
           port: ${{ secrets.STAGING_PORT }}
           envs: APP_PATH
           script: |
+            set -e
             cd "$APP_PATH"
             git pull origin main
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
             npm ci
             npm run build
             php artisan migrate --force
+            php artisan optimize:clear
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            sudo -n systemctl reload php8.4-fpm 2>/dev/null || sudo -n systemctl reload php-fpm 2>/dev/null || echo "php-fpm reload skipped (no sudo)"
             php artisan queue:restart 2>/dev/null || true
             echo "Deploy complete!"
