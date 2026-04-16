@@ -139,6 +139,19 @@ class DisApiClient
     }
 
     /**
+     * List lightweight week summaries for timeline/gantt views.
+     */
+    public function listWeekSummaries(string $start, string $end): array
+    {
+        $response = $this->get('/api/internal/merch-calendar/weeks-summary', [
+            'start' => $start,
+            'end' => $end,
+        ]);
+
+        return $this->parseResponse($response);
+    }
+
+    /**
      * Get full detail of a distribution week (groups, images, classifications).
      */
     public function getWeek(int $id): array

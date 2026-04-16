@@ -51,7 +51,7 @@
 
 @include('merch-calendar._partials.collection-sidebar')
 <script>
-    const WEEKS_API = @json(route('marketing.merch-calendar.api.weeks'));
+    const SUMMARY_API = @json(route('marketing.merch-calendar.api.weeks.summary'));
     let ganttOffset = 0; // days offset from today
 
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -79,24 +79,8 @@
         const totalDays = daysBetween(startStr, endStr);
 
         try {
-            const res = await fetch(`${WEEKS_API}?start=${startStr}&end=${endStr}`, { headers:{'Accept':'application/json'} });
-            const events = await res.json();
-
-            // Extract weeks
-            const weekMap = {};
-            events.forEach(e => {
-                if (e.extendedProps?.type === 'collection') {
-                    const p = e.extendedProps;
-                    weekMap[p.distribution_week_id] = {
-                        id: p.distribution_week_id,
-                        name: e.title,
-                        week_start: p.week_start,
-                        week_end: p.week_end,
-                        status: p.status,
-                    };
-                }
-            });
-            const weeks = Object.values(weekMap).sort((a,b) => a.week_start.localeCompare(b.week_start));
+            const res = await fetch(`${SUMMARY_API}?start=${startStr}&end=${endStr}`, { headers:{'Accept':'application/json'} });
+            const weeks = (await res.json()).sort((a,b) => a.week_start.localeCompare(b.week_start));
 
             renderGantt(weeks, startStr, totalDays, todayStr);
         } catch(e) {
@@ -157,10 +141,10 @@
             const cells = days.map(d => `<div class="gantt-cell${d.isToday ? ' today' : ''}"></div>`).join('');
 
             const barClass = 'gantt-bar gantt-bar-' + (w.status || 'planned');
-            const bar = `<div class="${barClass}" style="left:${barStart * 40}px;width:${barWidth * 40 - 2}px;">${w.name.replace(/ \(\d+\)$/, '')}</div>`;
+            const bar = `<div class="${barClass}" style="left:${barStart * 40}px;width:${barWidth * 40 - 2}px;">${w.name}</div>`;
 
             return `<div class="gantt-row">
-                <div class="gantt-label" title="${w.name}">${w.name.replace(/ \(\d+\)$/, '')}</div>
+                <div class="gantt-label" title="${w.name}">${w.name}</div>
                 <div class="gantt-cells">${cells}${bar}</div>
             </div>`;
         }).join('');

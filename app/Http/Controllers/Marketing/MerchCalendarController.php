@@ -100,6 +100,19 @@ class MerchCalendarController extends Controller
     }
 
     /**
+     * Get lightweight summaries for timeline/gantt.
+     */
+    public function weeksSummaryJson(Request $request): JsonResponse
+    {
+        $start = $request->input('start', now()->startOfMonth()->toDateString());
+        $end = $request->input('end', now()->endOfMonth()->addMonths(2)->toDateString());
+
+        $weeks = $this->disApi->listWeekSummaries($start, $end);
+
+        return response()->json($weeks);
+    }
+
+    /**
      * Create a new distribution week.
      */
     public function storeWeek(Request $request): JsonResponse

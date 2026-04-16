@@ -180,6 +180,7 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
 
         // API proxies
         Route::get('/api/weeks', [MerchCalendarController::class, 'weeksJson'])->name('api.weeks');
+        Route::get('/api/weeks-summary', [MerchCalendarController::class, 'weeksSummaryJson'])->name('api.weeks.summary');
         Route::get('/api/weeks/{id}', [MerchCalendarController::class, 'weekDetail'])->name('api.weeks.show');
         Route::post('/api/weeks', [MerchCalendarController::class, 'storeWeek'])->name('api.weeks.store');
         Route::put('/api/weeks/{id}', [MerchCalendarController::class, 'updateWeek'])->name('api.weeks.update');
@@ -188,6 +189,21 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/api/item-groups/search', [MerchCalendarController::class, 'searchGroups'])->name('api.item-groups.search');
         Route::get('/api/price-lists', [MerchCalendarController::class, 'priceLists'])->name('api.price-lists');
     });
+
+    // ─── CDN Image Proxy (bypasses hotlink protection) ──
+    Route::get('/cdn-image', function (\Illuminate\Http\Request $request) {
+        $url = $request->query('url');
+        if (!$url || !str_starts_with($url, 'https://web-cdn.zeroabsolute.com/')) {
+            abort(400);
+        }
+        $response = \Illuminate\Support\Facades\Http::withoutVerifying()->timeout(10)->get($url);
+        if ($response->failed()) {
+            abort(404);
+        }
+        return response($response->body(), 200)
+            ->header('Content-Type', $response->header('Content-Type') ?: 'image/jpeg')
+            ->header('Cache-Control', 'public, max-age=86400');
+    })->name('cdn-image');
 
     // ─── Analytics ──────────────────────────────────
     Route::prefix('analytics')->as('analytics.')->middleware('marketing.permission:' . P::ANALYTICS_VIEW->value)->group(function () {
