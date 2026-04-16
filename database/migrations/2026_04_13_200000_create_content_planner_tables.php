@@ -144,7 +144,7 @@ return new class extends Migration
         // ── Approval Steps ────────────────────────────────────
         Schema::create('content_approval_steps', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('post_id')->constrained('content_posts')->cascadeOnDelete();
+            $table->unsignedBigInteger('post_id');
             $table->unsignedTinyInteger('step_order');
             $table->string('role', 50)->nullable();
             $table->unsignedBigInteger('assigned_to')->nullable()->index();
@@ -154,6 +154,7 @@ return new class extends Migration
             $table->text('feedback')->nullable();
             $table->timestamps();
 
+            $table->foreign('post_id', 'approval_steps_post_fk')->references('id')->on('content_posts')->cascadeOnDelete();
             $table->unique(['post_id', 'step_order']);
             $table->index(['assigned_to', 'status']);
         });
@@ -161,20 +162,21 @@ return new class extends Migration
         // ── Post Versions ─────────────────────────────────────
         Schema::create('content_post_versions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('post_id')->constrained('content_posts')->cascadeOnDelete()->index();
+            $table->unsignedBigInteger('post_id')->index();
             $table->unsignedInteger('version_number');
             $table->json('snapshot');
             $table->string('change_summary', 255)->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
 
+            $table->foreign('post_id', 'post_versions_post_fk')->references('id')->on('content_posts')->cascadeOnDelete();
             $table->unique(['post_id', 'version_number']);
         });
 
         // ── Suggestions ───────────────────────────────────────
         Schema::create('content_suggestions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('post_id')->constrained('content_posts')->cascadeOnDelete();
+            $table->unsignedBigInteger('post_id');
             $table->unsignedBigInteger('user_id')->index();
             $table->text('original_text');
             $table->text('suggested_text');
@@ -185,6 +187,7 @@ return new class extends Migration
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
 
+            $table->foreign('post_id', 'suggestions_post_fk')->references('id')->on('content_posts')->cascadeOnDelete();
             $table->index(['post_id', 'status']);
         });
 
