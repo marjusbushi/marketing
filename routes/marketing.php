@@ -196,7 +196,9 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         // Page view
         Route::get('/', [DailyBasketController::class, 'index'])->name('index');
 
-        // Collection summary + one day's basket
+        // Collection picker + summary + one day's basket
+        Route::get('/api/collections', [DailyBasketController::class, 'listCollections'])
+            ->name('api.collections.index');
         Route::get('/api/collections/{distributionWeek}', [DailyBasketController::class, 'collectionSummary'])
             ->name('api.collections.summary');
         Route::get('/api/collections/{distributionWeek}/{date}', [DailyBasketController::class, 'show'])

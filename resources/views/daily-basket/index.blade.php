@@ -142,6 +142,88 @@
     .db-picker-item.selected .db-picker-check { background: var(--db-text); border-color: var(--db-text); color: #fff; }
 
     .db-picker-empty { grid-column: 1/-1; padding: 24px; text-align: center; color: var(--db-text-3); font-size: 12px; }
+
+    /* Collection picker (dropdown in the collection row) */
+    .db-coll-picker { position: relative; }
+    .db-coll-trigger {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: transparent;
+        border: 1px solid transparent;
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+        color: var(--db-text);
+    }
+    .db-coll-trigger:hover { background: var(--db-accent-soft); border-color: var(--db-border); }
+    .db-coll-trigger-name { font-weight: 500; }
+    .db-coll-trigger-caret { font-size: 10px; color: var(--db-text-3); }
+
+    .db-coll-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: -8px;
+        width: 360px;
+        max-height: 420px;
+        overflow-y: auto;
+        background: var(--db-surface);
+        border: 1px solid var(--db-border);
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        z-index: 100;
+        display: none;
+        padding: 6px;
+    }
+    .db-coll-menu.open { display: block; }
+    .db-coll-menu-section {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--db-text-3);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 10px 10px 4px;
+    }
+    .db-coll-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+    .db-coll-menu-item:hover { background: var(--db-accent-soft); }
+    .db-coll-menu-item.active { background: #eef2ff; }
+    .db-coll-menu-item-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--db-text-3);
+        flex-shrink: 0;
+    }
+    .db-coll-menu-item.is-current .db-coll-menu-item-dot { background: #22c55e; }
+    .db-coll-menu-item.is-upcoming .db-coll-menu-item-dot { background: #3b82f6; }
+    .db-coll-menu-item-body { flex: 1; min-width: 0; }
+    .db-coll-menu-item-name {
+        font-size: 13px;
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .db-coll-menu-item-sub { font-size: 11px; color: var(--db-text-3); margin-top: 1px; }
+    .db-coll-menu-item-badge {
+        font-size: 9px;
+        padding: 2px 7px;
+        border-radius: 10px;
+        background: var(--db-accent-soft);
+        color: var(--db-text-2);
+        font-weight: 600;
+    }
+    .db-coll-menu-item.is-current .db-coll-menu-item-badge { background: #dcfce7; color: #166534; }
+    .db-coll-menu-item.is-upcoming .db-coll-menu-item-badge { background: #dbeafe; color: #1e40af; }
+
+    .db-coll-menu-empty { padding: 30px; text-align: center; color: var(--db-text-3); font-size: 12px; }
 </style>
 @endsection
 
@@ -207,7 +289,13 @@
     <div class="db-coll" id="dbColl">
         <div class="db-coll-left">
             <div class="db-coll-dot"></div>
-            <span class="db-coll-name" id="dbCollName">Duke ngarkuar kolekcionin aktiv…</span>
+            <div class="db-coll-picker">
+                <button class="db-coll-trigger" id="dbCollTrigger" type="button">
+                    <span class="db-coll-trigger-name" id="dbCollName">Duke ngarkuar…</span>
+                    <span class="db-coll-trigger-caret">▾</span>
+                </button>
+                <div class="db-coll-menu" id="dbCollMenu" role="menu"></div>
+            </div>
         </div>
         <div class="db-coll-prog" id="dbCollProg"></div>
     </div>
@@ -282,6 +370,7 @@
     }
 
     const state = {
+        collections: [],
         week: null,
         days: [],
         selectedDate: null,
@@ -334,32 +423,63 @@
         return parseInt(params.get('week'), 10) || null;
     }
 
-    async function loadCollection() {
-        const weekId = getWeekIdFromUrl();
-        if (!weekId) {
-            document.getElementById('dbCollName').textContent = 'Zgjidh kolekcion nga Merch Calendar (shto ?week=ID në URL)';
-            return;
+    function setUrlWeek(id) {
+        const url = new URL(location.href);
+        url.searchParams.set('week', String(id));
+        history.replaceState(null, '', url.toString());
+    }
+
+    async function bootstrap() {
+        // Always load the collection list first — it powers the picker.
+        try {
+            state.collections = await apiGet('/marketing/daily-basket/api/collections');
+        } catch (e) {
+            showError('S\'u ngarkuan kolekcionet: ' + e.message);
+            state.collections = [];
         }
+
+        renderCollectionMenu();
+
+        // Decide which collection to open: URL query wins, else current, else first.
+        const urlId = getWeekIdFromUrl();
+        const current = state.collections.find(c => c.is_current);
+        const target =
+            (urlId && state.collections.find(c => c.id === urlId))
+            || current
+            || state.collections[0];
+
+        if (target) {
+            await openCollection(target.id);
+        } else {
+            document.getElementById('dbCollName').textContent = 'Asnjë kolekcion në dispozicion';
+            document.getElementById('dbBtnNewPost').disabled = true;
+        }
+    }
+
+    async function openCollection(weekId) {
+        setUrlWeek(weekId);
 
         try {
             const data = await apiGet('/marketing/daily-basket/api/collections/' + encodeURIComponent(weekId));
             state.week = data.collection;
             state.days = data.days;
-            renderCollection();
+            renderCollectionHeader();
             renderDays();
 
             const today = new Date().toISOString().slice(0, 10);
             const todayInRange = state.days.find(d => d.date === today);
-            const target = todayInRange ? today : state.days[0]?.date;
-            if (target) selectDay(target);
+            const targetDay = todayInRange ? today : state.days[0]?.date;
+            if (targetDay) selectDay(targetDay);
         } catch (e) {
             showError('Ngarkimi dështoi: ' + e.message);
         }
     }
 
-    function renderCollection() {
+    function renderCollectionHeader() {
         const c = state.week;
         document.getElementById('dbCollName').textContent = c.name;
+        // Keep the menu's "active" highlight in sync with the loaded collection.
+        renderCollectionMenu();
 
         const prog = document.getElementById('dbCollProg');
         const total = state.days.reduce((s, d) => s + (d.posts_total || 0), 0);
@@ -368,16 +488,98 @@
         const strong = document.createElement('strong');
         strong.textContent = done;
         prog.appendChild(strong);
-        prog.append(' / ' + total + ' posts publikuar');
+        prog.append(' / ' + total + ' posts publikuar · ' + (c.week_start || '') + ' → ' + (c.week_end || ''));
+    }
 
-        const left = document.querySelector('.db-coll-left');
-        const sep = document.createElement('span');
-        sep.className = 'db-coll-sep';
-        sep.textContent = '·';
-        const range = document.createElement('span');
-        range.className = 'db-coll-range';
-        range.textContent = c.week_start + ' → ' + c.week_end;
-        left.append(sep, range);
+    function renderCollectionMenu() {
+        const menu = document.getElementById('dbCollMenu');
+        menu.textContent = '';
+
+        if (state.collections.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'db-coll-menu-empty';
+            empty.textContent = 'Asnjë kolekcion — krijo një te Merch Calendar';
+            menu.appendChild(empty);
+            return;
+        }
+
+        // Group by bucket (current / upcoming / past) — backend already sorted them.
+        const groups = { current: [], upcoming: [], past: [] };
+        const today = new Date().toISOString().slice(0, 10);
+        state.collections.forEach(c => {
+            if (c.is_current) groups.current.push(c);
+            else if ((c.week_start || '') > today) groups.upcoming.push(c);
+            else groups.past.push(c);
+        });
+
+        const sections = [
+            { key: 'current',  label: 'Aktiv tani' },
+            { key: 'upcoming', label: 'Të ardhshme' },
+            { key: 'past',     label: 'Të kaluara' },
+        ];
+
+        sections.forEach(sec => {
+            if (groups[sec.key].length === 0) return;
+
+            const title = document.createElement('div');
+            title.className = 'db-coll-menu-section';
+            title.textContent = sec.label;
+            menu.appendChild(title);
+
+            groups[sec.key].forEach(c => menu.appendChild(buildCollectionMenuItem(c, sec.key)));
+        });
+    }
+
+    function buildCollectionMenuItem(c, bucket) {
+        const item = document.createElement('div');
+        item.className = 'db-coll-menu-item';
+        if (bucket === 'current') item.classList.add('is-current');
+        if (bucket === 'upcoming') item.classList.add('is-upcoming');
+        if (state.week && state.week.id === c.id) item.classList.add('active');
+        item.setAttribute('role', 'menuitem');
+
+        const dot = document.createElement('div');
+        dot.className = 'db-coll-menu-item-dot';
+        item.appendChild(dot);
+
+        const body = document.createElement('div');
+        body.className = 'db-coll-menu-item-body';
+
+        const name = document.createElement('div');
+        name.className = 'db-coll-menu-item-name';
+        name.textContent = c.name;
+        body.appendChild(name);
+
+        const sub = document.createElement('div');
+        sub.className = 'db-coll-menu-item-sub';
+        const bits = [];
+        if (c.week_start && c.week_end) bits.push(c.week_start + ' → ' + c.week_end);
+        if (c.item_groups_count) bits.push(c.item_groups_count + ' produkte');
+        sub.textContent = bits.join(' · ');
+        body.appendChild(sub);
+
+        item.appendChild(body);
+
+        if (bucket !== 'past') {
+            const badge = document.createElement('div');
+            badge.className = 'db-coll-menu-item-badge';
+            badge.textContent = bucket === 'current' ? 'Sot' : 'Vjen';
+            item.appendChild(badge);
+        }
+
+        item.addEventListener('click', () => {
+            closeCollectionMenu();
+            openCollection(num(c.id));
+        });
+
+        return item;
+    }
+
+    function toggleCollectionMenu() {
+        document.getElementById('dbCollMenu').classList.toggle('open');
+    }
+    function closeCollectionMenu() {
+        document.getElementById('dbCollMenu').classList.remove('open');
     }
 
     function renderDays() {
@@ -889,6 +1091,18 @@
             if (e.target.id === 'dbModal') closeNewPostModal();
         });
 
+        // Collection picker trigger + outside-click close
+        document.getElementById('dbCollTrigger').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCollectionMenu();
+        });
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('dbCollMenu');
+            if (menu.classList.contains('open') && !menu.contains(e.target) && e.target.id !== 'dbCollTrigger') {
+                closeCollectionMenu();
+            }
+        });
+
         // Segmented controls
         document.querySelectorAll('#dbFieldType .db-seg-opt').forEach(el => {
             el.addEventListener('click', () => {
@@ -915,7 +1129,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         wireModalOnce();
-        loadCollection();
+        bootstrap();
     });
 })();
 </script>

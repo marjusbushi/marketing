@@ -49,6 +49,61 @@ class DailyBasketController extends Controller
     // ─── JSON endpoints ──────────────────────────────────────
 
     /**
+     * List collections (distribution weeks) the user can pick from.
+     * Spans a 3-month window (last month → next 2 months) so the picker
+     * shows recent, active, and upcoming collections in one place.
+     */
+    public function listCollections(Request $request): JsonResponse
+    {
+        $start = $request->input('start', now()->subMonth()->startOfMonth()->toDateString());
+        $end   = $request->input('end',   now()->addMonths(2)->endOfMonth()->toDateString());
+
+        $cacheKey = 'daily_basket:collection_list:'.$start.':'.$end;
+
+        $weeks = Cache::remember($cacheKey, 300, function () use ($start, $end) {
+            try {
+                return $this->disApi->listWeeks($start, $end);
+            } catch (\Throwable $e) {
+                report($e);
+                return [];
+            }
+        });
+
+        // Shape minimal payload for the picker + flag the "current" one
+        $today = now()->toDateString();
+        $items = array_map(function ($w) use ($today) {
+            $ws = $w['week_start'] ?? null;
+            $we = $w['week_end']   ?? null;
+            $isCurrent = $ws && $we && $today >= $ws && $today <= $we;
+
+            return [
+                'id'                => (int) ($w['id'] ?? 0),
+                'name'              => $w['name']       ?? 'Kolekcion',
+                'week_start'        => $ws,
+                'week_end'          => $we,
+                'status'            => $w['status']     ?? null,
+                'item_groups_count' => $w['item_groups_count'] ?? 0,
+                'is_current'        => $isCurrent,
+            ];
+        }, $weeks);
+
+        // Sort: current first, then upcoming, then past (within each group, by week_start desc)
+        usort($items, function ($a, $b) use ($today) {
+            $bucket = function ($w) use ($today) {
+                if ($w['is_current']) return 0;
+                if (($w['week_start'] ?? '') > $today) return 1; // upcoming
+                return 2; // past
+            };
+            $ba = $bucket($a);
+            $bb = $bucket($b);
+            if ($ba !== $bb) return $ba <=> $bb;
+            return strcmp($b['week_start'] ?? '', $a['week_start'] ?? '');
+        });
+
+        return response()->json($items);
+    }
+
+    /**
      * Summary of a whole collection: the week itself + one entry per day
      * (existing basket or null placeholder with zero counts).
      */
