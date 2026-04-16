@@ -24,7 +24,12 @@ jobs:
           script: |
             set -e
             cd "$APP_PATH"
-            git pull origin main
+            # Force server working tree to match origin/main — discards any ad-hoc
+            # edits made directly on the server. Prevents silent 'git pull' aborts
+            # that leave the server running old code.
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd -e .env -e .env.* -e storage -e node_modules -e vendor
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
             npm ci
             npm run build
