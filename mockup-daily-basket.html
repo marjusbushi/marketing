@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<title>Shporta Ditore</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #eeeeec;
+    --border-strong: #e4e4e2;
+    --text: #18181b;
+    --text-2: #71717a;
+    --text-3: #a1a1aa;
+    --accent: #18181b;
+    --accent-soft: #f4f4f5;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 200px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 12px;
+    flex-shrink: 0;
+  }
+  .brand {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 8px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .brand small {
+    display: block;
+    font-size: 10px;
+    color: var(--text-3);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+  .nav-item {
+    padding: 7px 10px;
+    font-size: 12px;
+    color: var(--text-2);
+    cursor: pointer;
+    border-radius: 6px;
+    margin-bottom: 1px;
+  }
+  .nav-item:hover { background: var(--accent-soft); color: var(--text); }
+  .nav-item.active { background: var(--accent-soft); color: var(--text); font-weight: 500; }
+
+  /* Main */
+  .main {
+    flex: 1;
+    padding: 32px 40px;
+    max-width: 1600px;
+    overflow: auto;
+  }
+
+  /* Header */
+  .page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 28px;
+  }
+  .page-title {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .page-meta {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+
+  /* Collection row — minimalist */
+  .coll-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .coll-left { display: flex; align-items: center; gap: 10px; }
+  .coll-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+  }
+  .coll-name { font-weight: 500; }
+  .coll-range { color: var(--text-3); }
+  .coll-sep { color: var(--text-3); margin: 0 6px; }
+  .coll-prog {
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .coll-prog strong { color: var(--text); font-weight: 500; }
+
+  /* Day tabs — clean, minimal */
+  .days {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 32px;
+  }
+  .day {
+    flex: 1;
+    padding: 10px 8px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    text-align: left;
+  }
+  .day:hover { background: var(--accent-soft); }
+  .day.active { border-bottom-color: var(--text); }
+  .day-lbl {
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+  .day.active .day-lbl { color: var(--text); }
+  .day-date {
+    font-size: 15px;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+  .day-count {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 3px;
+  }
+  .day-count-done { color: #22c55e; }
+
+  /* Kanban */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .col {
+    min-width: 0;
+  }
+  .col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .col-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-3);
+  }
+  .col[data-stage="production"] .col-dot { background: #f59e0b; }
+  .col[data-stage="editing"] .col-dot { background: #8b5cf6; }
+  .col[data-stage="scheduling"] .col-dot { background: #3b82f6; }
+  .col[data-stage="published"] .col-dot { background: #22c55e; }
+  .col-count {
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .col-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Post card — clean minimal */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .card:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card.selected {
+    border-color: var(--text);
+    box-shadow: 0 0 0 3px rgba(24,24,27,0.06);
+  }
+
+  .card-type {
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    margin-bottom: 10px;
+  }
+
+  .card-products {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+  .thumb {
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    background: #f4f4f5;
+    flex-shrink: 0;
+  }
+
+  .card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .foot-left { display: flex; align-items: center; gap: 6px; }
+  .avatar {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--text-2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+  }
+  .platforms { display: flex; gap: 3px; }
+  .platform {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    background: #f4f4f5;
+    color: var(--text-2);
+    font-size: 7px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Empty state */
+  .empty {
+    padding: 20px 12px;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 11px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+  }
+
+  /* Detail panel (right drawer style — simulated as bottom sheet) */
+  .sheet-label {
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+    margin: 40px 0 10px;
+  }
+
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .sheet-head {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet-breadcrumb {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-bottom: 4px;
+  }
+  .sheet-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  /* Progress track */
+  .track {
+    display: flex;
+    padding: 16px 24px;
+    background: #fafafa;
+    border-bottom: 1px solid var(--border);
+    gap: 4px;
+  }
+  .track-step {
+    flex: 1;
+    padding: 4px 0;
+    position: relative;
+  }
+  .track-step-line {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-bottom: 6px;
+  }
+  .track-step.done .track-step-line { background: #22c55e; }
+  .track-step.current .track-step-line { background: var(--text); }
+  .track-step-lbl {
+    font-size: 10px;
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  .track-step.done .track-step-lbl { color: #22c55e; }
+  .track-step.current .track-step-lbl { color: var(--text); font-weight: 600; }
+
+  /* Sheet body */
+  .sheet-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .sec {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sec:nth-child(odd) { border-right: 1px solid var(--border); }
+  .sec:last-child, .sec:nth-last-child(2) { border-bottom: 0; }
+  .sec-lbl {
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .sec-val {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.55;
+  }
+  .sec-val.muted { color: var(--text-3); }
+
+  .prod-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .prod-row:last-child { border-bottom: 0; }
+  .prod-row-thumb {
+    width: 32px; height: 32px;
+    border-radius: 5px;
+    background: #f4f4f5;
+    flex-shrink: 0;
+  }
+  .prod-row-name {
+    font-size: 12px;
+    font-weight: 500;
+    flex: 1;
+  }
+  .prod-row-role {
+    font-size: 10px;
+    color: var(--text-3);
+  }
+  .prod-row-price {
+    font-size: 12px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ref-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .ref-thumb {
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #f4f4f5, #e4e4e7);
+    flex-shrink: 0;
+  }
+  .ref-link {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+    word-break: break-all;
+  }
+  .ref-link:hover { text-decoration: underline; }
+  .ref-note {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 2px;
+  }
+
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .media {
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #f4f4f5, #e4e4e7);
+  }
+  .media.empty {
+    background: transparent;
+    border: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    font-size: 16px;
+  }
+
+  /* Sheet footer */
+  .sheet-foot {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: #fafafa;
+  }
+  .btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: 500;
+    background: transparent;
+    color: var(--text-2);
+  }
+  .btn:hover { background: var(--accent-soft); color: var(--text); }
+  .btn-primary {
+    background: var(--text);
+    color: #fff;
+  }
+  .btn-primary:hover { background: #27272a; color: #fff; }
+  .btn-group { display: flex; gap: 4px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="brand">
+      Flare
+      <small>by Zero Absolute</small>
+    </div>
+    <div class="nav-item">Dashboard</div>
+    <div class="nav-item">Content Planner</div>
+    <div class="nav-item">Merch Calendar</div>
+    <div class="nav-item active">Shporta Ditore</div>
+    <div class="nav-item">Influencers</div>
+    <div class="nav-item">Analytics</div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <div class="page-head">
+      <div>
+        <div class="page-title">Shporta Ditore</div>
+      </div>
+      <div class="page-meta">E Hënë, 05 Maj 2026</div>
+    </div>
+
+    <!-- Collection row (one-line) -->
+    <div class="coll-row">
+      <div class="coll-left">
+        <div class="coll-dot"></div>
+        <span class="coll-name">Spring Drop 2026</span>
+        <span class="coll-sep">·</span>
+        <span class="coll-range">01 → 08 Maj</span>
+      </div>
+      <div class="coll-prog">
+        <strong>9</strong> / 14 posts · <strong>7</strong> publikuar
+      </div>
+    </div>
+
+    <!-- Day tabs -->
+    <div class="days">
+      <div class="day">
+        <div class="day-lbl">Enj</div>
+        <div class="day-date">01</div>
+        <div class="day-count day-count-done">2/2</div>
+      </div>
+      <div class="day">
+        <div class="day-lbl">Pre</div>
+        <div class="day-date">02</div>
+        <div class="day-count day-count-done">2/2</div>
+      </div>
+      <div class="day">
+        <div class="day-lbl">Sht</div>
+        <div class="day-date">03</div>
+        <div class="day-count day-count-done">1/1</div>
+      </div>
+      <div class="day">
+        <div class="day-lbl">Die</div>
+        <div class="day-date">04</div>
+        <div class="day-count day-count-done">2/2</div>
+      </div>
+      <div class="day active">
+        <div class="day-lbl">Hën · sot</div>
+        <div class="day-date">05</div>
+        <div class="day-count">2 / 4</div>
+      </div>
+      <div class="day">
+        <div class="day-lbl">Mar</div>
+        <div class="day-date">06</div>
+        <div class="day-count">— / 2</div>
+      </div>
+      <div class="day">
+        <div class="day-lbl">Mër</div>
+        <div class="day-date">07</div>
+        <div class="day-count">— / 2</div>
+      </div>
+      <div class="day">
+        <div class="day-lbl">Enj</div>
+        <div class="day-date">08</div>
+        <div class="day-count">— / 1</div>
+      </div>
+    </div>
+
+    <!-- Kanban -->
+    <div class="board">
+
+      <!-- Planifikim -->
+      <div class="col" data-stage="planning">
+        <div class="col-head">
+          <div class="col-title"><span class="col-dot"></span>Planifikim</div>
+          <div class="col-count">1</div>
+        </div>
+        <div class="col-body">
+          <div class="card">
+            <div class="card-type">Story · 3 pjesë</div>
+            <div class="card-title">Aksesorë ditor — behind the scenes</div>
+            <div class="card-products">
+              <div class="thumb" style="background:linear-gradient(135deg,#fef3c7,#fde68a);"></div>
+              <div class="thumb" style="background:linear-gradient(135deg,#fef3c7,#d97706);"></div>
+            </div>
+            <div class="card-foot">
+              <div class="foot-left">
+                <div class="avatar">MB</div>
+                <span>Pa reference</span>
+              </div>
+              <div class="platforms">
+                <div class="platform">IG</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prodhim -->
+      <div class="col" data-stage="production">
+        <div class="col-head">
+          <div class="col-title"><span class="col-dot"></span>Prodhim</div>
+          <div class="col-count">1</div>
+        </div>
+        <div class="col-body">
+          <div class="card selected">
+            <div class="card-type">Reel · 15s</div>
+            <div class="card-title">Spring Weekend Outfit</div>
+            <div class="card-products">
+              <div class="thumb" style="background:linear-gradient(135deg,#fce7f3,#f9a8d4);"></div>
+              <div class="thumb" style="background:linear-gradient(135deg,#fef3c7,#d97706);"></div>
+              <div class="thumb" style="background:linear-gradient(135deg,#ecfdf5,#6ee7b7);"></div>
+            </div>
+            <div class="card-foot">
+              <div class="foot-left">
+                <div class="avatar">AL</div>
+                <span>Shkrepje 14:00</span>
+              </div>
+              <div class="platforms">
+                <div class="platform">IG</div>
+                <div class="platform">TT</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editim -->
+      <div class="col" data-stage="editing">
+        <div class="col-head">
+          <div class="col-title"><span class="col-dot"></span>Editim</div>
+          <div class="col-count">1</div>
+        </div>
+        <div class="col-body">
+          <div class="card">
+            <div class="card-type">Carousel · 6 foto</div>
+            <div class="card-title">Leather Tote Bag</div>
+            <div class="card-products">
+              <div class="thumb" style="background:linear-gradient(135deg,#fef3c7,#d97706);"></div>
+            </div>
+            <div class="card-foot">
+              <div class="foot-left">
+                <div class="avatar">EK</div>
+                <span>Caption në draft</span>
+              </div>
+              <div class="platforms">
+                <div class="platform">IG</div>
+                <div class="platform">FB</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skedulim -->
+      <div class="col" data-stage="scheduling">
+        <div class="col-head">
+          <div class="col-title"><span class="col-dot"></span>Skedulim</div>
+          <div class="col-count">1</div>
+        </div>
+        <div class="col-body">
+          <div class="card">
+            <div class="card-type">Photo · Feed</div>
+            <div class="card-title">Silk Scarf</div>
+            <div class="card-products">
+              <div class="thumb" style="background:linear-gradient(135deg,#ecfdf5,#6ee7b7);"></div>
+            </div>
+            <div class="card-foot">
+              <div class="foot-left">
+                <div class="avatar">MB</div>
+                <span>Sot · 18:00</span>
+              </div>
+              <div class="platforms">
+                <div class="platform">IG</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Publikuar -->
+      <div class="col" data-stage="published">
+        <div class="col-head">
+          <div class="col-title"><span class="col-dot"></span>Publikuar</div>
+          <div class="col-count">0</div>
+        </div>
+        <div class="col-body">
+          <div class="empty">Asnjë post ende sot</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Selected post detail -->
+    <div class="sheet-label">Posti i zgjedhur</div>
+
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="sheet-breadcrumb">Shporta #5 · 05 Maj · Reel 15s</div>
+        <div class="sheet-title">Spring Weekend Outfit</div>
+      </div>
+
+      <!-- Progress track -->
+      <div class="track">
+        <div class="track-step done">
+          <div class="track-step-line"></div>
+          <div class="track-step-lbl">Planifikim</div>
+        </div>
+        <div class="track-step current">
+          <div class="track-step-line"></div>
+          <div class="track-step-lbl">Prodhim</div>
+        </div>
+        <div class="track-step">
+          <div class="track-step-line"></div>
+          <div class="track-step-lbl">Editim</div>
+        </div>
+        <div class="track-step">
+          <div class="track-step-line"></div>
+          <div class="track-step-lbl">Skedulim</div>
+        </div>
+        <div class="track-step">
+          <div class="track-step-line"></div>
+          <div class="track-step-lbl">Publikuar</div>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="sheet-body">
+
+        <div class="sec">
+          <div class="sec-lbl">Produktet</div>
+          <div>
+            <div class="prod-row">
+              <div class="prod-row-thumb" style="background:linear-gradient(135deg,#fce7f3,#f9a8d4);"></div>
+              <div>
+                <div class="prod-row-name">Midi Silk Dress</div>
+                <div class="prod-row-role">Fashion · DRS-203</div>
+              </div>
+              <div class="prod-row-price" style="margin-left:auto;">€179</div>
+            </div>
+            <div class="prod-row">
+              <div class="prod-row-thumb" style="background:linear-gradient(135deg,#fef3c7,#d97706);"></div>
+              <div>
+                <div class="prod-row-name">Leather Tote Bag</div>
+                <div class="prod-row-role">Lokomotivë · BAG-415</div>
+              </div>
+              <div class="prod-row-price" style="margin-left:auto;">€189</div>
+            </div>
+            <div class="prod-row">
+              <div class="prod-row-thumb" style="background:linear-gradient(135deg,#ecfdf5,#6ee7b7);"></div>
+              <div>
+                <div class="prod-row-name">Silk Scarf</div>
+                <div class="prod-row-role">Karrem · SCF-107</div>
+              </div>
+              <div class="prod-row-price" style="margin-left:auto;">€45</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-lbl">Reference</div>
+          <div class="ref-block">
+            <div class="ref-thumb"></div>
+            <div>
+              <a class="ref-link">pinterest.com/pin/7238495</a>
+              <div class="ref-note">Transition reel · outdoor street style · jump cut</div>
+            </div>
+          </div>
+          <div class="sec-val muted" style="margin-top:12px;font-size:12px;">
+            Model Ana · Bllok café · 14:00 · Sony A7 + gimbal
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-lbl">Media (2 / 4)</div>
+          <div class="media-grid">
+            <div class="media" style="background:linear-gradient(135deg,#fce7f3,#f9a8d4);"></div>
+            <div class="media" style="background:linear-gradient(135deg,#fef3c7,#d97706);"></div>
+            <div class="media empty">+</div>
+            <div class="media empty">+</div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-lbl">Caption</div>
+          <div class="sec-val muted">Do plotësohet në fazën 3</div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="sheet-foot">
+        <button class="btn">← Kthe</button>
+        <div class="btn-group">
+          <button class="btn">Komento</button>
+          <button class="btn">Cakto tjetër</button>
+          <button class="btn btn-primary">Kalo te editim →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

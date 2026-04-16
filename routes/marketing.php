@@ -3,6 +3,7 @@
 use App\Enums\MarketingPermissionEnum as P;
 use App\Http\Controllers\Marketing\ContentPlannerApiController;
 use App\Http\Controllers\Marketing\ContentPlannerController;
+use App\Http\Controllers\Marketing\DailyBasketController;
 use App\Http\Controllers\Marketing\MerchCalendarController;
 use App\Http\Controllers\Marketing\InfluencerProductsController;
 use App\Http\Controllers\Marketing\InfluencerReportsController;
@@ -188,6 +189,30 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::post('/api/weeks/{id}/status', [MerchCalendarController::class, 'updateStatus'])->name('api.weeks.status');
         Route::get('/api/item-groups/search', [MerchCalendarController::class, 'searchGroups'])->name('api.item-groups.search');
         Route::get('/api/price-lists', [MerchCalendarController::class, 'priceLists'])->name('api.price-lists');
+    });
+
+    // ─── Shporta Ditore ─────────────────────────────
+    Route::prefix('daily-basket')->as('daily-basket.')->group(function () {
+        // Page view
+        Route::get('/', [DailyBasketController::class, 'index'])->name('index');
+
+        // Collection summary + one day's basket
+        Route::get('/api/collections/{distributionWeek}', [DailyBasketController::class, 'collectionSummary'])
+            ->name('api.collections.summary');
+        Route::get('/api/collections/{distributionWeek}/{date}', [DailyBasketController::class, 'show'])
+            ->name('api.day.show');
+
+        // Post CRUD + transitions
+        Route::post('/api/baskets/{basketId}/posts', [DailyBasketController::class, 'storePost'])
+            ->name('api.posts.store');
+        Route::put('/api/posts/{post}', [DailyBasketController::class, 'updatePost'])
+            ->name('api.posts.update');
+        Route::put('/api/posts/{post}/products', [DailyBasketController::class, 'syncProducts'])
+            ->name('api.posts.products');
+        Route::post('/api/posts/{post}/transition', [DailyBasketController::class, 'transitionPost'])
+            ->name('api.posts.transition');
+        Route::delete('/api/posts/{post}', [DailyBasketController::class, 'deletePost'])
+            ->name('api.posts.destroy');
     });
 
     // ─── CDN Image Proxy (bypasses hotlink protection) ──

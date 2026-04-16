@@ -1,0 +1,476 @@
+<?php
+
+namespace App\Http\Controllers\Marketing;
+
+use App\Enums\DailyBasketPostStage;
+use App\Enums\DailyBasketPostType;
+use App\Http\Controllers\Controller;
+use App\Models\DailyBasket;
+use App\Models\DailyBasketPost;
+use App\Services\ContentPlanner\ContentPostService;
+use App\Services\DisApiClient;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+/**
+ * Shporta Ditore — bridge between Merch Calendar and Content Planner.
+ *
+ * Flow:
+ *   DIS Merch Calendar (collections) → Shporta Ditore (daily posts with
+ *   5-stage pipeline) → Content Planner (publish to socials).
+ *
+ * Read-only access to DIS data goes through the existing DisApiClient
+ * (for week + item group details); writes stay local to za-marketing.
+ */
+class DailyBasketController extends Controller
+{
+    public function __construct(
+        private DisApiClient $disApi,
+        private ContentPostService $contentPostService,
+    ) {}
+
+    // ─── Page views ──────────────────────────────────────────
+
+    /**
+     * Landing page. Shows the active collection (DistributionWeek) and the
+     * strip of its N daily baskets. Defaults to today's date within the
+     * current collection.
+     */
+    public function index(Request $request): View
+    {
+        return view('daily-basket.index');
+    }
+
+    // ─── JSON endpoints ──────────────────────────────────────
+
+    /**
+     * Summary of a whole collection: the week itself + one entry per day
+     * (existing basket or null placeholder with zero counts).
+     */
+    public function collectionSummary(int $distributionWeekId): JsonResponse
+    {
+        $week = $this->disApi->getWeek($distributionWeekId);
+
+        $start = Carbon::parse($week['week_start']);
+        $end = Carbon::parse($week['week_end']);
+
+        $baskets = DailyBasket::query()
+            ->where('distribution_week_id', $distributionWeekId)
+            ->withCount([
+                'posts',
+                'posts as published_count' => fn ($q) => $q->where('stage', DailyBasketPostStage::PUBLISHED->value),
+            ])
+            ->get()
+            ->keyBy(fn ($b) => $b->date->toDateString());
+
+        $days = [];
+        for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
+            $key = $d->toDateString();
+            $basket = $baskets->get($key);
+            $days[] = [
+                'date' => $key,
+                'basket_id' => $basket?->id,
+                'status' => $basket?->status,
+                'posts_total' => $basket?->posts_count ?? 0,
+                'posts_published' => $basket?->published_count ?? 0,
+            ];
+        }
+
+        return response()->json([
+            'collection' => [
+                'id' => $week['id'],
+                'name' => $week['name'],
+                'week_start' => $week['week_start'],
+                'week_end' => $week['week_end'],
+                'status' => $week['status'] ?? null,
+            ],
+            'days' => $days,
+        ]);
+    }
+
+    /**
+     * The Kanban view of one day's basket.
+     * Auto-creates the basket row if it doesn't exist yet (drafts), loads
+     * the available products from the linked DIS collection (cached 5 min),
+     * and enriches each post's products with their current DIS metadata.
+     */
+    public function show(int $distributionWeekId, string $date): JsonResponse
+    {
+        $dateObj = Carbon::parse($date)->startOfDay();
+
+        $basket = DailyBasket::firstOrCreate(
+            [
+                'distribution_week_id' => $distributionWeekId,
+                'date' => $dateObj->toDateString(),
+            ],
+            [
+                'status' => 'draft',
+                'created_by' => $this->currentUserId(),
+            ]
+        );
+
+        $basket->load([
+            'posts' => fn ($q) => $q->orderBy('sort_order')->orderBy('id'),
+        ]);
+
+        // Pull products for this collection (cached) — the single source of
+        // product data for the whole page.
+        $availableProducts = $this->loadCollectionProducts($distributionWeekId);
+        $productLookup = collect($availableProducts)->keyBy('id');
+
+        // Pivot rows per post — cross-DB items are attached by id only.
+        $postIds = $basket->posts->pluck('id');
+        $pivotRows = DB::table('daily_basket_post_products')
+            ->whereIn('daily_basket_post_id', $postIds)
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('daily_basket_post_id');
+
+        $byStage = [];
+        foreach (DailyBasketPostStage::cases() as $stage) {
+            $byStage[$stage->value] = [];
+        }
+
+        foreach ($basket->posts as $post) {
+            $rows = $pivotRows->get($post->id, collect());
+            $byStage[$post->stage->value][] = [
+                'id' => $post->id,
+                'title' => $post->title,
+                'post_type' => $post->post_type->value,
+                'post_type_label' => $post->post_type->label(),
+                'stage' => $post->stage->value,
+                'stage_label' => $post->stage->label(),
+                'priority' => $post->priority,
+                'target_platforms' => $post->target_platforms ?? [],
+                'scheduled_for' => $post->scheduled_for?->toIso8601String(),
+                'assigned_to' => $post->assigned_to,
+                'caption' => $post->caption,
+                'reference_url' => $post->reference_url,
+                'products' => $rows->map(function ($r) use ($productLookup) {
+                    $meta = $productLookup->get($r->item_group_id);
+
+                    return [
+                        'item_group_id' => $r->item_group_id,
+                        'sort_order' => $r->sort_order,
+                        'is_hero' => (bool) $r->is_hero,
+                        // Enrichment from DIS (null-safe for stale references)
+                        'name' => $meta['name'] ?? null,
+                        'code' => $meta['code'] ?? null,
+                        'image_url' => $meta['image_url'] ?? null,
+                        'classification' => $meta['classification'] ?? null,
+                    ];
+                })->values()->all(),
+            ];
+        }
+
+        return response()->json([
+            'basket' => [
+                'id' => $basket->id,
+                'distribution_week_id' => $basket->distribution_week_id,
+                'date' => $basket->date->toDateString(),
+                'status' => $basket->status,
+                'notes' => $basket->notes,
+            ],
+            'columns' => array_map(
+                fn (DailyBasketPostStage $s) => [
+                    'key' => $s->value,
+                    'label' => $s->label(),
+                    'color' => $s->color(),
+                    'count' => count($byStage[$s->value]),
+                    'posts' => $byStage[$s->value],
+                ],
+                DailyBasketPostStage::cases(),
+            ),
+            'available_products' => $availableProducts,
+        ]);
+    }
+
+    /**
+     * Fetch the item_groups of a DIS distribution_week, shaped for the
+     * product picker UI. Cached 5 minutes.
+     *
+     * Returns an empty array (plus logs) on DIS errors — the basket UI
+     * stays usable even when DIS is unreachable.
+     */
+    private function loadCollectionProducts(int $distributionWeekId): array
+    {
+        $cacheKey = 'daily_basket:collection_products:'.$distributionWeekId;
+
+        return Cache::remember($cacheKey, 300, function () use ($distributionWeekId) {
+            try {
+                $week = $this->disApi->getWeek($distributionWeekId);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return [];
+            }
+
+            $groups = $week['item_groups'] ?? [];
+
+            return array_map(fn ($g) => [
+                'id' => (int) ($g['id'] ?? 0),
+                'code' => $g['code'] ?? null,
+                'name' => $g['name'] ?? 'Unnamed',
+                'vendor_name' => $g['vendor_name'] ?? null,
+                'image_url' => $g['image_url'] ?? null,
+                'avg_price' => $g['avg_price'] ?? null,
+                'pricelist_price' => $g['pricelist_price'] ?? null,
+                'classification' => $g['classification'] ?? null,
+                'total_stock' => $g['total_stock'] ?? 0,
+            ], $groups);
+        });
+    }
+
+    /**
+     * Create a new post inside a basket.
+     */
+    public function storePost(Request $request, int $basketId): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'post_type' => ['required', Rule::in(DailyBasketPostType::values())],
+            'priority' => ['nullable', Rule::in(['low', 'normal', 'high', 'urgent'])],
+            'reference_url' => 'nullable|url|max:500',
+            'reference_notes' => 'nullable|string',
+            'target_platforms' => 'nullable|array',
+            'target_platforms.*' => 'string',
+            'product_ids' => 'nullable|array',
+            'product_ids.*' => 'integer',
+            'hero_product_id' => 'nullable|integer',
+            'assigned_to' => 'nullable|integer',
+        ]);
+
+        $basket = DailyBasket::findOrFail($basketId);
+
+        $post = $basket->posts()->create([
+            'title' => $validated['title'],
+            'post_type' => $validated['post_type'],
+            'stage' => DailyBasketPostStage::PLANNING,
+            'priority' => $validated['priority'] ?? 'normal',
+            'reference_url' => $validated['reference_url'] ?? null,
+            'reference_notes' => $validated['reference_notes'] ?? null,
+            'target_platforms' => $validated['target_platforms'] ?? [],
+            'assigned_to' => $validated['assigned_to'] ?? null,
+        ]);
+
+        if (! empty($validated['product_ids'])) {
+            $heroId = $validated['hero_product_id'] ?? $validated['product_ids'][0];
+            $now = now();
+            $rows = [];
+            foreach ($validated['product_ids'] as $idx => $groupId) {
+                $rows[] = [
+                    'daily_basket_post_id' => $post->id,
+                    'item_group_id' => $groupId,
+                    'sort_order' => $idx,
+                    'is_hero' => $groupId === $heroId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            DB::table('daily_basket_post_products')->insert($rows);
+        }
+
+        return response()->json(['id' => $post->id], 201);
+    }
+
+    /**
+     * Edit an existing post. Does NOT change stage — see transitionPost().
+     */
+    public function updatePost(Request $request, DailyBasketPost $post): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'post_type' => ['sometimes', Rule::in(DailyBasketPostType::values())],
+            'priority' => ['sometimes', Rule::in(['low', 'normal', 'high', 'urgent'])],
+            'reference_url' => 'nullable|url|max:500',
+            'reference_notes' => 'nullable|string',
+            'production_brief' => 'nullable|string',
+            'caption' => 'nullable|string',
+            'hashtags' => 'nullable|string',
+            'target_platforms' => 'sometimes|array',
+            'target_platforms.*' => 'string',
+            'scheduled_for' => 'nullable|date',
+            'assigned_to' => 'nullable|integer',
+            'sort_order' => 'sometimes|integer',
+        ]);
+
+        // Only update fields that were actually sent.
+        $post->fill($validated);
+        $post->save();
+
+        return response()->json(['id' => $post->id, 'stage' => $post->stage->value]);
+    }
+
+    /**
+     * Attach / replace the product set of a post.
+     *
+     * Uses raw DB ops (instead of belongsToMany->sync) because the related
+     * model lives on the DIS connection; Eloquent's sync() would try to
+     * read the pivot table via DIS, which doesn't have it. Writing against
+     * the DB facade directly keeps this on the mysql (za_marketing) DB.
+     */
+    public function syncProducts(Request $request, DailyBasketPost $post): JsonResponse
+    {
+        $validated = $request->validate([
+            'product_ids' => 'required|array',
+            'product_ids.*' => 'integer',
+            'hero_product_id' => 'nullable|integer',
+        ]);
+
+        $ids = $validated['product_ids'];
+        $heroId = $validated['hero_product_id'] ?? ($ids[0] ?? null);
+
+        DB::transaction(function () use ($post, $ids, $heroId) {
+            DB::table('daily_basket_post_products')
+                ->where('daily_basket_post_id', $post->id)
+                ->delete();
+
+            $rows = [];
+            $now = now();
+            foreach ($ids as $idx => $groupId) {
+                $rows[] = [
+                    'daily_basket_post_id' => $post->id,
+                    'item_group_id' => $groupId,
+                    'sort_order' => $idx,
+                    'is_hero' => $groupId === $heroId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            if (! empty($rows)) {
+                DB::table('daily_basket_post_products')->insert($rows);
+            }
+        });
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Move the post to the next (or an explicit) stage.
+     * Enforces simple progression guards: you can only move forward or
+     * backward by one step, and some target stages need required fields.
+     */
+    public function transitionPost(Request $request, DailyBasketPost $post): JsonResponse
+    {
+        $validated = $request->validate([
+            'stage' => ['required', Rule::in(DailyBasketPostStage::values())],
+        ]);
+
+        $target = DailyBasketPostStage::from($validated['stage']);
+        $current = $post->stage;
+
+        // Only one step forward or one step back.
+        $delta = $target->order() - $current->order();
+        if (abs($delta) !== 1) {
+            return response()->json([
+                'message' => "Nuk mund t\u00eb kal\u00ebsh nga '{$current->label()}' te '{$target->label()}' direkt \u2014 vet\u00ebm nj\u00eb hap n\u00eb kah t\u00eb njejt\u00eb lejohet.",
+            ], 422);
+        }
+
+        // Forward transitions have "definition of done" guards.
+        if ($delta === 1) {
+            $blockingReason = $this->cannotLeave($post, $current);
+            if ($blockingReason !== null) {
+                return response()->json(['message' => $blockingReason], 422);
+            }
+        }
+
+        DB::transaction(function () use ($post, $target) {
+            $post->stage = $target;
+
+            // Handoff to Content Planner the moment the post is published.
+            // Creates a content_posts row exactly once — if the basket post
+            // is reverted and re-published, we reuse the existing link.
+            if ($target === DailyBasketPostStage::PUBLISHED && $post->content_post_id === null) {
+                $contentPostId = $this->handOffToContentPlanner($post);
+                $post->content_post_id = $contentPostId;
+            }
+
+            $post->save();
+        });
+
+        return response()->json([
+            'id' => $post->id,
+            'stage' => $post->stage->value,
+            'stage_label' => $post->stage->label(),
+            'content_post_id' => $post->content_post_id,
+        ]);
+    }
+
+    /**
+     * Create the matching Content Planner post and return its id.
+     *
+     * The basket post carries the planning/production state; Content
+     * Planner handles publishing + analytics. We only copy what is
+     * meaningful there: caption, platforms, schedule, hashtags (as notes).
+     */
+    private function handOffToContentPlanner(DailyBasketPost $post): int
+    {
+        $platforms = $post->target_platforms ?? [];
+        $platform = count($platforms) === 1 ? $platforms[0] : 'multi';
+
+        // Compose a small "notes" blob so the publisher can see provenance
+        $notes = trim(
+            ($post->hashtags ? $post->hashtags."\n\n" : '').
+            'From Shporta Ditore #'.$post->daily_basket_id.' · post #'.$post->id
+        );
+
+        $contentPost = $this->contentPostService->createPost([
+            'platform' => $platform,
+            'platforms' => $platforms,
+            'content' => $post->caption,
+            'content_type' => 'post',
+            'scheduled_at' => $post->scheduled_for?->toIso8601String(),
+            'status' => 'scheduled',
+            'notes' => $notes,
+        ], $this->currentUserId() ?? 1);
+
+        return $contentPost->id;
+    }
+
+    /**
+     * Delete a post (soft delete).
+     */
+    public function deletePost(DailyBasketPost $post): JsonResponse
+    {
+        $post->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    // ─── Guards ──────────────────────────────────────────────
+
+    /**
+     * Return null if the post can leave this stage, or a user-facing
+     * reason otherwise.
+     */
+    private function cannotLeave(DailyBasketPost $post, DailyBasketPostStage $stage): ?string
+    {
+        return match ($stage) {
+            DailyBasketPostStage::PLANNING => empty($post->reference_url)
+                ? 'Duhet nj\u00eb reference para se t\u00eb kalojm\u00eb n\u00eb prodhim.'
+                : null,
+
+            DailyBasketPostStage::EDITING => empty($post->caption)
+                ? 'Caption duhet plot\u00ebsuar para se t\u00eb kalojm\u00eb n\u00eb skedulim.'
+                : null,
+
+            DailyBasketPostStage::SCHEDULING => empty($post->scheduled_for) || empty($post->target_platforms)
+                ? 'Duhen data e skedulimit + paku nj\u00eb platform\u00eb para publikimit.'
+                : null,
+
+            default => null,
+        };
+    }
+
+    private function currentUserId(): ?int
+    {
+        return auth()->id();
+    }
+}
