@@ -34,6 +34,9 @@ jobs:
             npm ci
             npm run build
             php artisan migrate --force
+            # Idempotent: creates public/storage -> storage/app/public symlink
+            # so ContentMedia on the "public" disk is web-reachable.
+            php artisan storage:link || true
             php artisan optimize:clear
             php artisan config:cache
             php artisan route:cache
