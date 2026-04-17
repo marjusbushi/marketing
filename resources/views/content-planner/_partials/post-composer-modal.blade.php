@@ -1192,11 +1192,36 @@
         orig.textContent = suggestFloat.original;
         rep.value = '';
 
-        // Position the popover just below the floating button.
-        pop.style.left = suggestFloat.anchorX + 'px';
-        pop.style.top  = (suggestFloat.anchorY + 28) + 'px';
-        pop.style.transform = 'translate(-50%, 0)';
+        // Show first so we can measure.
         pop.style.display = 'block';
+        pop.style.visibility = 'hidden';
+        pop.style.left = '0px';
+        pop.style.top = '0px';
+        pop.style.transform = 'none';
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const pw = pop.offsetWidth  || 260;
+        const ph = pop.offsetHeight || 180;
+        const margin = 12;
+
+        // Horizontal: center under the anchor, clamp inside the viewport.
+        let left = suggestFloat.anchorX - pw / 2;
+        left = Math.max(margin, Math.min(vw - pw - margin, left));
+
+        // Vertical: prefer BELOW the anchor; flip ABOVE when it doesn't fit.
+        const spaceBelow = vh - (suggestFloat.anchorY + 28);
+        let top;
+        if (spaceBelow >= ph + margin) {
+            top = suggestFloat.anchorY + 28;
+        } else {
+            top = suggestFloat.anchorY - ph - 12; // above the anchor
+            if (top < margin) top = margin; // never off-screen top
+        }
+
+        pop.style.left = left + 'px';
+        pop.style.top  = top + 'px';
+        pop.style.visibility = 'visible';
         setTimeout(() => rep.focus(), 20);
 
         // Hide the pill while the popover is open.
@@ -1349,48 +1374,33 @@
     }
 
     async function resolveSuggestion(id, accepted) {
+        // Backend expects { status: 'accepted' | 'rejected' } and, when
+        // accepted, performs the content swap on the post server-side —
+        // we just need to mirror the change locally in the textarea.
         let resolvedData = null;
         try {
             const res = await fetch('{{ url('/marketing/planner/api/suggestions') }}/' + id + '/resolve', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-                body: JSON.stringify({ accepted: accepted ? 1 : 0 }),
+                body: JSON.stringify({ status: accepted ? 'accepted' : 'rejected' }),
             });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || ('HTTP ' + res.status));
+            }
             resolvedData = await res.json().catch(() => ({}));
         } catch (e) {
             alert('Could not resolve suggestion: ' + e.message);
             return;
         }
 
-        // When accepted, apply the change to the caption AND persist the post
-        // so the change survives a page refresh / modal close. We call the
-        // existing PUT /api/posts/{id} endpoint directly with just the
-        // content field — no other fields are touched so this is safe even
-        // mid-edit.
-        if (accepted && composerState.postId) {
+        // Keep the caption textarea in sync with the server-side update.
+        if (accepted) {
             const ta = document.getElementById('composerContent');
             const from = resolvedData.original_text;
             const to   = resolvedData.suggested_text;
             if (ta && from && to && ta.value.includes(from)) {
                 ta.value = ta.value.replace(from, to);
-
-                try {
-                    await fetch('{{ url('/marketing/planner/api/posts') }}/' + composerState.postId, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json',
-                        },
-                        body: JSON.stringify({ content: ta.value }),
-                    });
-                } catch (e) {
-                    // The suggestion is already accepted server-side; the
-                    // content update failing is non-fatal — the user can
-                    // still save manually. Log and move on.
-                    console.error('Failed to persist accepted suggestion', e);
-                }
             }
         }
 
