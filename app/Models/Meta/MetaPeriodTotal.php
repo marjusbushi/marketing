@@ -18,6 +18,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class MetaPeriodTotal extends Model
 {
+    // Meta data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'meta_period_totals';
 
     protected $fillable = [

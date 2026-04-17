@@ -33,6 +33,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class MetaPageInsight extends Model
 {
+    // Meta data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'meta_page_insights';
 
     protected $fillable = [

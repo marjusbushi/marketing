@@ -24,6 +24,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class MetaRawEvent extends Model
 {
+    // Meta data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     public $timestamps = false;
 
     protected $table = 'meta_raw_events';

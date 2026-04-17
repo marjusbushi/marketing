@@ -24,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class MetaCampaign extends Model
 {
+    // Meta data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'meta_campaigns';
 
     protected $fillable = [

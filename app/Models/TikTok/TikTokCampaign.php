@@ -21,6 +21,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class TikTokCampaign extends Model
 {
+    // TikTok data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'tiktok_campaigns';
 
     protected $fillable = [

@@ -25,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class TikTokAccountSnapshot extends Model
 {
+    // TikTok data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'tiktok_account_snapshots';
 
     protected $fillable = [

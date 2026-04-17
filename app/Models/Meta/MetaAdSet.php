@@ -22,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class MetaAdSet extends Model
 {
+    // Meta data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'meta_ad_sets';
 
     protected $fillable = [

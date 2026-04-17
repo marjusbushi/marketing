@@ -22,6 +22,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class TikTokSyncLog extends Model
 {
+    // TikTok data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'tiktok_sync_logs';
 
     protected $fillable = [

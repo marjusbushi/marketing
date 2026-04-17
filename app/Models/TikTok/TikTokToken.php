@@ -26,6 +26,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class TikTokToken extends Model
 {
+    // TikTok data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'tiktok_tokens';
 
     protected $fillable = [

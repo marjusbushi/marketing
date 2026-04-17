@@ -25,6 +25,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class MetaSyncLog extends Model
 {
+    // Meta data lives in the DIS database (shared with the monolith).
+    protected $connection = 'dis';
+
     protected $table = 'meta_sync_logs';
 
     protected $fillable = [
