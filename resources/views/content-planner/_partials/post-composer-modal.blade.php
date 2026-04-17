@@ -3,7 +3,7 @@
 
     {{-- Top bar --}}
     <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 20px; border-bottom:1px solid #e5e7eb; height:48px;">
-        {{-- Left: platform icon + Campaign + Labels --}}
+        {{-- Left: platform icon + type tabs + Campaign + Labels pills (Planable-style) --}}
         <div style="display:flex; align-items:center; gap:12px;">
             <div id="composerPlatformIcon" style="width:28px; height:28px; display:flex; align-items:center; justify-content:center;">
                 <iconify-icon icon="skill-icons:instagram" width="24"></iconify-icon>
@@ -13,6 +13,17 @@
                 <button type="button" class="cp-type-tab" data-type="story" onclick="switchContentType('story')">Story</button>
                 <button type="button" class="cp-type-tab" data-type="reels" onclick="switchContentType('reels')">Reels</button>
             </div>
+            <div style="width:1px; height:20px; background:#e5e7eb;"></div>
+            <button type="button" id="composerCampaignPill" onclick="openCampaignPicker()" title="Assign a campaign"
+                style="height:28px; padding:0 10px; border-radius:14px; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:500;">
+                <iconify-icon icon="heroicons-outline:megaphone" width="12"></iconify-icon>
+                <span data-default="Campaign">Campaign</span>
+            </button>
+            <button type="button" id="composerLabelsPill" onclick="openLabelsPicker()" title="Add labels"
+                style="height:28px; padding:0 10px; border-radius:14px; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:500;">
+                <iconify-icon icon="heroicons-outline:tag" width="12"></iconify-icon>
+                <span data-default="Labels">Labels</span>
+            </button>
         </div>
         {{-- Right: platforms + share + actions + close --}}
         <div style="display:flex; align-items:center; gap:8px;">
@@ -43,31 +54,71 @@
         {{-- POST / REELS view --}}
         <div id="composerPostReels" style="display:flex; flex:1; min-width:0;">
 
-            {{-- Left: Post content --}}
-            <div style="flex:1; display:flex; flex-direction:column; overflow-y:auto; min-width:0;">
+            {{-- Planable-style vertical approval rail — compact column on the far left --}}
+            <div id="composerApprovalRail" style="width:72px; flex-shrink:0; border-right:1px solid #f1f5f9; display:flex; flex-direction:column; align-items:center; padding:24px 0; gap:4px; background:#fafbfc;">
+                {{-- Step 1: Approval status --}}
+                <button id="composerApproveBtn" onclick="approvePost()" title="Approve post"
+                    style="width:32px; height:32px; border-radius:50%; border:1.5px solid #d1d5db; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <iconify-icon icon="heroicons-outline:check" width="14" style="color:#9ca3af;"></iconify-icon>
+                </button>
+                <span id="composerApprovalStatus" style="font-size:9px; color:#94a3b8; text-align:center; line-height:1.2; max-width:64px;">Not approved<br>yet</span>
 
-                {{-- Approval row --}}
-                <div style="display:flex; align-items:center; gap:8px; padding:12px 24px;">
-                    <span id="composerApprovalStatus" style="font-size:12px; color:#94a3b8;">Not approved yet</span>
-                    <button id="composerApproveBtn" onclick="approvePost()" style="width:22px; height:22px; border-radius:50%; border:1.5px solid #d1d5db; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Approve">
-                        <iconify-icon icon="heroicons-outline:check" width="12" style="color:#9ca3af;"></iconify-icon>
-                    </button>
+                {{-- Connector line --}}
+                <div style="width:1px; height:20px; background:#e5e7eb; margin:4px 0;"></div>
+
+                {{-- Step 2: Auto-publish status (lightning) --}}
+                <div title="Auto-publish disabled" style="width:32px; height:32px; border-radius:50%; background:#fff; border:1.5px solid #e5e7eb; display:flex; align-items:center; justify-content:center;">
+                    <iconify-icon icon="heroicons-outline:bolt" width="14" style="color:#cbd5e1;"></iconify-icon>
                 </div>
 
-                {{-- User + schedule --}}
-                <div style="display:flex; align-items:center; gap:8px; padding:0 24px 12px;">
-                    <div style="width:28px; height:28px; border-radius:50%; background:#e0e7ff; display:flex; align-items:center; justify-content:center;">
-                        <iconify-icon icon="heroicons-outline:user" width="14" style="color:#6366f1;"></iconify-icon>
+                {{-- Connector --}}
+                <div style="width:1px; height:20px; background:#e5e7eb; margin:4px 0;"></div>
+
+                {{-- Step 3: Device (phone) --}}
+                <div title="Mobile preview" style="width:32px; height:32px; border-radius:50%; background:#fff; border:1.5px solid #e5e7eb; display:flex; align-items:center; justify-content:center;">
+                    <iconify-icon icon="heroicons-outline:device-phone-mobile" width="14" style="color:#9ca3af;"></iconify-icon>
+                </div>
+
+                {{-- Connector --}}
+                <div style="width:1px; height:20px; background:#e5e7eb; margin:4px 0;"></div>
+
+                {{-- Step 4: Target platform --}}
+                <div title="Publishes to Instagram" style="width:32px; height:32px; border-radius:50%; background:#fff; border:1.5px solid #e5e7eb; display:flex; align-items:center; justify-content:center;">
+                    <iconify-icon icon="skill-icons:instagram" width="18"></iconify-icon>
+                </div>
+            </div>
+
+            {{-- Center: Post content --}}
+            <div style="flex:1; display:flex; flex-direction:column; overflow-y:auto; min-width:0;">
+
+                {{-- User + schedule + device toggle --}}
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:16px 24px 12px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#e0e7ff; display:flex; align-items:center; justify-content:center;">
+                            <iconify-icon icon="heroicons-outline:user" width="14" style="color:#6366f1;"></iconify-icon>
+                        </div>
+                        <span style="font-size:13px; font-weight:500; color:#1e293b;">{{ auth()->user()->name ?? 'User' }}</span>
+                        <span style="color:#cbd5e1;">·</span>
+                        <span id="scheduleLabel" style="font-size:12px; color:#94a3b8; cursor:pointer;" onclick="openSchedulePicker()">Select date & time</span>
+                        <input id="composerScheduledAt" type="hidden">
                     </div>
-                    <span style="font-size:13px; font-weight:500; color:#1e293b;">{{ auth()->user()->name ?? 'User' }}</span>
-                    <span style="color:#cbd5e1;">·</span>
-                    <span id="scheduleLabel" style="font-size:12px; color:#94a3b8; cursor:pointer;" onclick="openSchedulePicker()">Select date & time</span>
-                    <input id="composerScheduledAt" type="hidden">
+
+                    {{-- Device toggle (phone / desktop) — controls preview width --}}
+                    <div id="composerDeviceToggle" role="tablist" style="display:flex; background:#f1f5f9; border-radius:7px; padding:2px; gap:0;">
+                        <button type="button" class="cp-device-btn active" data-device="desktop" onclick="setPreviewDevice('desktop')" aria-label="Desktop preview"
+                            style="width:32px; height:28px; border:none; background:#fff; border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                            <iconify-icon icon="heroicons-outline:computer-desktop" width="14" style="color:#18181b;"></iconify-icon>
+                        </button>
+                        <button type="button" class="cp-device-btn" data-device="phone" onclick="setPreviewDevice('phone')" aria-label="Phone preview"
+                            style="width:32px; height:28px; border:none; background:transparent; border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                            <iconify-icon icon="heroicons-outline:device-phone-mobile" width="14" style="color:#71717a;"></iconify-icon>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Instagram post mockup frame --}}
                 <div style="flex:1; display:flex; align-items:center; justify-content:center; background:#fafbfc; padding:24px; overflow-y:auto;">
-                    <div style="width:100%; max-width:380px; position:relative;">
+                    <div id="composerPreviewCard" style="width:100%; max-width:380px; position:relative; transition:max-width 0.2s ease;">
 
                         {{-- Photo toolbar left --}}
                         <div id="composerPhotoToolbarLeft" style="display:none; position:absolute; top:12px; left:12px; z-index:10; gap:4px;">
@@ -274,6 +325,18 @@
     .story-phone-frame.has-media img, .story-phone-frame.has-media video { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
     .story-side-slot { width: 44px; height: 78px; border: 1.5px dashed #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
     .story-side-slot:hover { border-color: #6366f1; background: #f5f3ff; }
+
+    /* Device toggle (phone / desktop) */
+    .cp-device-btn { transition: all 0.15s; }
+    .cp-device-btn.active { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+    .cp-device-btn:not(.active):hover { background: rgba(255,255,255,0.5); }
+    /* When phone preview is active, preview card shrinks to ~iPhone width */
+    #composerPreviewCard.device-phone { max-width: 320px; }
+    #composerPreviewCard.device-desktop { max-width: 380px; }
+
+    /* Campaign / Labels pills (top bar) */
+    #composerCampaignPill:hover, #composerLabelsPill:hover { background:#f8fafc; border-color:#cbd5e1; color:#1e293b; }
+    #composerCampaignPill.has-value, #composerLabelsPill.has-value { background:#eef2ff; border-color:#a5b4fc; color:#3730a3; }
 </style>
 
 <script>
@@ -834,7 +897,60 @@
         const btn = document.getElementById('composerApproveBtn');
         const status = document.getElementById('composerApprovalStatus');
         btn.style.background = '#10b981'; btn.style.borderColor = '#10b981';
-        btn.innerHTML = '<iconify-icon icon="heroicons-solid:check" width="12" style="color:#fff;"></iconify-icon>';
+        // Swap inner icon without innerHTML + user data — static markup is safe.
+        while (btn.firstChild) btn.removeChild(btn.firstChild);
+        const ic = document.createElement('iconify-icon');
+        ic.setAttribute('icon', 'heroicons-solid:check');
+        ic.setAttribute('width', '14');
+        ic.style.color = '#fff';
+        btn.appendChild(ic);
         status.textContent = 'Approved'; status.style.color = '#10b981';
+    }
+
+    // ── Device toggle (Planable-style) ──
+    function setPreviewDevice(device) {
+        const card = document.getElementById('composerPreviewCard');
+        if (!card) return;
+        card.classList.remove('device-phone', 'device-desktop');
+        card.classList.add('device-' + device);
+        document.querySelectorAll('.cp-device-btn').forEach(el => {
+            const isActive = el.dataset.device === device;
+            el.classList.toggle('active', isActive);
+            el.style.background = isActive ? '#fff' : 'transparent';
+            const ic = el.querySelector('iconify-icon');
+            if (ic) ic.style.color = isActive ? '#18181b' : '#71717a';
+        });
+    }
+
+    // ── Campaign / Labels pills (placeholder for Faza 6 polish) ──
+    function openCampaignPicker() {
+        // TODO Faza 6: replace with a proper dropdown fetching /api/campaigns.
+        const name = prompt('Campaign name (leave empty to remove):', '');
+        const pill = document.getElementById('composerCampaignPill');
+        const span = pill.querySelector('span[data-default]');
+        if (name && name.trim()) {
+            span.textContent = name.trim();
+            pill.classList.add('has-value');
+        } else if (name === '') {
+            span.textContent = span.dataset.default;
+            pill.classList.remove('has-value');
+            composerState.campaignId = null;
+        }
+    }
+
+    function openLabelsPicker() {
+        // TODO Faza 6: replace with a proper dropdown fetching /api/labels.
+        const labels = prompt('Labels (comma-separated, leave empty to clear):', '');
+        const pill = document.getElementById('composerLabelsPill');
+        const span = pill.querySelector('span[data-default]');
+        if (labels && labels.trim()) {
+            const list = labels.split(',').map(s => s.trim()).filter(Boolean);
+            span.textContent = list.length + ' label' + (list.length === 1 ? '' : 's');
+            pill.classList.add('has-value');
+        } else if (labels === '') {
+            span.textContent = span.dataset.default;
+            pill.classList.remove('has-value');
+            composerState.labelIds = [];
+        }
     }
 </script>
