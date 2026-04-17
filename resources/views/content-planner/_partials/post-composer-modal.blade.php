@@ -93,9 +93,28 @@
 
                         {{-- The card --}}
                         <div style="background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden;">
-                            {{-- Photo --}}
+                            {{-- Photo / Carousel --}}
                             <div id="composerMediaPreview" style="display:none; position:relative;">
-                                <div id="composerMediaMain" style="position:relative;"></div>
+                                {{-- Overflow-hidden viewport holds the sliding track. --}}
+                                <div id="composerMediaViewport" style="position:relative; overflow:hidden; touch-action:pan-y; user-select:none;">
+                                    <div id="composerMediaMain" style="display:flex; transition:transform 0.3s ease; will-change:transform;"></div>
+                                </div>
+
+                                {{-- Left / right arrows (shown only on multi-item) --}}
+                                <button type="button" id="composerCarouselPrev" onclick="carouselPrev()" aria-label="Previous slide"
+                                    style="display:none; position:absolute; left:8px; top:50%; transform:translateY(-50%); width:30px; height:30px; border-radius:50%; border:none; background:rgba(255,255,255,0.9); box-shadow:0 1px 3px rgba(0,0,0,0.15); cursor:pointer; align-items:center; justify-content:center; padding:0;">
+                                    <iconify-icon icon="heroicons-outline:chevron-left" width="18" style="color:#262626;"></iconify-icon>
+                                </button>
+                                <button type="button" id="composerCarouselNext" onclick="carouselNext()" aria-label="Next slide"
+                                    style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); width:30px; height:30px; border-radius:50%; border:none; background:rgba(255,255,255,0.9); box-shadow:0 1px 3px rgba(0,0,0,0.15); cursor:pointer; align-items:center; justify-content:center; padding:0;">
+                                    <iconify-icon icon="heroicons-outline:chevron-right" width="18" style="color:#262626;"></iconify-icon>
+                                </button>
+
+                                {{-- Slide counter badge (top-right, IG style) --}}
+                                <div id="composerCarouselCounter" style="display:none; position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; font-weight:500; padding:3px 9px; border-radius:11px; letter-spacing:0.2px;"></div>
+
+                                {{-- Dots indicator (bottom, IG style) --}}
+                                <div id="composerCarouselDots" style="display:none; position:absolute; bottom:10px; left:0; right:0; justify-content:center; gap:4px; pointer-events:none;"></div>
                             </div>
                             <div id="composerMediaEmpty" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; cursor:pointer; aspect-ratio:1; background:#f8fafc;" onclick="document.getElementById('mediaFileInput').click()">
                                 <iconify-icon icon="heroicons-outline:photo" width="48" style="color:#d1d5db;"></iconify-icon>
@@ -335,63 +354,205 @@
         } catch (e) { console.error('Failed to load post:', e); }
     }
 
-    // ── Media ──
-    function addMediaToComposer(media) {
-        const preview = document.getElementById('composerMediaPreview');
-        const main = document.getElementById('composerMediaMain');
-        const strip = document.getElementById('composerMediaStrip');
-        const grid = document.getElementById('composerMediaGrid');
+    // ── Media carousel ──
+    //
+    // Slides live inside #composerMediaMain (a flex row). The viewport
+    // (#composerMediaViewport) is overflow:hidden and the track is moved
+    // with translateX(-index * 100%). Swipe is wired to touch and mouse.
+    // All DOM is built with createElement (no innerHTML + user data) so
+    // media URLs from the API cannot inject markup.
+    const carousel = {
+        index: 0,
+        dragging: false,
+        startX: 0,
+        currentDx: 0,
+        width: 0,
+    };
 
-        // First media → show full size
-        if (composerState.mediaItems.length <= 1 || preview.style.display === 'none') {
-            preview.style.display = 'block';
-            document.getElementById('composerMediaEmpty').style.display = 'none';
-            showPhotoToolbars(true);
-            if (media.mime_type?.startsWith('video/')) {
-                main.innerHTML = `<video src="${media.url}" muted autoplay loop playsinline style="width:100%;display:block;"></video>`;
-            } else {
-                main.innerHTML = `<img src="${media.thumbnail_url || media.url}" style="width:100%;display:block;">`;
+    function buildSlideElement(media) {
+        const slide = document.createElement('div');
+        slide.className = 'cp-slide';
+        slide.style.cssText = 'flex:0 0 100%;width:100%;';
+
+        const isVideo = (media.mime_type || '').startsWith('video/');
+        const el = document.createElement(isVideo ? 'video' : 'img');
+        el.src = media.thumbnail_url || media.url;
+        el.style.cssText = 'width:100%;display:block;' + (isVideo ? '' : 'pointer-events:none;');
+        if (isVideo) {
+            el.muted = true; el.autoplay = true; el.loop = true; el.playsInline = true;
+        } else {
+            el.alt = '';
+            el.draggable = false;
+        }
+        slide.appendChild(el);
+        return slide;
+    }
+
+    function renderCarousel() {
+        const main = document.getElementById('composerMediaMain');
+        const items = composerState.mediaItems;
+
+        // Clear and rebuild slides with DOM methods.
+        while (main.firstChild) main.removeChild(main.firstChild);
+        items.forEach((m) => main.appendChild(buildSlideElement(m)));
+
+        carousel.index = Math.min(carousel.index, Math.max(0, items.length - 1));
+        applyCarouselTransform(false);
+        updateCarouselChrome();
+    }
+
+    function applyCarouselTransform(animate) {
+        const main = document.getElementById('composerMediaMain');
+        main.style.transition = animate === false ? 'none' : 'transform 0.3s ease';
+        main.style.transform = `translateX(-${carousel.index * 100}%)`;
+        if (animate === false) {
+            // Re-enable transition on next frame so future moves animate.
+            requestAnimationFrame(() => { main.style.transition = 'transform 0.3s ease'; });
+        }
+    }
+
+    function updateCarouselChrome() {
+        const count = composerState.mediaItems.length;
+        const multi = count > 1;
+
+        document.getElementById('composerCarouselPrev').style.display = multi ? 'flex' : 'none';
+        document.getElementById('composerCarouselNext').style.display = multi ? 'flex' : 'none';
+
+        const counter = document.getElementById('composerCarouselCounter');
+        counter.style.display = multi ? 'block' : 'none';
+        counter.textContent = `${carousel.index + 1}/${count}`;
+
+        const dotsHost = document.getElementById('composerCarouselDots');
+        dotsHost.style.display = multi ? 'flex' : 'none';
+        while (dotsHost.firstChild) dotsHost.removeChild(dotsHost.firstChild);
+        if (multi) {
+            for (let i = 0; i < count; i++) {
+                const dot = document.createElement('div');
+                dot.style.cssText = `width:6px;height:6px;border-radius:50%;background:${i === carousel.index ? '#fff' : 'rgba(255,255,255,0.5)'};box-shadow:0 0 2px rgba(0,0,0,0.3);`;
+                dotsHost.appendChild(dot);
             }
         }
 
-        // Multiple media → show strip
-        if (composerState.mediaItems.length > 1) {
-            strip.style.display = 'block';
-            grid.innerHTML = '';
-            composerState.mediaItems.forEach((m, i) => {
-                const thumb = document.createElement('div');
-                thumb.style.cssText = 'width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;position:relative;cursor:pointer;border:2px solid ' + (i === 0 ? '#6366f1' : 'transparent');
-                thumb.innerHTML = `<img src="${m.thumbnail_url || m.url}" style="width:100%;height:100%;object-fit:cover;">`;
-                thumb.onclick = () => showMediaAtIndex(i);
-                grid.appendChild(thumb);
-            });
+        // Thumbnail strip below the card — keeps click-to-jump.
+        const strip = document.getElementById('composerMediaStrip');
+        const grid = document.getElementById('composerMediaGrid');
+        strip.style.display = count > 1 ? 'block' : 'none';
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
+        composerState.mediaItems.forEach((m, i) => {
+            const thumb = document.createElement('div');
+            thumb.style.cssText = `width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;position:relative;cursor:pointer;border:2px solid ${i === carousel.index ? '#6366f1' : 'transparent'};`;
+            const tImg = document.createElement('img');
+            tImg.src = m.thumbnail_url || m.url;
+            tImg.draggable = false;
+            tImg.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+            thumb.appendChild(tImg);
+            thumb.onclick = () => showMediaAtIndex(i);
+            grid.appendChild(thumb);
+        });
+    }
+
+    function addMediaToComposer(media) {
+        const preview = document.getElementById('composerMediaPreview');
+        const empty = document.getElementById('composerMediaEmpty');
+
+        preview.style.display = 'block';
+        empty.style.display = 'none';
+        showPhotoToolbars(true);
+
+        // `composerState.mediaItems` already contains the new media (pushed by caller).
+        // If this is the first slide, keep index at 0; otherwise jump to the newest.
+        if (composerState.mediaItems.length === 1) {
+            carousel.index = 0;
+        } else if (composerState.mediaItems[composerState.mediaItems.length - 1]?.id === media.id) {
+            carousel.index = composerState.mediaItems.length - 1;
         }
+
+        renderCarousel();
+        ensureCarouselWired();
     }
 
     function showMediaAtIndex(index) {
-        const media = composerState.mediaItems[index];
-        if (!media) return;
-        const main = document.getElementById('composerMediaMain');
-        if (media.mime_type?.startsWith('video/')) {
-            main.innerHTML = `<video src="${media.url}" muted autoplay loop playsinline style="width:100%;display:block;"></video>`;
-        } else {
-            main.innerHTML = `<img src="${media.thumbnail_url || media.url}" style="width:100%;display:block;">`;
-        }
-        // Update strip selection
-        document.querySelectorAll('#composerMediaGrid > div').forEach((el, i) => {
-            el.style.borderColor = i === index ? '#6366f1' : 'transparent';
-        });
+        const count = composerState.mediaItems.length;
+        if (index < 0 || index >= count) return;
+        carousel.index = index;
+        applyCarouselTransform(true);
+        updateCarouselChrome();
     }
+
+    function carouselNext() { showMediaAtIndex(carousel.index + 1); }
+    function carouselPrev() { showMediaAtIndex(carousel.index - 1); }
 
     function removeAllMedia() {
         composerState.mediaIds = [];
         composerState.mediaItems = [];
+        carousel.index = 0;
         document.getElementById('composerMediaPreview').style.display = 'none';
         document.getElementById('composerMediaEmpty').style.display = 'flex';
         document.getElementById('composerMediaStrip').style.display = 'none';
-        document.getElementById('composerMediaMain').innerHTML = '';
-        document.getElementById('composerMediaGrid').innerHTML = '';
+        const main = document.getElementById('composerMediaMain');
+        const grid = document.getElementById('composerMediaGrid');
+        while (main.firstChild) main.removeChild(main.firstChild);
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
+        updateCarouselChrome();
         showPhotoToolbars(false);
+    }
+
+    // Wire swipe once the viewport exists. Idempotent — guarded by data attr.
+    function ensureCarouselWired() {
+        const viewport = document.getElementById('composerMediaViewport');
+        if (!viewport || viewport.dataset.wired === '1') return;
+        viewport.dataset.wired = '1';
+
+        const track = document.getElementById('composerMediaMain');
+
+        const onStart = (x) => {
+            if (composerState.mediaItems.length < 2) return;
+            carousel.dragging = true;
+            carousel.startX = x;
+            carousel.currentDx = 0;
+            carousel.width = viewport.clientWidth;
+            track.style.transition = 'none';
+        };
+
+        const onMove = (x) => {
+            if (!carousel.dragging) return;
+            carousel.currentDx = x - carousel.startX;
+            const base = -carousel.index * carousel.width;
+            track.style.transform = `translate3d(${base + carousel.currentDx}px, 0, 0)`;
+        };
+
+        const onEnd = () => {
+            if (!carousel.dragging) return;
+            carousel.dragging = false;
+            track.style.transition = 'transform 0.3s ease';
+            const threshold = carousel.width * 0.18; // ~18% swipe = advance
+            if (carousel.currentDx < -threshold) {
+                carousel.index = Math.min(composerState.mediaItems.length - 1, carousel.index + 1);
+            } else if (carousel.currentDx > threshold) {
+                carousel.index = Math.max(0, carousel.index - 1);
+            }
+            track.style.transform = `translateX(-${carousel.index * 100}%)`;
+            carousel.currentDx = 0;
+            updateCarouselChrome();
+        };
+
+        // Touch (mobile)
+        viewport.addEventListener('touchstart', (e) => onStart(e.touches[0].clientX), { passive: true });
+        viewport.addEventListener('touchmove',  (e) => onMove(e.touches[0].clientX),  { passive: true });
+        viewport.addEventListener('touchend',   onEnd);
+        viewport.addEventListener('touchcancel', onEnd);
+
+        // Mouse drag (desktop)
+        viewport.addEventListener('mousedown', (e) => { onStart(e.clientX); e.preventDefault(); });
+        window.addEventListener('mousemove',   (e) => onMove(e.clientX));
+        window.addEventListener('mouseup',     onEnd);
+
+        // Keyboard (when viewport has focus)
+        viewport.tabIndex = 0;
+        viewport.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft')  { e.preventDefault(); carouselPrev(); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); carouselNext(); }
+        });
     }
 
     async function handleMediaSelect(files) {
@@ -647,9 +808,12 @@
     }
 
     function downloadComposerMedia() {
-        const img = document.querySelector('#composerMediaMain img');
-        const vid = document.querySelector('#composerMediaMain video');
-        const src = img?.src || vid?.src;
+        // With the carousel, multiple slides live in #composerMediaMain.
+        // Download the currently-shown slide instead of the first one.
+        const slides = document.querySelectorAll('#composerMediaMain .cp-slide');
+        const active = slides[carousel.index];
+        if (!active) return;
+        const src = active.querySelector('img')?.src || active.querySelector('video')?.src;
         if (src) { const a = document.createElement('a'); a.href = src; a.download = ''; a.click(); }
     }
 
