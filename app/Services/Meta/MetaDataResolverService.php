@@ -133,7 +133,8 @@ class MetaDataResolverService
         $this->ensureMessagingData('messenger', $from, $to);
 
         $pageId = (string) config('meta.page_id');
-        $fbRows = MetaPageInsight::where('page_id', $pageId)
+        $fbRows = MetaPageInsight::query()
+            ->when($pageId !== '', fn ($q) => $q->where('page_id', $pageId))
             ->whereBetween('date', [$from, $to])
             ->orderBy('date')
             ->get();
@@ -175,7 +176,8 @@ class MetaDataResolverService
     {
         $pageId = (string) config('meta.page_id');
 
-        $fb = MetaPageInsight::where('page_id', $pageId)
+        $fb = MetaPageInsight::query()
+            ->when($pageId !== '', fn ($q) => $q->where('page_id', $pageId))
             ->whereBetween('date', [$from, $to])
             ->selectRaw('
                 COALESCE(SUM(page_reach), 0) as reach,
@@ -219,7 +221,8 @@ class MetaDataResolverService
         $this->ensureMessagingData('instagram', $from, $to);
 
         $igAccountId = (string) config('meta.ig_account_id');
-        $igRows = MetaIgInsight::where('ig_account_id', $igAccountId)
+        $igRows = MetaIgInsight::query()
+            ->when($igAccountId !== '', fn ($q) => $q->where('ig_account_id', $igAccountId))
             ->whereBetween('date', [$from, $to])
             ->orderBy('date')
             ->get();
@@ -261,7 +264,8 @@ class MetaDataResolverService
     {
         $igAccountId = (string) config('meta.ig_account_id');
 
-        $ig = MetaIgInsight::where('ig_account_id', $igAccountId)
+        $ig = MetaIgInsight::query()
+            ->when($igAccountId !== '', fn ($q) => $q->where('ig_account_id', $igAccountId))
             ->whereBetween('date', [$from, $to])
             ->selectRaw('
                 COALESCE(SUM(reach), 0) as reach,
@@ -693,7 +697,8 @@ class MetaDataResolverService
     public function resolveFbTotalsDbOnly(string $from, string $to): array
     {
         $pageId = (string) config('meta.page_id');
-        $fb = MetaPageInsight::where('page_id', $pageId)
+        $fb = MetaPageInsight::query()
+            ->when($pageId !== '', fn ($q) => $q->where('page_id', $pageId))
             ->whereBetween('date', [$from, $to])
             ->selectRaw('
                 COALESCE(SUM(page_reach), 0) as reach,
@@ -730,7 +735,8 @@ class MetaDataResolverService
     public function resolveIgTotalsDbOnly(string $from, string $to): array
     {
         $igAccountId = (string) config('meta.ig_account_id');
-        $ig = MetaIgInsight::where('ig_account_id', $igAccountId)
+        $ig = MetaIgInsight::query()
+            ->when($igAccountId !== '', fn ($q) => $q->where('ig_account_id', $igAccountId))
             ->whereBetween('date', [$from, $to])
             ->selectRaw('
                 COALESCE(SUM(reach), 0) as reach,
