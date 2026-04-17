@@ -167,20 +167,25 @@ class MetaDataResolverService
     }
 
     /**
-     * Return FB period totals from Meta API (de-duplicated).
-     * KPI cards use period-level API calls, NOT SUM(daily DB rows).
+     * Return FB period totals from the DIS database.
+     * The DIS app runs the Meta sync jobs; this marketing app only reads.
      * Shape matches windowTotals()['facebook'].
      */
     public function resolveFbTotals(string $from, string $to): array
     {
-        $this->ensureMessagingData('messenger', $from, $to);
-
         $pageId = (string) config('meta.page_id');
 
-        // Period totals from API (de-duplicated, matches Meta Insights exactly)
-        $fb = $this->fetchFbPeriodTotals($pageId, $from, $to);
+        $fb = MetaPageInsight::where('page_id', $pageId)
+            ->whereBetween('date', [$from, $to])
+            ->selectRaw('
+                COALESCE(SUM(page_reach), 0) as reach,
+                COALESCE(SUM(page_posts_impressions), 0) as impressions,
+                COALESCE(SUM(page_views_total), 0) as page_views,
+                COALESCE(SUM(page_post_engagements), 0) as post_engagement,
+                COALESCE(SUM(page_reactions_total), 0) as content_interactions
+            ')
+            ->first();
 
-        // Messaging from DB (additive counts, SUM is correct)
         $msg = MetaMessagingStat::messenger()
             ->whereBetween('date', [$from, $to])
             ->selectRaw('
@@ -191,11 +196,11 @@ class MetaDataResolverService
             ->first();
 
         return [
-            'impressions' => $fb['impressions'],
-            'reach' => $fb['reach'],
-            'page_views' => $fb['page_views'],
-            'post_engagement' => $fb['post_engagement'],
-            'content_interactions' => $fb['content_interactions'],
+            'impressions' => (int) ($fb->impressions ?? 0),
+            'reach' => (int) ($fb->reach ?? 0),
+            'page_views' => (int) ($fb->page_views ?? 0),
+            'post_engagement' => (int) ($fb->post_engagement ?? 0),
+            'content_interactions' => (int) ($fb->content_interactions ?? 0),
             'link_clicks' => 0, // FB deprecated page-level link clicks
             'conversations' => (int) ($msg->conversations ?? 0),
             'received' => (int) ($msg->received ?? 0),
@@ -248,20 +253,26 @@ class MetaDataResolverService
     }
 
     /**
-     * Return IG period totals from Meta API (de-duplicated).
-     * KPI cards use period-level API calls, NOT SUM(daily DB rows).
+     * Return IG period totals from the DIS database.
+     * The DIS app runs the Meta sync jobs; this marketing app only reads.
      * Shape matches windowTotals()['instagram'].
      */
     public function resolveIgTotals(string $from, string $to): array
     {
-        $this->ensureMessagingData('instagram', $from, $to);
-
         $igAccountId = (string) config('meta.ig_account_id');
 
-        // Period totals from API (de-duplicated, matches Meta Insights exactly)
-        $ig = $this->fetchIgPeriodTotals($igAccountId, $from, $to);
+        $ig = MetaIgInsight::where('ig_account_id', $igAccountId)
+            ->whereBetween('date', [$from, $to])
+            ->selectRaw('
+                COALESCE(SUM(reach), 0) as reach,
+                COALESCE(SUM(views), 0) as views,
+                COALESCE(SUM(profile_views), 0) as profile_views,
+                COALESCE(SUM(total_interactions), 0) as engagement,
+                COALESCE(SUM(website_clicks), 0) as link_clicks,
+                COALESCE(SUM(new_followers), 0) as new_followers
+            ')
+            ->first();
 
-        // Messaging from DB (additive counts, SUM is correct)
         $msg = MetaMessagingStat::instagram()
             ->whereBetween('date', [$from, $to])
             ->selectRaw('
@@ -272,12 +283,12 @@ class MetaDataResolverService
             ->first();
 
         return [
-            'reach' => $ig['reach'],
-            'views' => $ig['views'],
-            'profile_views' => $ig['profile_views'],
-            'new_followers' => $ig['new_followers'],
-            'engagement' => $ig['engagement'],
-            'link_clicks' => $ig['link_clicks'],
+            'reach' => (int) ($ig->reach ?? 0),
+            'views' => (int) ($ig->views ?? 0),
+            'profile_views' => (int) ($ig->profile_views ?? 0),
+            'new_followers' => (int) ($ig->new_followers ?? 0),
+            'engagement' => (int) ($ig->engagement ?? 0),
+            'link_clicks' => (int) ($ig->link_clicks ?? 0),
             'conversations' => (int) ($msg->conversations ?? 0),
             'received' => (int) ($msg->received ?? 0),
             'sent' => (int) ($msg->sent ?? 0),
@@ -287,14 +298,13 @@ class MetaDataResolverService
     // ─── Resolve: Ads ─────────────────────────────────────
 
     /**
-     * Return ads period totals from Meta API (de-duplicated).
-     * KPI cards use period-level API calls, NOT SUM(daily DB rows).
+     * Return ads period totals from the DIS database.
+     * The DIS app runs the Meta sync jobs; this marketing app only reads.
      * Shape matches windowTotals()['ads'].
      */
     public function resolveAdsTotals(string $from, string $to): array
     {
-        // Period totals from API (de-duplicated, matches Meta Ads Manager exactly)
-        return $this->fetchAdsPeriodTotals($from, $to);
+        return $this->resolveAdsTotalsDbOnly($from, $to);
     }
 
     /**
@@ -631,7 +641,8 @@ class MetaDataResolverService
     // ─── Resolve: Ads Platform Totals ─────────────────────
 
     /**
-     * Return ads totals filtered by platform (from JSON breakdown).
+     * Return ads totals filtered by platform (from DB platform_breakdown JSON).
+     * The DIS sync job stores per-platform breakdown per daily row.
      */
     public function resolveAdsPlatformTotals(string $from, string $to, string $platform): array
     {
@@ -639,16 +650,7 @@ class MetaDataResolverService
             return $this->resolveAdsTotals($from, $to);
         }
 
-        // Period totals with platform breakdown — single de-duplicated row per platform
-        return $this->fetchAdsPlatformPeriodTotals($from, $to, $platform);
-    }
-
-    /**
-     * Fetch ads period totals filtered by publisher_platform (no time_increment → de-duplicated).
-     */
-    private function fetchAdsPlatformPeriodTotals(string $from, string $to, string $platform): array
-    {
-        $defaults = [
+        $totals = [
             'spend' => 0.0,
             'impressions' => 0,
             'reach' => 0,
@@ -659,65 +661,6 @@ class MetaDataResolverService
             'messaging_conversations_replied' => 0,
         ];
 
-        $accountId = config('meta.ad_account_id');
-        if (!$accountId) {
-            return $defaults;
-        }
-
-        try {
-            $insights = $this->api->getAdsInsights($accountId, [
-                'level' => 'account',
-                'time_range' => json_encode(['since' => $from, 'until' => $to]),
-                'breakdowns' => 'publisher_platform',
-                'fields' => 'spend,impressions,reach,actions,action_values',
-                ...$this->adsSyncService->getAttributionParams(),
-            ]);
-
-            foreach ($insights as $row) {
-                if (strtolower((string) ($row['publisher_platform'] ?? '')) !== $platform) {
-                    continue;
-                }
-
-                $result = $defaults;
-                $result['spend'] = (float) ($row['spend'] ?? 0);
-                $result['impressions'] = (int) ($row['impressions'] ?? 0);
-                $result['reach'] = (int) ($row['reach'] ?? 0);
-
-                $actionsByType = [];
-                foreach ($row['actions'] ?? [] as $action) {
-                    $type = $action['action_type'] ?? '';
-                    $val = (int) ($action['value'] ?? 0);
-                    $actionsByType[$type] = $val;
-                    match ($type) {
-                        'link_click' => $result['link_clicks'] = $val,
-                        'purchase' => $result['purchases'] = $val,
-                        'onsite_conversion.messaging_conversation_replied_7d' => $result['messaging_conversations_replied'] = $val,
-                        default => null,
-                    };
-                }
-
-                // Prefer total_messaging_connection (broader, matches Meta Business Suite)
-                // over messaging_conversation_started_7d (7-day attribution window only).
-                $result['messaging_conversations'] =
-                    $actionsByType['onsite_conversion.total_messaging_connection']
-                    ?? $actionsByType['onsite_conversion.messaging_conversation_started_7d']
-                    ?? 0;
-
-                foreach ($row['action_values'] ?? [] as $action) {
-                    if (($action['action_type'] ?? '') === 'purchase') {
-                        $result['revenue'] = (float) ($action['value'] ?? 0);
-                    }
-                }
-
-                return $result;
-            }
-        } catch (Throwable $e) {
-            Log::debug("Ads platform period totals ({$platform}) failed: {$e->getMessage()}");
-        }
-
-        // Fallback: DB SUM of daily platform_breakdown (inflates reach but better than 0)
-        Log::warning("Ads platform period totals ({$platform}): API failed, using DB SUM fallback");
-        $this->ensureAdsData($from, $to);
         $rows = MetaAdsInsight::whereBetween('date', [$from, $to])
             ->whereNotNull('platform_breakdown')
             ->get();
@@ -728,17 +671,17 @@ class MetaDataResolverService
                 continue;
             }
             $p = $bd[$platform];
-            $defaults['spend'] += (float) ($p['spend'] ?? 0);
-            $defaults['impressions'] += (int) ($p['impressions'] ?? 0);
-            $defaults['reach'] += (int) ($p['reach'] ?? 0);
-            $defaults['link_clicks'] += (int) ($p['link_clicks'] ?? 0);
-            $defaults['purchases'] += (int) ($p['purchases'] ?? 0);
-            $defaults['revenue'] += (float) ($p['purchase_value'] ?? 0);
-            $defaults['messaging_conversations'] += (int) ($p['messaging_conversations'] ?? 0);
-            $defaults['messaging_conversations_replied'] += (int) ($p['messaging_conversations_replied'] ?? 0);
+            $totals['spend'] += (float) ($p['spend'] ?? 0);
+            $totals['impressions'] += (int) ($p['impressions'] ?? 0);
+            $totals['reach'] += (int) ($p['reach'] ?? 0);
+            $totals['link_clicks'] += (int) ($p['link_clicks'] ?? 0);
+            $totals['purchases'] += (int) ($p['purchases'] ?? 0);
+            $totals['revenue'] += (float) ($p['purchase_value'] ?? 0);
+            $totals['messaging_conversations'] += (int) ($p['messaging_conversations'] ?? 0);
+            $totals['messaging_conversations_replied'] += (int) ($p['messaging_conversations_replied'] ?? 0);
         }
 
-        return $defaults;
+        return $totals;
     }
 
     // ─── Resolve: DB-only (YoY, no gap-fill) ──────────────
@@ -1618,24 +1561,16 @@ class MetaDataResolverService
     }
 
     /**
-     * Period totals for TikTok ads (KPI cards).
-     * Current period: call API (no time dimension = de-duplicated reach).
+     * Period totals for TikTok ads (KPI cards) from the DIS database.
+     * The DIS app runs the TikTok sync jobs; this marketing app only reads.
      */
     public function resolveTiktokAdsTotals(string $from, string $to): array
     {
-        try {
-            $sync = app(TiktokAdsSyncService::class);
-
-            return $sync->fetchPeriodTotals($from, $to);
-        } catch (Throwable $e) {
-            Log::warning("resolveTiktokAdsTotals API failed, falling back to DB: {$e->getMessage()}");
-
-            return $this->resolveTiktokAdsTotalsDbOnly($from, $to);
-        }
+        return $this->resolveTiktokAdsTotalsDbOnly($from, $to);
     }
 
     /**
-     * Period totals from DB SUM (for YoY or as fallback).
+     * Period totals from DB SUM.
      */
     public function resolveTiktokAdsTotalsDbOnly(string $from, string $to): array
     {
@@ -1646,12 +1581,18 @@ class MetaDataResolverService
                 COALESCE(SUM(reach), 0) as reach,
                 COALESCE(SUM(clicks), 0) as clicks,
                 COALESCE(SUM(video_views), 0) as video_views,
+                COALESCE(SUM(video_watched_2s), 0) as video_watched_2s,
+                COALESCE(SUM(video_watched_6s), 0) as video_watched_6s,
                 COALESCE(SUM(likes), 0) as likes,
                 COALESCE(SUM(comments), 0) as comments,
                 COALESCE(SUM(shares), 0) as shares,
+                COALESCE(SUM(follows), 0) as follows,
                 COALESCE(SUM(conversions), 0) as conversions,
+                COALESCE(AVG(cost_per_conversion), 0) as cost_per_conversion,
                 COALESCE(SUM(purchases), 0) as purchases,
-                COALESCE(SUM(purchase_value), 0) as purchase_value
+                COALESCE(SUM(purchase_value), 0) as purchase_value,
+                COALESCE(SUM(add_to_cart), 0) as add_to_cart,
+                COALESCE(SUM(initiate_checkout), 0) as initiate_checkout
             ')
             ->first();
 
@@ -1661,12 +1602,18 @@ class MetaDataResolverService
             'reach' => (int) ($ads->reach ?? 0),
             'clicks' => (int) ($ads->clicks ?? 0),
             'video_views' => (int) ($ads->video_views ?? 0),
+            'video_watched_2s' => (int) ($ads->video_watched_2s ?? 0),
+            'video_watched_6s' => (int) ($ads->video_watched_6s ?? 0),
             'likes' => (int) ($ads->likes ?? 0),
             'comments' => (int) ($ads->comments ?? 0),
             'shares' => (int) ($ads->shares ?? 0),
+            'follows' => (int) ($ads->follows ?? 0),
             'conversions' => (int) ($ads->conversions ?? 0),
+            'cost_per_conversion' => (float) ($ads->cost_per_conversion ?? 0),
             'purchases' => (int) ($ads->purchases ?? 0),
             'purchase_value' => (float) ($ads->purchase_value ?? 0),
+            'add_to_cart' => (int) ($ads->add_to_cart ?? 0),
+            'initiate_checkout' => (int) ($ads->initiate_checkout ?? 0),
         ];
     }
 

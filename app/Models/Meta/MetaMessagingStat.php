@@ -40,4 +40,14 @@ class MetaMessagingStat extends Model
             'synced_at' => 'datetime',
         ];
     }
+
+    public function scopeMessenger($query)
+    {
+        return $query->where('platform', 'messenger');
+    }
+
+    public function scopeInstagram($query)
+    {
+        return $query->where('platform', 'instagram');
+    }
 }

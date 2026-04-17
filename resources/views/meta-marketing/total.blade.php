@@ -52,7 +52,7 @@
         <p class="text-sm text-slate-500 mt-1">
             Facebook Organic + Instagram Organic + Paid Ads — Graph API {{ $apiVersionV24 }}
             @if($lastSync)
-                — <span id="last-sync-text" class="text-xs">Sync i fundit: {{ $lastSync->created_at->diffForHumans() }}</span>
+                — <span id="last-sync-text" class="text-xs">Sync i fundit: {{ $lastSync->created_at->min(now())->diffForHumans() }}</span>
             @endif
         </p>
     </div>

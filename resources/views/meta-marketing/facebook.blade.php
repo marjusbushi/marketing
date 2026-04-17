@@ -56,7 +56,7 @@
         <p class="text-sm text-slate-500 mt-1">
             Facebook Organic + Messenger &mdash; Graph API {{ $apiVersionV24 }}
             @if($lastSync)
-                &mdash; <span id="last-sync-text" class="text-xs">Sync i fundit: {{ $lastSync->created_at->diffForHumans() }}</span>
+                &mdash; <span id="last-sync-text" class="text-xs">Sync i fundit: {{ $lastSync->created_at->min(now())->diffForHumans() }}</span>
             @endif
         </p>
     </div>
