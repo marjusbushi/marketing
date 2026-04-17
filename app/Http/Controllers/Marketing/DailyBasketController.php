@@ -7,6 +7,7 @@ use App\Enums\DailyBasketPostType;
 use App\Http\Controllers\Controller;
 use App\Models\DailyBasket;
 use App\Models\DailyBasketPost;
+use App\Models\Content\ContentMedia;
 use App\Services\ContentPlanner\ContentPostService;
 use App\Services\DisApiClient;
 use Carbon\Carbon;
@@ -14,6 +15,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -510,8 +514,9 @@ class DailyBasketController extends Controller
      * Create the matching Content Planner post and return its id.
      *
      * The basket post carries the planning/production state; Content
-     * Planner handles publishing + analytics. We only copy what is
-     * meaningful there: caption, platforms, schedule, hashtags (as notes).
+     * Planner handles publishing + analytics. We copy: caption, platforms,
+     * schedule, hashtags (as notes), and best-effort attach product images
+     * as ContentMedia so the post renders with thumbnails in the planner.
      */
     private function handOffToContentPlanner(DailyBasketPost $post): int
     {
@@ -524,6 +529,11 @@ class DailyBasketController extends Controller
             'From Shporta Ditore #'.$post->daily_basket_id.' · post #'.$post->id
         );
 
+        // Best-effort: attach product images as media so the planner shows them.
+        // Any failure (DIS slow, download fail, storage fail) is logged but must
+        // not block the publish — the ContentPost can still be created without media.
+        $mediaIds = $this->cloneProductImagesToMedia($post);
+
         $contentPost = $this->contentPostService->createPost([
             'platform' => $platform,
             'platforms' => $platforms,
@@ -532,9 +542,96 @@ class DailyBasketController extends Controller
             'scheduled_at' => $post->scheduled_for?->toIso8601String(),
             'status' => 'scheduled',
             'notes' => $notes,
+            'media_ids' => $mediaIds,
         ], $this->currentUserId() ?? 1);
 
         return $contentPost->id;
+    }
+
+    /**
+     * For each product linked to the post, download its image and create a
+     * ContentMedia record, returning the media ids (in pivot order). Failures
+     * are swallowed and reported — publishing proceeds even if 0 images land.
+     */
+    private function cloneProductImagesToMedia(DailyBasketPost $post): array
+    {
+        $basket = $post->basket()->first();
+        if (! $basket) {
+            return [];
+        }
+
+        $products = $this->loadCollectionProducts($basket->distribution_week_id);
+        $byId = collect($products)->keyBy('id');
+
+        $pivotRows = DB::table('daily_basket_post_products')
+            ->where('daily_basket_post_id', $post->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $ids = [];
+        foreach ($pivotRows as $pivot) {
+            $product = $byId->get($pivot->item_group_id);
+            if (! $product || empty($product['image_url'])) {
+                continue;
+            }
+
+            try {
+                $media = $this->createMediaFromUrl($product['image_url'], $product);
+                if ($media) {
+                    $ids[] = $media->id;
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Download a remote image URL and persist it as a ContentMedia row on the
+     * public disk. Returns null when the fetch fails or the body is empty.
+     */
+    private function createMediaFromUrl(string $url, array $product): ?ContentMedia
+    {
+        $response = Http::timeout(8)->get($url);
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $body = $response->body();
+        if ($body === '' || $body === null) {
+            return null;
+        }
+
+        $contentType = $response->header('Content-Type') ?: 'image/jpeg';
+        // Strip any charset suffix (e.g. "image/jpeg; charset=binary")
+        $mime = trim(explode(';', $contentType)[0]);
+        $ext = match (strtolower($mime)) {
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            'image/gif'  => 'gif',
+            default       => 'jpg',
+        };
+
+        $uuid = (string) Str::uuid();
+        $safeCode = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($product['code'] ?? 'na')) ?: 'na';
+        $filename = 'product-'.$safeCode.'-'.substr($uuid, 0, 8).'.'.$ext;
+        $path = 'content-media/daily-basket/'.date('Y/m').'/'.$filename;
+
+        Storage::disk('public')->put($path, $body);
+
+        return ContentMedia::create([
+            'uuid'              => $uuid,
+            'user_id'           => $this->currentUserId() ?? 1,
+            'filename'          => $filename,
+            'original_filename' => basename(parse_url($url, PHP_URL_PATH) ?: $filename),
+            'disk'              => 'public',
+            'path'              => $path,
+            'mime_type'         => $mime,
+            'size_bytes'        => strlen($body),
+            'alt_text'          => $product['name'] ?? null,
+        ]);
     }
 
     /**

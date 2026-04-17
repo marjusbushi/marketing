@@ -224,6 +224,41 @@
     .db-coll-menu-item.is-upcoming .db-coll-menu-item-badge { background: #dbeafe; color: #1e40af; }
 
     .db-coll-menu-empty { padding: 30px; text-align: center; color: var(--db-text-3); font-size: 12px; }
+
+    /* Detail sheet header — Edit button prominent */
+    .db-sheet-head { display: flex; justify-content: space-between; align-items: flex-start; }
+    .db-sheet-head-text { flex: 1; min-width: 0; }
+    .db-btn-edit {
+        background: var(--db-accent-soft);
+        color: var(--db-text);
+        border: 1px solid var(--db-border-strong);
+        padding: 7px 14px;
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+    .db-btn-edit:hover { background: var(--db-text); color: #fff; border-color: var(--db-text); }
+    .db-btn-edit-icon { font-size: 14px; line-height: 1; }
+
+    /* Inline reference input */
+    .db-inline-input {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid var(--db-border);
+        border-radius: 5px;
+        font-family: inherit;
+        font-size: 12px;
+        color: var(--db-text);
+        background: #fff;
+    }
+    .db-inline-input:focus { outline: none; border-color: var(--db-text); }
+    .db-inline-hint { font-size: 10px; color: var(--db-text-3); margin-top: 4px; }
 </style>
 @endsection
 
@@ -819,16 +854,33 @@
 
         const currentIdx = STAGE_ORDER.indexOf(post.stage);
 
-        // Head
+        // Head (title on the left, prominent Edit button on the right)
         const head = document.createElement('div');
         head.className = 'db-sheet-head';
+
+        const headText = document.createElement('div');
+        headText.className = 'db-sheet-head-text';
         const crumb = document.createElement('div');
         crumb.className = 'db-sheet-crumb';
         crumb.textContent = (state.selectedDate || '') + ' · ' + post.post_type_label;
         const title = document.createElement('div');
         title.className = 'db-sheet-title';
         title.textContent = post.title;
-        head.append(crumb, title);
+        headText.append(crumb, title);
+        head.appendChild(headText);
+
+        const headEdit = document.createElement('button');
+        headEdit.className = 'db-btn-edit';
+        headEdit.type = 'button';
+        const editIcon = document.createElement('span');
+        editIcon.className = 'db-btn-edit-icon';
+        editIcon.textContent = '✎';
+        const editLabel = document.createElement('span');
+        editLabel.textContent = 'Edit post';
+        headEdit.append(editIcon, editLabel);
+        headEdit.addEventListener('click', () => openEditPostModal(post));
+        head.appendChild(headEdit);
+
         sheet.appendChild(head);
 
         // Stepper
@@ -902,21 +954,46 @@
         }));
 
         body.appendChild(section('Reference', () => {
-            const v = document.createElement('div');
-            v.className = 'db-sec-val';
-            if (post.reference_url) {
-                const a = document.createElement('a');
-                a.href = post.reference_url;
-                a.target = '_blank';
-                a.rel = 'noopener noreferrer';
-                a.style.cssText = 'color: var(--db-text); text-decoration: underline;';
-                a.textContent = post.reference_url;
-                v.appendChild(a);
-            } else {
-                v.classList.add('muted');
-                v.textContent = 'Pa reference';
-            }
-            return v;
+            // Always-editable inline input — Enter or blur saves, no modal needed.
+            const wrap = document.createElement('div');
+
+            const input = document.createElement('input');
+            input.type = 'url';
+            input.className = 'db-inline-input';
+            input.placeholder = 'https://pinterest.com/pin/… (shtyp Enter për ruajtje)';
+            input.value = post.reference_url || '';
+
+            const hint = document.createElement('div');
+            hint.className = 'db-inline-hint';
+            hint.textContent = post.reference_url
+                ? 'Hap ▸ ' + post.reference_url
+                : 'Guard-i i Fazës 1 kërkon një reference para prodhimit';
+
+            const save = async (newValue) => {
+                const trimmed = (newValue || '').trim();
+                if (trimmed === (post.reference_url || '')) return;
+                try {
+                    await apiPutJson('/marketing/daily-basket/api/posts/' + num(post.id), {
+                        reference_url: trimmed || null,
+                    });
+                    post.reference_url = trimmed || null;
+                    hint.textContent = trimmed
+                        ? 'Hap ▸ ' + trimmed
+                        : 'Guard-i i Fazës 1 kërkon një reference para prodhimit';
+                } catch (e) {
+                    showError('Ruajtja dështoi: ' + e.message);
+                    input.value = post.reference_url || '';
+                }
+            };
+
+            input.addEventListener('blur', () => save(input.value));
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                if (e.key === 'Escape') { input.value = post.reference_url || ''; input.blur(); }
+            });
+
+            wrap.append(input, hint);
+            return wrap;
         }));
 
         body.appendChild(section('Platformat', () => {
@@ -959,12 +1036,7 @@
         const group = document.createElement('div');
         group.className = 'db-btn-group';
 
-        const btnEdit = document.createElement('button');
-        btnEdit.className = 'db-btn';
-        btnEdit.textContent = 'Edit';
-        btnEdit.addEventListener('click', () => openEditPostModal(post));
-        group.appendChild(btnEdit);
-
+        // Edit lives in the sheet header now (prominent). Footer focuses on stage moves only.
         const btnForward = document.createElement('button');
         btnForward.className = 'db-btn db-btn-primary';
         const canForward = currentIdx < STAGE_ORDER.length - 1;
