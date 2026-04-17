@@ -3,6 +3,10 @@
 namespace App\Providers;
 
 use App\Enums\MarketingPermissionEnum;
+use App\Models\Content\ContentPost;
+use App\Models\DailyBasketPost;
+use App\Observers\ContentPostObserver;
+use App\Observers\DailyBasketPostObserver;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,6 +26,17 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerMarketingGates();
+        $this->registerDailyBasketSync();
+    }
+
+    /**
+     * Keep ContentPost and DailyBasketPost in sync via observers.
+     * SyncGuard prevents infinite loops when one observer triggers the other.
+     */
+    protected function registerDailyBasketSync(): void
+    {
+        ContentPost::observe(ContentPostObserver::class);
+        DailyBasketPost::observe(DailyBasketPostObserver::class);
     }
 
     /**
