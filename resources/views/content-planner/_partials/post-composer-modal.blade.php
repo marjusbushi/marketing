@@ -1349,6 +1349,7 @@
     }
 
     async function resolveSuggestion(id, accepted) {
+        let resolvedData = null;
         try {
             const res = await fetch('{{ url('/marketing/planner/api/suggestions') }}/' + id + '/resolve', {
                 method: 'PATCH',
@@ -1356,23 +1357,44 @@
                 body: JSON.stringify({ accepted: accepted ? 1 : 0 }),
             });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-
-            // If accepted, swap the original text for the suggested text inside the caption.
-            if (accepted) {
-                const ta = document.getElementById('composerContent');
-                if (ta && ta.value) {
-                    const updated = await res.json().catch(() => ({}));
-                    const from = updated.original_text;
-                    const to = updated.suggested_text;
-                    if (from && to && ta.value.includes(from)) {
-                        ta.value = ta.value.replace(from, to);
-                    }
-                }
-            }
-            loadSuggestions();
+            resolvedData = await res.json().catch(() => ({}));
         } catch (e) {
             alert('Could not resolve suggestion: ' + e.message);
+            return;
         }
+
+        // When accepted, apply the change to the caption AND persist the post
+        // so the change survives a page refresh / modal close. We call the
+        // existing PUT /api/posts/{id} endpoint directly with just the
+        // content field — no other fields are touched so this is safe even
+        // mid-edit.
+        if (accepted && composerState.postId) {
+            const ta = document.getElementById('composerContent');
+            const from = resolvedData.original_text;
+            const to   = resolvedData.suggested_text;
+            if (ta && from && to && ta.value.includes(from)) {
+                ta.value = ta.value.replace(from, to);
+
+                try {
+                    await fetch('{{ url('/marketing/planner/api/posts') }}/' + composerState.postId, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ content: ta.value }),
+                    });
+                } catch (e) {
+                    // The suggestion is already accepted server-side; the
+                    // content update failing is non-fatal — the user can
+                    // still save manually. Log and move on.
+                    console.error('Failed to persist accepted suggestion', e);
+                }
+            }
+        }
+
+        loadSuggestions();
     }
 
     function formatFeedbackDate(iso) {
