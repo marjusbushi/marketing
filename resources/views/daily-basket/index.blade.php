@@ -238,11 +238,11 @@
         <button class="db-btn db-btn-primary" id="dbBtnNewPost" disabled>+ Post i ri</button>
     </div>
 
-    <!-- New Post modal -->
+    <!-- New/Edit Post modal -->
     <div class="db-modal-backdrop" id="dbModal">
         <div class="db-modal">
             <div class="db-modal-head">
-                <div class="db-modal-title">Post i ri</div>
+                <div class="db-modal-title" id="dbModalTitle">Post i ri</div>
                 <button class="db-modal-close" id="dbModalClose" aria-label="Mbyll">×</button>
             </div>
             <div class="db-modal-body">
@@ -269,6 +269,44 @@
                         <div class="db-seg-opt active" data-value="normal">Normal</div>
                         <div class="db-seg-opt" data-value="high">High</div>
                         <div class="db-seg-opt" data-value="urgent">Urgent</div>
+                    </div>
+                </div>
+
+                <!-- Edit-only fields (hidden when creating) -->
+                <div id="dbEditOnly" style="display:none;">
+                    <div class="db-field">
+                        <label class="db-field-lbl">Reference URL <span style="color:#a1a1aa; font-weight: 400;">(Faza 1)</span></label>
+                        <input type="url" class="db-input" id="dbFieldRefUrl" placeholder="https://pinterest.com/pin/…">
+                    </div>
+
+                    <div class="db-field">
+                        <label class="db-field-lbl">Reference notes</label>
+                        <input type="text" class="db-input" id="dbFieldRefNotes" placeholder="Mood, location, model…">
+                    </div>
+
+                    <div class="db-field">
+                        <label class="db-field-lbl">Caption <span style="color:#a1a1aa; font-weight: 400;">(Faza 3)</span></label>
+                        <textarea class="db-input" id="dbFieldCaption" rows="4" placeholder="Shkruaj tekstin e postit…"></textarea>
+                    </div>
+
+                    <div class="db-field">
+                        <label class="db-field-lbl">Hashtags</label>
+                        <input type="text" class="db-input" id="dbFieldHashtags" placeholder="#zeroabsolute #drop #sale">
+                    </div>
+
+                    <div class="db-field">
+                        <label class="db-field-lbl">Skeduluar për <span style="color:#a1a1aa; font-weight: 400;">(Faza 4)</span></label>
+                        <input type="datetime-local" class="db-input" id="dbFieldScheduled">
+                    </div>
+
+                    <div class="db-field">
+                        <label class="db-field-lbl">Platformat</label>
+                        <div class="db-seg" id="dbFieldPlatforms">
+                            <div class="db-seg-opt" data-value="instagram">Instagram</div>
+                            <div class="db-seg-opt" data-value="facebook">Facebook</div>
+                            <div class="db-seg-opt" data-value="tiktok">TikTok</div>
+                            <div class="db-seg-opt" data-value="web">Web</div>
+                        </div>
                     </div>
                 </div>
 
@@ -377,13 +415,17 @@
         selectedPostId: null,
         kanban: null,
         availableProducts: [],
-        // Modal (new-post) state
+        // Modal state (shared between "new post" and "edit post")
         modal: {
+            mode: 'create',         // 'create' | 'edit'
+            editingPostId: null,
             title: '',
             post_type: null,
             priority: 'normal',
             selectedProductIds: new Set(),
             heroProductId: null,
+            // Edit-only
+            platforms: new Set(),
         },
     };
 
@@ -394,8 +436,16 @@
     }
 
     async function apiPost(url, body) {
+        return apiSend('POST', url, body);
+    }
+
+    async function apiPutJson(url, body) {
+        return apiSend('PUT', url, body);
+    }
+
+    async function apiSend(method, url, body) {
         const res = await fetch(url, {
-            method: 'POST',
+            method,
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
@@ -912,7 +962,7 @@
         const btnEdit = document.createElement('button');
         btnEdit.className = 'db-btn';
         btnEdit.textContent = 'Edit';
-        btnEdit.addEventListener('click', () => alert('Editim i detajuar: v2'));
+        btnEdit.addEventListener('click', () => openEditPostModal(post));
         group.appendChild(btnEdit);
 
         const btnForward = document.createElement('button');
@@ -956,24 +1006,81 @@
         }
     }
 
-    // ── New-post modal ─────────────────────────────────
-    function openNewPostModal() {
+    // ── New/Edit modal ─────────────────────────────────
+    function resetModalFields() {
         state.modal = {
+            mode: 'create',
+            editingPostId: null,
             title: '',
             post_type: null,
             priority: 'normal',
             selectedProductIds: new Set(),
             heroProductId: null,
+            platforms: new Set(),
         };
 
         document.getElementById('dbFieldTitle').value = '';
+        document.getElementById('dbFieldRefUrl').value = '';
+        document.getElementById('dbFieldRefNotes').value = '';
+        document.getElementById('dbFieldCaption').value = '';
+        document.getElementById('dbFieldHashtags').value = '';
+        document.getElementById('dbFieldScheduled').value = '';
 
-        // Clear active states on segmented controls
-        document.querySelectorAll('#dbFieldType .db-seg-opt').forEach(el =>
-            el.classList.remove('active')
-        );
+        document.querySelectorAll('#dbFieldType .db-seg-opt').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('#dbFieldPriority .db-seg-opt').forEach(el => {
             el.classList.toggle('active', el.dataset.value === 'normal');
+        });
+        document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => el.classList.remove('active'));
+    }
+
+    function openNewPostModal() {
+        resetModalFields();
+        document.getElementById('dbModalTitle').textContent = 'Post i ri';
+        document.getElementById('dbModalSubmit').textContent = 'Krijo post';
+        document.getElementById('dbEditOnly').style.display = 'none';
+
+        renderProductPicker();
+        document.getElementById('dbModal').classList.add('open');
+        setTimeout(() => document.getElementById('dbFieldTitle').focus(), 50);
+    }
+
+    function openEditPostModal(post) {
+        resetModalFields();
+        state.modal.mode = 'edit';
+        state.modal.editingPostId = post.id;
+        state.modal.post_type = post.post_type;
+        state.modal.priority = post.priority || 'normal';
+        state.modal.platforms = new Set(post.target_platforms || []);
+        (post.products || []).forEach(p => state.modal.selectedProductIds.add(p.item_group_id));
+        const hero = (post.products || []).find(p => p.is_hero);
+        state.modal.heroProductId = hero ? hero.item_group_id : null;
+
+        document.getElementById('dbModalTitle').textContent = 'Edito postin';
+        document.getElementById('dbModalSubmit').textContent = 'Ruaj';
+        document.getElementById('dbEditOnly').style.display = 'block';
+
+        document.getElementById('dbFieldTitle').value = post.title || '';
+        document.getElementById('dbFieldRefUrl').value = post.reference_url || '';
+        document.getElementById('dbFieldRefNotes').value = post.reference_notes || '';
+        document.getElementById('dbFieldCaption').value = post.caption || '';
+        document.getElementById('dbFieldHashtags').value = post.hashtags || '';
+        // datetime-local expects 'YYYY-MM-DDTHH:MM'
+        if (post.scheduled_for) {
+            const d = new Date(post.scheduled_for);
+            const pad = (n) => String(n).padStart(2, '0');
+            document.getElementById('dbFieldScheduled').value =
+                d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+
+        document.querySelectorAll('#dbFieldType .db-seg-opt').forEach(el => {
+            el.classList.toggle('active', el.dataset.value === post.post_type);
+        });
+        document.querySelectorAll('#dbFieldPriority .db-seg-opt').forEach(el => {
+            el.classList.toggle('active', el.dataset.value === (post.priority || 'normal'));
+        });
+        document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => {
+            el.classList.toggle('active', state.modal.platforms.has(el.dataset.value));
         });
 
         renderProductPicker();
@@ -1054,38 +1161,89 @@
         renderProductPicker();
     }
 
-    async function submitNewPost() {
+    async function submitModal() {
         const title = document.getElementById('dbFieldTitle').value.trim();
         const postType = state.modal.post_type;
 
         if (!title) { showError('Titulli është i detyrueshëm'); return; }
         if (!postType) { showError('Zgjidh një tip posti'); return; }
 
-        const basketId = state.kanban?.basket?.id;
-        if (!basketId) { showError('Basket-i nuk është i ngarkuar'); return; }
-
         const productIds = Array.from(state.modal.selectedProductIds);
 
-        try {
-            await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
-                title,
-                post_type: postType,
-                priority: state.modal.priority,
-                product_ids: productIds,
-                hero_product_id: state.modal.heroProductId,
-            });
-            closeNewPostModal();
-            await selectDay(state.selectedDate);
-        } catch (e) {
-            showError('Krijimi i postit dështoi: ' + e.message);
+        if (state.modal.mode === 'create') {
+            const basketId = state.kanban?.basket?.id;
+            if (!basketId) { showError('Basket-i nuk është i ngarkuar'); return; }
+
+            try {
+                await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
+                    title,
+                    post_type: postType,
+                    priority: state.modal.priority,
+                    product_ids: productIds,
+                    hero_product_id: state.modal.heroProductId,
+                });
+            } catch (e) {
+                showError('Krijimi i postit dështoi: ' + e.message);
+                return;
+            }
+        } else {
+            // edit mode — two calls: PUT post + PUT products (sync)
+            const postId = num(state.modal.editingPostId);
+            const refUrl = document.getElementById('dbFieldRefUrl').value.trim();
+            const refNotes = document.getElementById('dbFieldRefNotes').value.trim();
+            const caption = document.getElementById('dbFieldCaption').value.trim();
+            const hashtags = document.getElementById('dbFieldHashtags').value.trim();
+            const scheduledLocal = document.getElementById('dbFieldScheduled').value;
+            const scheduledFor = scheduledLocal ? new Date(scheduledLocal).toISOString() : null;
+
+            try {
+                await apiPutJson('/marketing/daily-basket/api/posts/' + postId, {
+                    title,
+                    post_type: postType,
+                    priority: state.modal.priority,
+                    reference_url: refUrl || null,
+                    reference_notes: refNotes || null,
+                    caption: caption || null,
+                    hashtags: hashtags || null,
+                    scheduled_for: scheduledFor,
+                    target_platforms: Array.from(state.modal.platforms),
+                });
+
+                if (productIds.length > 0) {
+                    await apiPutJson('/marketing/daily-basket/api/posts/' + postId + '/products', {
+                        product_ids: productIds,
+                        hero_product_id: state.modal.heroProductId,
+                    });
+                }
+            } catch (e) {
+                showError('Ruajtja e postit dështoi: ' + e.message);
+                return;
+            }
         }
+
+        closeNewPostModal();
+        await selectDay(state.selectedDate);
     }
 
     function wireModalOnce() {
         document.getElementById('dbBtnNewPost').addEventListener('click', openNewPostModal);
         document.getElementById('dbModalClose').addEventListener('click', closeNewPostModal);
         document.getElementById('dbModalCancel').addEventListener('click', closeNewPostModal);
-        document.getElementById('dbModalSubmit').addEventListener('click', submitNewPost);
+        document.getElementById('dbModalSubmit').addEventListener('click', submitModal);
+
+        // Multi-select platforms (edit mode)
+        document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => {
+            el.addEventListener('click', () => {
+                const v = el.dataset.value;
+                if (state.modal.platforms.has(v)) {
+                    state.modal.platforms.delete(v);
+                    el.classList.remove('active');
+                } else {
+                    state.modal.platforms.add(v);
+                    el.classList.add('active');
+                }
+            });
+        });
 
         document.getElementById('dbModal').addEventListener('click', (e) => {
             if (e.target.id === 'dbModal') closeNewPostModal();

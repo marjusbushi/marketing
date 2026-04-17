@@ -104,8 +104,11 @@ class DailyBasketController extends Controller
     }
 
     /**
-     * Summary of a whole collection: the week itself + one entry per day
-     * (existing basket or null placeholder with zero counts).
+     * Summary of a whole collection: the week itself + one entry per day.
+     *
+     * On first open we eagerly upsert a `DailyBasket` row for every day
+     * inside the collection window, so all days show up as clickable in
+     * the strip (not only the one the user has already visited).
      */
     public function collectionSummary(int $distributionWeekId): JsonResponse
     {
@@ -113,6 +116,8 @@ class DailyBasketController extends Controller
 
         $start = Carbon::parse($week['week_start']);
         $end = Carbon::parse($week['week_end']);
+
+        $this->ensureBasketsForRange($distributionWeekId, $start, $end);
 
         $baskets = DailyBasket::query()
             ->where('distribution_week_id', $distributionWeekId)
@@ -146,6 +151,49 @@ class DailyBasketController extends Controller
             ],
             'days' => $days,
         ]);
+    }
+
+    /**
+     * Upsert one DailyBasket per day in the collection window.
+     *
+     * Uses a single bulk insertOrIgnore so opening a collection for the
+     * first time creates N baskets in one round-trip, and subsequent
+     * opens are idempotent.
+     */
+    private function ensureBasketsForRange(int $distributionWeekId, Carbon $start, Carbon $end): void
+    {
+        $existingDates = DailyBasket::query()
+            ->where('distribution_week_id', $distributionWeekId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->pluck('date')
+            ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : (string) $d)
+            ->all();
+
+        $existing = array_flip($existingDates);
+        $rows = [];
+        $now = now();
+        $creatorId = $this->currentUserId();
+
+        for ($d = $start->copy(); $d->lte($end); $d->addDay()) {
+            $dateStr = $d->toDateString();
+            if (isset($existing[$dateStr])) {
+                continue;
+            }
+            $rows[] = [
+                'distribution_week_id' => $distributionWeekId,
+                'date' => $dateStr,
+                'status' => 'draft',
+                'created_by' => $creatorId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (! empty($rows)) {
+            // insertOrIgnore protects against race conditions on the
+            // (distribution_week_id, date) unique index.
+            DailyBasket::insertOrIgnore($rows);
+        }
     }
 
     /**
@@ -424,7 +472,7 @@ class DailyBasketController extends Controller
         $delta = $target->order() - $current->order();
         if (abs($delta) !== 1) {
             return response()->json([
-                'message' => "Nuk mund t\u00eb kal\u00ebsh nga '{$current->label()}' te '{$target->label()}' direkt \u2014 vet\u00ebm nj\u00eb hap n\u00eb kah t\u00eb njejt\u00eb lejohet.",
+                'message' => "Nuk mund të kalësh nga '{$current->label()}' te '{$target->label()}' direkt — vetëm një hap në kah të njëjtë lejohet.",
             ], 422);
         }
 
@@ -509,15 +557,15 @@ class DailyBasketController extends Controller
     {
         return match ($stage) {
             DailyBasketPostStage::PLANNING => empty($post->reference_url)
-                ? 'Duhet nj\u00eb reference para se t\u00eb kalojm\u00eb n\u00eb prodhim.'
+                ? 'Duhet një reference para se të kalojmë në prodhim.'
                 : null,
 
             DailyBasketPostStage::EDITING => empty($post->caption)
-                ? 'Caption duhet plot\u00ebsuar para se t\u00eb kalojm\u00eb n\u00eb skedulim.'
+                ? 'Caption duhet plotësuar para se të kalojmë në skedulim.'
                 : null,
 
             DailyBasketPostStage::SCHEDULING => empty($post->scheduled_for) || empty($post->target_platforms)
-                ? 'Duhen data e skedulimit + paku nj\u00eb platform\u00eb para publikimit.'
+                ? 'Duhen data e skedulimit + paku një platformë para publikimit.'
                 : null,
 
             default => null,
