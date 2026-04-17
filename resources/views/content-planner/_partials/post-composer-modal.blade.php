@@ -125,11 +125,11 @@
                             <button onclick="document.getElementById('mediaFileInput').click()" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Replace photo">
                                 <iconify-icon icon="heroicons-outline:camera" width="14" style="color:#fff;"></iconify-icon>
                             </button>
-                            <button onclick="editCurrentMedia()" type="button" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Edit photo">
-                                <iconify-icon icon="heroicons-outline:pencil" width="14" style="color:#fff;"></iconify-icon>
+                            <button onclick="editCurrentMedia()" type="button" style="width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,0.65); border:1.5px solid rgba(255,255,255,0.4); cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);" title="Edit photo (crop, filter, resize)">
+                                <iconify-icon icon="heroicons-outline:pencil-square" width="16" style="color:#fff;"></iconify-icon>
                             </button>
-                            <button onclick="editCurrentMedia()" type="button" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Filter / adjust">
-                                <iconify-icon icon="heroicons-outline:adjustments-horizontal" width="14" style="color:#fff;"></iconify-icon>
+                            <button onclick="editCurrentMedia()" type="button" style="width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,0.65); border:1.5px solid rgba(255,255,255,0.4); cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);" title="Filter / adjust">
+                                <iconify-icon icon="heroicons-outline:adjustments-horizontal" width="16" style="color:#fff;"></iconify-icon>
                             </button>
                         </div>
                         {{-- Photo toolbar right --}}
@@ -147,8 +147,18 @@
                             {{-- Photo / Carousel --}}
                             <div id="composerMediaPreview" style="display:none; position:relative;">
                                 {{-- Overflow-hidden viewport holds the sliding track. --}}
-                                <div id="composerMediaViewport" style="position:relative; overflow:hidden; touch-action:pan-y; user-select:none;">
+                                <div id="composerMediaViewport" class="cp-media-viewport" style="position:relative; overflow:hidden; touch-action:pan-y; user-select:none;">
                                     <div id="composerMediaMain" style="display:flex; transition:transform 0.3s ease; will-change:transform;"></div>
+
+                                    {{-- Hover overlay with prominent 'Edit photo' button.
+                                         Shows on mouse-hover over the photo area. Does NOT
+                                         swallow swipe/drag events — we only capture clicks. --}}
+                                    <div class="cp-media-hover" id="composerMediaHover">
+                                        <button type="button" class="cp-media-edit-btn" onclick="event.stopPropagation(); editCurrentMedia();">
+                                            <iconify-icon icon="heroicons-outline:pencil-square" width="16"></iconify-icon>
+                                            <span>Edit photo</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {{-- Left / right arrows (shown only on multi-item) --}}
@@ -447,6 +457,42 @@
     /* Recurring switch */
     #schedRecurring:checked ~ .cp-switch-track { background:#6366f1 !important; }
     #schedRecurring:checked ~ .cp-switch-thumb { transform:translateX(14px); }
+
+    /* Media hover overlay — surfaces 'Edit photo' prominently.
+       Pointer-events:none on the overlay itself so swipe/drag still works;
+       only the button captures clicks. */
+    .cp-media-viewport { position: relative; }
+    .cp-media-hover {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 16px;
+        background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 50%);
+        opacity: 0;
+        transition: opacity 0.15s;
+        pointer-events: none;
+    }
+    .cp-media-viewport:hover .cp-media-hover,
+    .cp-media-hover:focus-within { opacity: 1; }
+    .cp-media-edit-btn {
+        pointer-events: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: rgba(255,255,255,0.95);
+        border: none;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #18181b;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: transform 0.15s, background 0.15s;
+    }
+    .cp-media-edit-btn:hover { background: #fff; transform: translateY(-1px); }
 </style>
 
 <script>
