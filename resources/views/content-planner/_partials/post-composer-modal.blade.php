@@ -125,10 +125,10 @@
                             <button onclick="document.getElementById('mediaFileInput').click()" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Replace photo">
                                 <iconify-icon icon="heroicons-outline:camera" width="14" style="color:#fff;"></iconify-icon>
                             </button>
-                            <button style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Edit">
+                            <button onclick="editCurrentMedia()" type="button" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Edit photo">
                                 <iconify-icon icon="heroicons-outline:pencil" width="14" style="color:#fff;"></iconify-icon>
                             </button>
-                            <button style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Filter">
+                            <button onclick="editCurrentMedia()" type="button" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Filter / adjust">
                                 <iconify-icon icon="heroicons-outline:adjustments-horizontal" width="14" style="color:#fff;"></iconify-icon>
                             </button>
                         </div>
@@ -1027,6 +1027,58 @@
         if (!active) return;
         const src = active.querySelector('img')?.src || active.querySelector('video')?.src;
         if (src) { const a = document.createElement('a'); a.href = src; a.download = ''; a.click(); }
+    }
+
+    // ── Image editor (Filerobot, lazy-loaded) ──
+    function editCurrentMedia() {
+        const active = composerState.mediaItems[carousel.index];
+        if (!active) return;
+        if ((active.mime_type || '').startsWith('video/')) {
+            alert('Editing video files is not supported yet.');
+            return;
+        }
+        const url = active.url || active.thumbnail_url;
+        if (!url) return;
+
+        // openImageEditor is defined by the editor partial. It lazy-loads the
+        // library on first call, opens the overlay, and invokes our callback
+        // with a Blob + filename when the user saves their changes.
+        if (typeof window.openImageEditor !== 'function') {
+            alert('Editor not available — did you forget to include image-editor-modal?');
+            return;
+        }
+
+        window.openImageEditor(url, async (blob, filename) => {
+            // Upload the new blob as a fresh ContentMedia, then swap it into
+            // the current carousel slot. The old media id is discarded from
+            // composerState but the record itself remains on the server
+            // (safe for undo / audit).
+            const formData = new FormData();
+            formData.append('file', blob, filename || 'edited.jpg');
+
+            let media;
+            try {
+                const res = await fetch('{{ route("marketing.planner.api.media.upload") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                if (!res.ok) throw new Error('Upload failed: HTTP ' + res.status);
+                media = await res.json();
+            } catch (e) {
+                alert('Could not save the edited image: ' + e.message);
+                return;
+            }
+
+            // Swap in-place: the edited image replaces the original at the
+            // same index, so the carousel position doesn't jump.
+            composerState.mediaItems[carousel.index] = media;
+            composerState.mediaIds[carousel.index] = media.id;
+            renderCarousel();
+        });
     }
 
     // ── Feedback panel ──

@@ -125,6 +125,7 @@
 </div>
 
 @include('content-planner._partials.post-composer-modal')
+@include('content-planner._partials.image-editor-modal')
 @include('content-planner._partials.media-sidebar')
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 

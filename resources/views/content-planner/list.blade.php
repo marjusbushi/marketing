@@ -86,6 +86,7 @@
 </div>
 
 @include('content-planner._partials.post-composer-modal')
+@include('content-planner._partials.image-editor-modal')
 
 <style>
     .cp-list-thumb { @apply w-9 h-9 rounded-md object-cover bg-slate-100; }
