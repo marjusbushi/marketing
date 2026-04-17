@@ -224,21 +224,49 @@
                 </div>
                 {{-- Tabs --}}
                 <div style="display:flex; border-bottom:1px solid #f1f5f9;">
-                    <button class="cp-feedback-tab active" onclick="switchFeedbackTab('comments', this)">Comments</button>
-                    <button class="cp-feedback-tab" onclick="switchFeedbackTab('suggestions', this)">Suggestions</button>
+                    <button class="cp-feedback-tab active" data-feedback-tab="comments" onclick="switchFeedbackTab('comments', this)">
+                        Comments
+                        <span id="cp-tab-comments-count" class="cp-tab-count" style="display:none;"></span>
+                    </button>
+                    <button class="cp-feedback-tab" data-feedback-tab="suggestions" onclick="switchFeedbackTab('suggestions', this)">
+                        Suggestions
+                        <span id="cp-tab-suggestions-count" class="cp-tab-count" style="display:none;"></span>
+                    </button>
                 </div>
-                {{-- Comment input --}}
-                <div style="padding:12px 16px; border-bottom:1px solid #f1f5f9;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <iconify-icon icon="heroicons-outline:chat-bubble-left" width="16" style="color:#cbd5e1;"></iconify-icon>
-                        <input id="feedbackCommentInput" type="text" placeholder="Say something..." style="flex:1; border:none; outline:none; font-size:13px; color:#374151; font-family:inherit;" onkeydown="if(event.key==='Enter')addComment()">
+
+                {{-- Comments panel --}}
+                <div id="cp-panel-comments" class="cp-feedback-panel" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+                    <div style="padding:12px 16px; border-bottom:1px solid #f1f5f9;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <iconify-icon icon="heroicons-outline:chat-bubble-left" width="16" style="color:#cbd5e1;"></iconify-icon>
+                            <input id="feedbackCommentInput" type="text" placeholder="Say something..." style="flex:1; border:none; outline:none; font-size:13px; color:#374151; font-family:inherit;" onkeydown="if(event.key==='Enter')addComment()">
+                        </div>
+                    </div>
+                    <div id="feedbackCommentsList" style="flex:1; overflow-y:auto; padding:16px;">
+                        <div class="cp-feedback-empty" style="text-align:center; padding:40px 16px;">
+                            <p style="font-size:13px; font-weight:500; color:#64748b; margin:0 0 4px;">No comments yet</p>
+                            <p style="font-size:12px; color:#94a3b8; margin:0;">Start the conversation by leaving the first comment.</p>
+                        </div>
                     </div>
                 </div>
-                {{-- Comments list --}}
-                <div id="feedbackCommentsList" style="flex:1; overflow-y:auto; padding:16px;">
-                    <div style="text-align:center; padding:40px 16px;">
-                        <p style="font-size:13px; font-weight:500; color:#64748b; margin:0 0 4px;">No comments yet</p>
-                        <p style="font-size:12px; color:#94a3b8; margin:0;">Start the conversation by leaving the first comment.</p>
+
+                {{-- Suggestions panel (shown when tab is active) --}}
+                <div id="cp-panel-suggestions" class="cp-feedback-panel" style="display:none; flex-direction:column; flex:1; min-height:0;">
+                    {{-- New suggestion composer: select text from caption + propose a replacement --}}
+                    <div style="padding:12px 16px; border-bottom:1px solid #f1f5f9; display:flex; flex-direction:column; gap:6px;">
+                        <div style="font-size:10px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Suggest an edit</div>
+                        <input id="suggestOriginal" type="text" placeholder="Original text (what you want to replace)" style="width:100%; padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px; outline:none; font-family:inherit;">
+                        <input id="suggestReplacement" type="text" placeholder="Suggested replacement" style="width:100%; padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px; outline:none; font-family:inherit;" onkeydown="if(event.key==='Enter')addSuggestion()">
+                        <div style="display:flex; justify-content:flex-end; gap:6px;">
+                            <button onclick="fillSuggestionFromSelection()" type="button" style="padding:5px 10px; font-size:11px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#64748b; cursor:pointer;" title="Copy currently-selected caption text into the original field">Use selection</button>
+                            <button onclick="addSuggestion()" type="button" style="padding:5px 12px; font-size:11px; border:none; border-radius:6px; background:#6366f1; color:#fff; cursor:pointer; font-weight:500;">Propose</button>
+                        </div>
+                    </div>
+                    <div id="feedbackSuggestionsList" style="flex:1; overflow-y:auto; padding:16px;">
+                        <div class="cp-feedback-empty" style="text-align:center; padding:40px 16px;">
+                            <p style="font-size:13px; font-weight:500; color:#64748b; margin:0 0 4px;">No suggestions yet</p>
+                            <p style="font-size:12px; color:#94a3b8; margin:0;">Propose a wording change and the author can accept it in one click.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -493,6 +521,36 @@
         transition: transform 0.15s, background 0.15s;
     }
     .cp-media-edit-btn:hover { background: #fff; transform: translateY(-1px); }
+
+    /* Feedback tabs + panels */
+    .cp-feedback-tab { position: relative; }
+    .cp-tab-count { margin-left: 6px; padding: 1px 7px; border-radius: 9px; background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 600; }
+    .cp-feedback-tab.active .cp-tab-count { background: #eef2ff; color: #4338ca; }
+
+    /* Comment / suggestion cards */
+    .cp-comment, .cp-suggestion {
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #fff;
+        border: 1px solid #f1f5f9;
+        margin-bottom: 8px;
+    }
+    .cp-comment-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+    .cp-comment-author { font-weight: 600; color: #475569; }
+    .cp-comment-body { font-size: 13px; color: #334155; line-height: 1.5; white-space: pre-wrap; }
+    .cp-comment-resolved { opacity: 0.55; }
+    .cp-comment-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .cp-comment-action-btn { background: none; border: none; cursor: pointer; font-size: 11px; color: #64748b; padding: 0; }
+    .cp-comment-action-btn:hover { color: #1e293b; text-decoration: underline; }
+
+    /* Suggestion diff */
+    .cp-suggestion-diff { font-size: 12px; line-height: 1.5; background: #f8fafc; border-radius: 6px; padding: 8px 10px; margin-top: 6px; }
+    .cp-suggestion-from { color: #991b1b; text-decoration: line-through; text-decoration-color: rgba(153,27,27,0.4); }
+    .cp-suggestion-to { color: #065f46; font-weight: 500; }
+    .cp-suggestion-arrow { color: #cbd5e1; margin: 0 6px; }
+    .cp-suggestion-status { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 4px; }
+    .cp-suggestion-status.resolved { background: #dcfce7; color: #166534; }
+    .cp-suggestion-status.rejected { background: #fef2f2; color: #991b1b; }
 </style>
 
 <script>
@@ -570,6 +628,10 @@
             }
             composerState.labelIds = (post.labels || []).map(l => l.id);
             if (post.campaign_id) composerState.campaignId = post.campaign_id;
+
+            // Pull in existing comments + suggestions so the side panel is
+            // populated instead of showing a stale 'No comments yet' message.
+            refreshFeedback();
         } catch (e) { console.error('Failed to load post:', e); }
     }
 
@@ -901,17 +963,276 @@
         } catch (e) { alert('Delete failed: ' + e.message); }
     }
 
+    // ── Feedback (Comments + Suggestions) ──
+    //
+    // Two tabs share the right-hand panel. Comments live on content_comments
+    // and are free-form; Suggestions live on content_suggestions and carry
+    // original_text + suggested_text so the author can accept a wording
+    // change with one click. Both talk to existing planner API endpoints.
+
+    const _cpEsc = document.createElement('div');
+    function cpEsc(s) {
+        if (s == null) return '';
+        _cpEsc.textContent = String(s);
+        return _cpEsc.innerHTML;
+    }
+
+    async function refreshFeedback() {
+        if (!composerState.postId) return;
+        await Promise.all([loadComments(), loadSuggestions()]);
+    }
+
     // ── Comments ──
     async function addComment() {
         if (!composerState.postId) return alert('Save the post first.');
-        const body = document.getElementById('newCommentBody')?.value?.trim();
+        const input = document.getElementById('feedbackCommentInput');
+        const body = (input?.value || '').trim();
         if (!body) return;
         try {
-            await fetch('{{ route("marketing.planner.api.comments.store") }}', {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+            const res = await fetch('{{ route("marketing.planner.api.comments.store") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
                 body: JSON.stringify({ content_post_id: composerState.postId, body }),
             });
-        } catch (e) { console.error(e); }
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            input.value = '';
+            loadComments();
+        } catch (e) {
+            alert('Could not post comment: ' + e.message);
+        }
+    }
+
+    async function loadComments() {
+        if (!composerState.postId) return;
+        try {
+            const url = '{{ url('/marketing/planner/api/posts') }}/' + encodeURIComponent(composerState.postId);
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) return;
+            const data = await res.json();
+            renderComments(Array.isArray(data.comments) ? data.comments : []);
+        } catch (e) { /* silent */ }
+    }
+
+    function renderComments(comments) {
+        const host = document.getElementById('feedbackCommentsList');
+        host.textContent = '';
+
+        const count = comments.length;
+        const badge = document.getElementById('cp-tab-comments-count');
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+
+        if (!count) {
+            const empty = document.createElement('div');
+            empty.className = 'cp-feedback-empty';
+            empty.style.cssText = 'text-align:center; padding:40px 16px;';
+            empty.innerHTML = '<p style="font-size:13px; font-weight:500; color:#64748b; margin:0 0 4px;">No comments yet</p><p style="font-size:12px; color:#94a3b8; margin:0;">Start the conversation by leaving the first comment.</p>'; // eslint-disable-line
+            host.appendChild(empty);
+            return;
+        }
+
+        comments.forEach(c => host.appendChild(buildCommentCard(c)));
+    }
+
+    function buildCommentCard(c) {
+        const card = document.createElement('div');
+        card.className = 'cp-comment' + (c.resolved_at ? ' cp-comment-resolved' : '');
+
+        const meta = document.createElement('div');
+        meta.className = 'cp-comment-meta';
+        const who = document.createElement('span');
+        who.className = 'cp-comment-author';
+        who.textContent = c.user?.name || c.user?.full_name || 'Someone';
+        const when = document.createElement('span');
+        when.textContent = formatFeedbackDate(c.created_at);
+        meta.append(who, document.createTextNode(' · '), when);
+        card.appendChild(meta);
+
+        const body = document.createElement('div');
+        body.className = 'cp-comment-body';
+        body.textContent = c.body || '';
+        card.appendChild(body);
+
+        // Resolve / reopen action
+        const actions = document.createElement('div');
+        actions.className = 'cp-comment-actions';
+        const resolveBtn = document.createElement('button');
+        resolveBtn.type = 'button';
+        resolveBtn.className = 'cp-comment-action-btn';
+        resolveBtn.textContent = c.resolved_at ? 'Reopen' : 'Resolve';
+        resolveBtn.onclick = async () => {
+            try {
+                await fetch('{{ url('/marketing/planner/api/comments') }}/' + c.id + '/resolve', {
+                    method: 'PATCH',
+                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                });
+                loadComments();
+            } catch (e) { /* silent */ }
+        };
+        actions.appendChild(resolveBtn);
+        card.appendChild(actions);
+        return card;
+    }
+
+    // ── Suggestions ──
+    function fillSuggestionFromSelection() {
+        const ta = document.getElementById('composerContent');
+        if (!ta) return;
+        const start = ta.selectionStart, end = ta.selectionEnd;
+        if (start === end) return alert('Select some caption text first.');
+        const text = (ta.value || '').substring(start, end);
+        const orig = document.getElementById('suggestOriginal');
+        orig.value = text;
+        document.getElementById('suggestReplacement').focus();
+    }
+
+    async function addSuggestion() {
+        if (!composerState.postId) return alert('Save the post first.');
+        const original = document.getElementById('suggestOriginal').value.trim();
+        const replacement = document.getElementById('suggestReplacement').value.trim();
+        if (!original || !replacement) return alert('Both original and suggested text are required.');
+
+        try {
+            const res = await fetch('{{ url('/marketing/planner/api/posts') }}/' + composerState.postId + '/suggestions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                body: JSON.stringify({ original_text: original, suggested_text: replacement }),
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            document.getElementById('suggestOriginal').value = '';
+            document.getElementById('suggestReplacement').value = '';
+            loadSuggestions();
+        } catch (e) {
+            alert('Could not save suggestion: ' + e.message);
+        }
+    }
+
+    async function loadSuggestions() {
+        if (!composerState.postId) return;
+        try {
+            const res = await fetch('{{ url('/marketing/planner/api/posts') }}/' + composerState.postId + '/suggestions', {
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            renderSuggestions(Array.isArray(data) ? data : []);
+        } catch (e) { /* silent */ }
+    }
+
+    function renderSuggestions(items) {
+        const host = document.getElementById('feedbackSuggestionsList');
+        host.textContent = '';
+
+        const open = items.filter(s => !s.resolved_at).length;
+        const badge = document.getElementById('cp-tab-suggestions-count');
+        badge.textContent = open;
+        badge.style.display = open > 0 ? 'inline-block' : 'none';
+
+        if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'cp-feedback-empty';
+            empty.style.cssText = 'text-align:center; padding:40px 16px;';
+            empty.innerHTML = '<p style="font-size:13px; font-weight:500; color:#64748b; margin:0 0 4px;">No suggestions yet</p><p style="font-size:12px; color:#94a3b8; margin:0;">Propose a wording change and the author can accept it in one click.</p>'; // eslint-disable-line
+            host.appendChild(empty);
+            return;
+        }
+
+        items.forEach(s => host.appendChild(buildSuggestionCard(s)));
+    }
+
+    function buildSuggestionCard(s) {
+        const card = document.createElement('div');
+        card.className = 'cp-suggestion';
+
+        const meta = document.createElement('div');
+        meta.className = 'cp-comment-meta';
+        const who = document.createElement('span');
+        who.className = 'cp-comment-author';
+        who.textContent = s.author?.name || s.author?.full_name || 'Someone';
+        const when = document.createElement('span');
+        when.textContent = formatFeedbackDate(s.created_at);
+        meta.append(who, document.createTextNode(' · '), when);
+
+        if (s.resolved_at) {
+            const tag = document.createElement('span');
+            tag.className = 'cp-suggestion-status ' + (s.accepted ? 'resolved' : 'rejected');
+            tag.textContent = s.accepted ? 'Accepted' : 'Rejected';
+            tag.style.marginLeft = 'auto';
+            meta.appendChild(tag);
+        }
+        card.appendChild(meta);
+
+        const diff = document.createElement('div');
+        diff.className = 'cp-suggestion-diff';
+        const from = document.createElement('span');
+        from.className = 'cp-suggestion-from';
+        from.textContent = s.original_text || '';
+        const arrow = document.createElement('span');
+        arrow.className = 'cp-suggestion-arrow';
+        arrow.textContent = '→';
+        const to = document.createElement('span');
+        to.className = 'cp-suggestion-to';
+        to.textContent = s.suggested_text || '';
+        diff.append(from, arrow, to);
+        card.appendChild(diff);
+
+        if (!s.resolved_at) {
+            const actions = document.createElement('div');
+            actions.className = 'cp-comment-actions';
+
+            const accept = document.createElement('button');
+            accept.type = 'button';
+            accept.className = 'cp-comment-action-btn';
+            accept.style.color = '#166534';
+            accept.textContent = 'Accept';
+            accept.onclick = () => resolveSuggestion(s.id, true);
+
+            const reject = document.createElement('button');
+            reject.type = 'button';
+            reject.className = 'cp-comment-action-btn';
+            reject.style.color = '#991b1b';
+            reject.textContent = 'Reject';
+            reject.onclick = () => resolveSuggestion(s.id, false);
+
+            actions.append(accept, reject);
+            card.appendChild(actions);
+        }
+
+        return card;
+    }
+
+    async function resolveSuggestion(id, accepted) {
+        try {
+            const res = await fetch('{{ url('/marketing/planner/api/suggestions') }}/' + id + '/resolve', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+                body: JSON.stringify({ accepted: accepted ? 1 : 0 }),
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+
+            // If accepted, swap the original text for the suggested text inside the caption.
+            if (accepted) {
+                const ta = document.getElementById('composerContent');
+                if (ta && ta.value) {
+                    const updated = await res.json().catch(() => ({}));
+                    const from = updated.original_text;
+                    const to = updated.suggested_text;
+                    if (from && to && ta.value.includes(from)) {
+                        ta.value = ta.value.replace(from, to);
+                    }
+                }
+            }
+            loadSuggestions();
+        } catch (e) {
+            alert('Could not resolve suggestion: ' + e.message);
+        }
+    }
+
+    function formatFeedbackDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d)) return '';
+        return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
 
     // ── Char Count ──
@@ -1186,6 +1507,16 @@
     function switchFeedbackTab(tab, btn) {
         document.querySelectorAll('.cp-feedback-tab').forEach(t => t.classList.remove('active'));
         if (btn) btn.classList.add('active');
+
+        // Show the matching panel, hide the other.
+        const panels = {
+            comments: document.getElementById('cp-panel-comments'),
+            suggestions: document.getElementById('cp-panel-suggestions'),
+        };
+        Object.entries(panels).forEach(([key, el]) => {
+            if (!el) return;
+            el.style.display = key === tab ? 'flex' : 'none';
+        });
     }
 
     function toggleFeedbackPanel() {
