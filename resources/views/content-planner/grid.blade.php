@@ -278,9 +278,11 @@
             const hoverHtml = `<div class="feed-hover"></div>`;
 
             const imgSrc = thumb || mediaUrl || '';
+            // For external (imported) posts we still open the permalink in a new tab;
+            // local posts open the carousel preview which fetches the full media list.
             const clickFn = isExternal && permalink
                 ? `window.open('${permalink.replace(/'/g, "\\'")}','_blank')`
-                : `openPostPreview(${event.id}, '${(imgSrc).replace(/'/g, "\\'")}', ${isVideo ? 'true' : 'false'}, '${(p.content || '').replace(/'/g, "\\'").replace(/\n/g, ' ').substring(0, 120)}')`;
+                : `openPostPreview(${event.id})`;
 
             return `<div class="feed-tile" ${dataAttr} onclick="${clickFn}">
                 ${mediaHtml}
@@ -353,27 +355,191 @@
     document.addEventListener('DOMContentLoaded', refreshGrid);
 
     // ─── Post Preview Overlay (Planable-style) ───
+    //
+    // Opens the post in a full-screen lightbox. When the post has multiple
+    // media attached, builds a swipeable carousel (touch + mouse drag +
+    // arrow buttons + arrow keys). The carousel mirrors the composer's
+    // behaviour so the feel is the same across edit and view.
     let previewPostId = null;
+    const preview = {
+        media: [],       // [{ url, thumbnail_url, mime_type }]
+        index: 0,
+        dragging: false,
+        startX: 0,
+        currentDx: 0,
+        width: 0,
+    };
 
-    function openPostPreview(postId, mediaSrc, isVideo, caption) {
+    async function openPostPreview(postId) {
         previewPostId = postId;
+        preview.media = [];
+        preview.index = 0;
+
         const overlay = document.getElementById('postPreviewOverlay');
-        const media = document.getElementById('postPreviewMedia');
-
-        if (isVideo && mediaSrc) {
-            media.innerHTML = `<video src="${mediaSrc}" autoplay loop muted playsinline style="max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px;display:block;"></video>`;
-        } else if (mediaSrc) {
-            media.innerHTML = `<img src="${mediaSrc}" alt="" style="max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px;display:block;">`;
-        } else {
-            media.innerHTML = `<div style="width:300px;height:300px;background:#f1f5f9;border-radius:12px;display:flex;align-items:center;justify-content:center;"><iconify-icon icon="heroicons-outline:photo" width="48" style="color:#cbd5e1;"></iconify-icon></div>`;
-        }
-
+        const mediaHost = document.getElementById('postPreviewMedia');
         const captionEl = document.getElementById('postPreviewCaption');
-        captionEl.textContent = caption || '';
-        captionEl.style.display = caption ? '' : 'none';
 
+        // Open overlay with loading state before the fetch so clicks feel instant.
         overlay.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+        while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
+        captionEl.textContent = '';
+        captionEl.style.display = 'none';
+
+        const loader = document.createElement('div');
+        loader.style.cssText = 'color:rgba(255,255,255,0.6);font-size:13px;';
+        loader.textContent = 'Loading…';
+        mediaHost.appendChild(loader);
+
+        try {
+            const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            preview.media = Array.isArray(data.media) ? data.media : [];
+            captionEl.textContent = data.content || '';
+            captionEl.style.display = data.content ? '' : 'none';
+            renderPreviewCarousel();
+            ensurePreviewWired();
+        } catch (e) {
+            while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
+            const err = document.createElement('div');
+            err.style.cssText = 'color:#fecaca;font-size:13px;';
+            err.textContent = 'Nuk u ngarkua posti: ' + (e.message || 'unknown error');
+            mediaHost.appendChild(err);
+        }
+    }
+
+    function renderPreviewCarousel() {
+        const host = document.getElementById('postPreviewMedia');
+        while (host.firstChild) host.removeChild(host.firstChild);
+
+        if (preview.media.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'width:300px;height:300px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#6b7280;';
+            empty.textContent = 'Asnjë media';
+            host.appendChild(empty);
+            updatePreviewChrome();
+            return;
+        }
+
+        // Viewport is a fixed-size container; track slides horizontally inside it.
+        const viewport = document.createElement('div');
+        viewport.id = 'postPreviewViewport';
+        viewport.style.cssText = 'position:relative;max-width:90vw;max-height:80vh;width:min(90vw, 800px);overflow:hidden;border-radius:8px;touch-action:pan-y;user-select:none;';
+        viewport.tabIndex = 0;
+
+        const track = document.createElement('div');
+        track.id = 'postPreviewTrack';
+        track.style.cssText = 'display:flex;transition:transform 0.3s ease;will-change:transform;';
+
+        preview.media.forEach((m) => {
+            const slide = document.createElement('div');
+            slide.style.cssText = 'flex:0 0 100%;width:100%;display:flex;align-items:center;justify-content:center;';
+            const isVideo = (m.mime_type || '').startsWith('video/');
+            const el = document.createElement(isVideo ? 'video' : 'img');
+            el.src = m.url || m.thumbnail_url || '';
+            el.style.cssText = 'max-width:100%;max-height:80vh;object-fit:contain;display:block;' + (isVideo ? '' : 'pointer-events:none;');
+            if (isVideo) { el.muted = true; el.autoplay = true; el.loop = true; el.playsInline = true; }
+            else { el.alt = ''; el.draggable = false; }
+            slide.appendChild(el);
+            track.appendChild(slide);
+        });
+
+        viewport.appendChild(track);
+        host.appendChild(viewport);
+        applyPreviewTransform(false);
+        updatePreviewChrome();
+    }
+
+    function applyPreviewTransform(animate) {
+        const track = document.getElementById('postPreviewTrack');
+        if (!track) return;
+        track.style.transition = animate === false ? 'none' : 'transform 0.3s ease';
+        track.style.transform = `translateX(-${preview.index * 100}%)`;
+        if (animate === false) {
+            requestAnimationFrame(() => { track.style.transition = 'transform 0.3s ease'; });
+        }
+    }
+
+    function updatePreviewChrome() {
+        const prev = document.getElementById('postPreviewPrev');
+        const next = document.getElementById('postPreviewNext');
+        const counter = document.getElementById('postPreviewCounter');
+        const dots = document.getElementById('postPreviewDots');
+        const multi = preview.media.length > 1;
+
+        prev.style.display = multi ? 'flex' : 'none';
+        next.style.display = multi ? 'flex' : 'none';
+        counter.style.display = multi ? 'block' : 'none';
+        counter.textContent = `${preview.index + 1}/${preview.media.length}`;
+
+        dots.style.display = multi ? 'flex' : 'none';
+        while (dots.firstChild) dots.removeChild(dots.firstChild);
+        if (multi) {
+            for (let i = 0; i < preview.media.length; i++) {
+                const d = document.createElement('div');
+                d.style.cssText = `width:7px;height:7px;border-radius:50%;background:${i === preview.index ? '#fff' : 'rgba(255,255,255,0.4)'};`;
+                dots.appendChild(d);
+            }
+        }
+    }
+
+    function previewAt(index) {
+        if (!preview.media.length) return;
+        preview.index = Math.max(0, Math.min(preview.media.length - 1, index));
+        applyPreviewTransform(true);
+        updatePreviewChrome();
+    }
+    function previewNext() { previewAt(preview.index + 1); }
+    function previewPrev() { previewAt(preview.index - 1); }
+
+    function ensurePreviewWired() {
+        const viewport = document.getElementById('postPreviewViewport');
+        if (!viewport || viewport.dataset.wired === '1') return;
+        viewport.dataset.wired = '1';
+
+        const track = document.getElementById('postPreviewTrack');
+
+        const onStart = (x) => {
+            if (preview.media.length < 2) return;
+            preview.dragging = true;
+            preview.startX = x;
+            preview.currentDx = 0;
+            preview.width = viewport.clientWidth;
+            track.style.transition = 'none';
+        };
+        const onMove = (x) => {
+            if (!preview.dragging) return;
+            preview.currentDx = x - preview.startX;
+            const base = -preview.index * preview.width;
+            track.style.transform = `translate3d(${base + preview.currentDx}px, 0, 0)`;
+        };
+        const onEnd = () => {
+            if (!preview.dragging) return;
+            preview.dragging = false;
+            track.style.transition = 'transform 0.3s ease';
+            const threshold = preview.width * 0.18;
+            if (preview.currentDx < -threshold) preview.index = Math.min(preview.media.length - 1, preview.index + 1);
+            else if (preview.currentDx > threshold)  preview.index = Math.max(0, preview.index - 1);
+            track.style.transform = `translateX(-${preview.index * 100}%)`;
+            preview.currentDx = 0;
+            updatePreviewChrome();
+        };
+
+        viewport.addEventListener('touchstart', (e) => onStart(e.touches[0].clientX), { passive: true });
+        viewport.addEventListener('touchmove',  (e) => onMove(e.touches[0].clientX),  { passive: true });
+        viewport.addEventListener('touchend',   onEnd);
+        viewport.addEventListener('touchcancel', onEnd);
+
+        viewport.addEventListener('mousedown', (e) => { onStart(e.clientX); e.preventDefault(); });
+        window.addEventListener('mousemove',   (e) => onMove(e.clientX));
+        window.addEventListener('mouseup',     onEnd);
+
+        viewport.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft')  { e.preventDefault(); previewPrev(); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); previewNext(); }
+        });
     }
 
     function closePostPreview() {
@@ -382,7 +548,18 @@
         const vid = document.querySelector('#postPreviewMedia video');
         if (vid) vid.pause();
         previewPostId = null;
+        preview.media = [];
+        preview.index = 0;
     }
+
+    // ESC closes the preview, and in the preview ← → navigate the carousel.
+    document.addEventListener('keydown', (e) => {
+        const overlay = document.getElementById('postPreviewOverlay');
+        if (!overlay || overlay.style.display !== 'flex') return;
+        if (e.key === 'Escape') closePostPreview();
+        if (e.key === 'ArrowLeft')  previewPrev();
+        if (e.key === 'ArrowRight') previewNext();
+    });
 
     function editFromPreview() {
         const id = previewPostId;
@@ -391,9 +568,8 @@
     }
 
     function downloadFromPreview() {
-        const img = document.querySelector('#postPreviewMedia img');
-        const vid = document.querySelector('#postPreviewMedia video');
-        const src = img?.src || vid?.src;
+        const active = preview.media[preview.index];
+        const src = active?.url || active?.thumbnail_url;
         if (src) { const a = document.createElement('a'); a.href = src; a.download = ''; a.click(); }
     }
 </script>
@@ -414,12 +590,27 @@
             <iconify-icon icon="heroicons-outline:x-mark" width="20" style="color:#fff;"></iconify-icon>
         </button>
     </div>
-    {{-- Media --}}
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 40px 20px;min-height:0;" onclick="closePostPreview()">
-        <div id="postPreviewMedia" onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center;"></div>
+    {{-- Media (with carousel controls) --}}
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 60px 20px;min-height:0;position:relative;" onclick="closePostPreview()">
+        <div id="postPreviewMedia" onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center;position:relative;"></div>
+
+        {{-- Carousel arrows (stopPropagation so they don't close the overlay) --}}
+        <button type="button" id="postPreviewPrev" onclick="event.stopPropagation(); previewPrev();" aria-label="Previous"
+            style="display:none; position:absolute; left:12px; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); border:none; cursor:pointer; align-items:center; justify-content:center;">
+            <iconify-icon icon="heroicons-outline:chevron-left" width="22" style="color:#fff;"></iconify-icon>
+        </button>
+        <button type="button" id="postPreviewNext" onclick="event.stopPropagation(); previewNext();" aria-label="Next"
+            style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); border:none; cursor:pointer; align-items:center; justify-content:center;">
+            <iconify-icon icon="heroicons-outline:chevron-right" width="22" style="color:#fff;"></iconify-icon>
+        </button>
+
+        {{-- Counter badge top-right of the media --}}
+        <div id="postPreviewCounter" onclick="event.stopPropagation()" style="display:none; position:absolute; top:8px; right:70px; background:rgba(0,0,0,0.55); color:#fff; font-size:12px; font-weight:500; padding:4px 10px; border-radius:12px;"></div>
     </div>
-    {{-- Caption --}}
+
+    {{-- Dots indicator + Caption --}}
     <div style="padding:0 40px 20px;text-align:center;">
+        <div id="postPreviewDots" onclick="event.stopPropagation()" style="display:none; justify-content:center; gap:6px; margin-bottom:10px;"></div>
         <p id="postPreviewCaption" style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;max-width:500px;display:inline-block;"></p>
     </div>
 </div>
