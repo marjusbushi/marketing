@@ -70,6 +70,8 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::post('/api/posts/{id}/duplicate', [ContentPlannerApiController::class, 'duplicatePost'])
             ->name('api.posts.duplicate')
             ->middleware('marketing.permission:' . P::CONTENT_PLANNER_CREATE->value);
+        Route::get('/api/schedule/suggestions', [ContentPlannerApiController::class, 'scheduleSuggestions'])
+            ->name('api.schedule.suggestions');
         Route::post('/api/posts/batch-schedule', [ContentPlannerApiController::class, 'batchSchedule'])
             ->name('api.posts.batch-schedule')
             ->middleware('marketing.permission:' . P::CONTENT_PLANNER_PUBLISH->value);

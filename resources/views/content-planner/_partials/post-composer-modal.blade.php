@@ -253,9 +253,9 @@
     </div>
 </div>
 
-{{-- Schedule Picker Modal --}}
+{{-- Schedule Picker Modal (Planable-style: calendar + top picks + engagement forecast + recurring) --}}
 <div id="schedPickerOverlay" class="hidden fixed inset-0 bg-black/20 z-[9998]" onclick="closeSchedulePicker()"></div>
-<div id="schedPickerModal" class="hidden fixed z-[9999] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden" style="width:480px; top:50%; left:50%; transform:translate(-50%,-50%);">
+<div id="schedPickerModal" class="hidden fixed z-[9999] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden" style="width:640px; max-width:95vw; top:50%; left:50%; transform:translate(-50%,-50%);">
     <div style="display:flex; min-height:0;">
         {{-- Calendar side --}}
         <div style="flex:1; padding:20px 16px 12px; border-right:1px solid #f1f5f9;">
@@ -281,20 +281,57 @@
             </div>
             <div id="schedCalendarGrid" style="display:grid; grid-template-columns:repeat(7,1fr); text-align:center;"></div>
         </div>
-        {{-- Time side — Planable-style single input --}}
-        <div style="width:170px; padding:20px 16px 12px; display:flex; flex-direction:column;">
-            <div style="font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px;">Select time</div>
-            <input id="schedTimeInput" type="time" value="12:00" style="width:100%; height:40px; border:1px solid #e2e8f0; border-radius:8px; padding:0 12px; font-size:15px; font-weight:600; color:#1e293b; text-align:center; outline:none; font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'" onchange="updateSchedSummary()">
-            <div style="margin-top:16px;">
-                <div style="font-size:10px; font-weight:500; color:#94a3b8; margin-bottom:6px;">Quick picks</div>
-                <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                    <button onclick="setQuickTime('09:00')" style="padding:3px 8px; font-size:11px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">09:00</button>
-                    <button onclick="setQuickTime('12:00')" style="padding:3px 8px; font-size:11px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">12:00</button>
-                    <button onclick="setQuickTime('15:00')" style="padding:3px 8px; font-size:11px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">15:00</button>
-                    <button onclick="setQuickTime('18:00')" style="padding:3px 8px; font-size:11px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">18:00</button>
-                    <button onclick="setQuickTime('20:00')" style="padding:3px 8px; font-size:11px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">20:00</button>
-                    <button onclick="setQuickTime('21:30')" style="padding:3px 8px; font-size:11px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">21:30</button>
+
+        {{-- Time + suggestions side --}}
+        <div style="width:300px; padding:20px 18px 12px; display:flex; flex-direction:column; gap:14px;">
+            {{-- Select time heading + help tooltip --}}
+            <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:11px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Select time</span>
+            </div>
+
+            {{-- Top picks for you (Planable-style) --}}
+            <div>
+                <div style="display:flex; align-items:center; gap:5px; margin-bottom:8px;">
+                    <span style="font-size:11px; font-weight:600; color:#0f172a;">Top picks for you</span>
+                    <span title="Based on your past 90 days of scheduled posts" style="cursor:help; color:#cbd5e1;">
+                        <iconify-icon icon="heroicons-outline:question-mark-circle" width="13"></iconify-icon>
+                    </span>
                 </div>
+                <div id="schedTopPicks" style="display:flex; gap:8px;">
+                    {{-- Filled by JS: two buttons with HH:MM times --}}
+                </div>
+            </div>
+
+            {{-- Time input (replaces old quick-picks) --}}
+            <div>
+                <input id="schedTimeInput" type="time" value="12:00" style="width:100%; height:38px; border:1px solid #e2e8f0; border-radius:8px; padding:0 12px; font-size:14px; font-weight:600; color:#1e293b; text-align:center; outline:none; font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'" onchange="updateSchedSummary()">
+            </div>
+
+            {{-- Engagement forecast bar chart --}}
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <span style="font-size:10px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Engagement forecast</span>
+                    <span style="font-size:9px; color:#94a3b8;">3-hour avg</span>
+                </div>
+                <div id="schedForecast" style="display:flex; align-items:flex-end; gap:4px; height:56px; padding:4px 0;">
+                    {{-- Filled by JS: 8 bars --}}
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-top:4px;">
+                    <span style="font-size:9px; color:#cbd5e1;">00</span>
+                    <span style="font-size:9px; color:#cbd5e1;">06</span>
+                    <span style="font-size:9px; color:#cbd5e1;">12</span>
+                    <span style="font-size:9px; color:#cbd5e1;">18</span>
+                </div>
+            </div>
+
+            {{-- Recurring toggle --}}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background:#f8fafc; border-radius:8px; margin-top:auto;">
+                <span style="font-size:12px; font-weight:500; color:#334155;">Recurring</span>
+                <label style="position:relative; display:inline-block; width:32px; height:18px;">
+                    <input id="schedRecurring" type="checkbox" style="opacity:0; width:0; height:0;" onchange="updateSchedSummary()">
+                    <span class="cp-switch-track" style="position:absolute; cursor:pointer; inset:0; background:#e2e8f0; border-radius:9px; transition:0.2s;"></span>
+                    <span class="cp-switch-thumb" style="position:absolute; height:14px; width:14px; left:2px; bottom:2px; background:#fff; border-radius:50%; transition:0.2s; box-shadow:0 1px 2px rgba(0,0,0,0.1);"></span>
+                </label>
             </div>
         </div>
     </div>
@@ -302,7 +339,7 @@
         <span id="schedSummary" class="text-xs text-slate-500 font-medium"></span>
         <div style="display:flex; gap:8px;">
             <button onclick="closeSchedulePicker()" class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors">Cancel</button>
-            <button onclick="applySchedule()" class="px-4 py-1.5 text-xs font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 shadow-sm transition-colors">Apply</button>
+            <button onclick="applySchedule()" class="px-4 py-1.5 text-xs font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 shadow-sm transition-colors">Save</button>
         </div>
     </div>
 </div>
@@ -337,6 +374,24 @@
     /* Campaign / Labels pills (top bar) */
     #composerCampaignPill:hover, #composerLabelsPill:hover { background:#f8fafc; border-color:#cbd5e1; color:#1e293b; }
     #composerCampaignPill.has-value, #composerLabelsPill.has-value { background:#eef2ff; border-color:#a5b4fc; color:#3730a3; }
+
+    /* Schedule picker — Top picks */
+    .sched-top-pick { flex:1; height:40px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; font-size:14px; font-weight:600; color:#1e293b; cursor:pointer; transition:all 0.15s; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:4px 0; }
+    .sched-top-pick:hover { border-color:#6366f1; background:#eef2ff; }
+    .sched-top-pick.selected { border-color:#6366f1; background:#6366f1; color:#fff; }
+    .sched-top-pick-time { line-height:1; }
+    .sched-top-pick-score { font-size:9px; font-weight:500; opacity:0.7; margin-top:2px; line-height:1; text-transform:uppercase; letter-spacing:0.05em; }
+
+    /* Schedule picker — Forecast bars */
+    .sched-bar { flex:1; background:#e2e8f0; border-radius:3px 3px 0 0; min-height:4px; transition:all 0.2s; position:relative; }
+    .sched-bar.peak { background:linear-gradient(to top, #3b82f6, #6366f1); }
+    .sched-bar.near-current { background:#6366f1; }
+    .sched-bar.dim { background:#e2e8f0; }
+    .sched-bar:hover { opacity:0.8; }
+
+    /* Recurring switch */
+    #schedRecurring:checked ~ .cp-switch-track { background:#6366f1 !important; }
+    #schedRecurring:checked ~ .cp-switch-thumb { transform:translateX(14px); }
 </style>
 
 <script>
@@ -783,6 +838,100 @@
         }
         renderSchedCalendar();
         updateSchedSummary();
+
+        // Fetch + render engagement suggestions (async, doesn't block the picker)
+        loadSchedSuggestions();
+    }
+
+    // ── Engagement forecast + top picks (Faza 4) ──
+    async function loadSchedSuggestions() {
+        // Render a neutral placeholder first so the panel never looks empty.
+        renderSchedTopPicks([{ time: '11:00', score: 0 }, { time: '19:00', score: 0 }]);
+        renderSchedForecast([
+            { hour: 0, value: 0.1 }, { hour: 3, value: 0.05 }, { hour: 6, value: 0.1 }, { hour: 9, value: 0.5 },
+            { hour: 12, value: 0.8 }, { hour: 15, value: 0.55 }, { hour: 18, value: 0.95 }, { hour: 21, value: 0.7 },
+        ]);
+
+        try {
+            const platform = (composerState.platforms || [])[0];
+            const url = new URL('{{ url('/marketing/planner/api/schedule/suggestions') }}', window.location.origin);
+            if (platform) url.searchParams.set('platform', platform);
+            const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) return; // keep placeholder
+            const data = await res.json();
+            if (Array.isArray(data.top_picks) && data.top_picks.length) {
+                renderSchedTopPicks(data.top_picks);
+            }
+            if (Array.isArray(data.hourly_engagement) && data.hourly_engagement.length) {
+                renderSchedForecast(data.hourly_engagement);
+            }
+        } catch (e) {
+            // Silent — placeholder remains.
+        }
+    }
+
+    function renderSchedTopPicks(picks) {
+        const host = document.getElementById('schedTopPicks');
+        while (host.firstChild) host.removeChild(host.firstChild);
+
+        const current = document.getElementById('schedTimeInput').value;
+        picks.slice(0, 2).forEach(p => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sched-top-pick' + (p.time === current ? ' selected' : '');
+            const t = document.createElement('span');
+            t.className = 'sched-top-pick-time';
+            t.textContent = p.time;
+            const s = document.createElement('span');
+            s.className = 'sched-top-pick-score';
+            s.textContent = p.score > 0.3 ? 'Peak' : 'Good';
+            btn.append(t, s);
+            btn.onclick = () => {
+                document.getElementById('schedTimeInput').value = p.time;
+                updateSchedSummary();
+                // Re-render picks to update the selected state.
+                renderSchedTopPicks(picks);
+            };
+            host.appendChild(btn);
+        });
+    }
+
+    function renderSchedForecast(bars) {
+        const host = document.getElementById('schedForecast');
+        while (host.firstChild) host.removeChild(host.firstChild);
+
+        const currentTime = document.getElementById('schedTimeInput').value || '12:00';
+        const currentHour = parseInt(currentTime.split(':')[0], 10);
+        const currentBucket = Math.floor(currentHour / 3) * 3;
+
+        const maxValue = Math.max(...bars.map(b => Number(b.value) || 0), 0.01);
+
+        bars.forEach(b => {
+            const wrap = document.createElement('div');
+            wrap.className = 'sched-bar';
+            wrap.title = `${String(b.hour).padStart(2,'0')}:00–${String((b.hour+3)%24).padStart(2,'0')}:00${b.count != null ? ' · ' + b.count + ' posts' : ''}`;
+            // Height as percentage of the chart height (max 100%).
+            const pct = Math.max(6, Math.round((Number(b.value) || 0) / maxValue * 100));
+            wrap.style.height = pct + '%';
+
+            if (b.hour === currentBucket) {
+                wrap.classList.add('near-current');
+            } else if ((Number(b.value) || 0) >= 0.8) {
+                wrap.classList.add('peak');
+            } else {
+                wrap.classList.add('dim');
+            }
+
+            wrap.addEventListener('click', () => {
+                // Clicking a bar sets time to the middle of its bucket.
+                const mid = Math.min(23, b.hour + 1);
+                document.getElementById('schedTimeInput').value = String(mid).padStart(2,'0') + ':00';
+                updateSchedSummary();
+                renderSchedForecast(bars);
+            });
+
+            host.appendChild(wrap);
+        });
     }
 
     function closeSchedulePicker() {

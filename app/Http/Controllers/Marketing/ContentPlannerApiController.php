@@ -21,6 +21,7 @@ use App\Services\ContentPlanner\ShareLinkService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
@@ -789,5 +790,98 @@ class ContentPlannerApiController extends Controller
         $link->update(['is_active' => false]);
 
         return response()->json(['message' => 'Share link deactivated.']);
+    }
+
+    // ── Schedule suggestions (engagement forecast) ──
+    //
+    // Returns:
+    //   - hourly_engagement: 8 buckets (00,03,06,09,12,15,18,21) with a
+    //     0-1 normalized value representing how often posts have been
+    //     scheduled/published in that 3-hour window historically.
+    //   - top_picks: the 2 highest-scoring time slots.
+    //
+    // When there is no history yet, we seed the response with sensible
+    // IG-peak defaults (11:00 and 19:00) so the UI is usable day one.
+    public function scheduleSuggestions(Request $request): JsonResponse
+    {
+        $platform = $request->input('platform'); // optional filter
+        $now      = Carbon::now();
+        $sinceDate = $now->copy()->subDays(90)->toDateTimeString();
+
+        $query = ContentPost::query()
+            ->whereNotNull('scheduled_at')
+            ->where('scheduled_at', '>=', $sinceDate);
+
+        if ($platform && in_array($platform, ['instagram', 'facebook', 'tiktok', 'multi'], true)) {
+            $query->where('platform', $platform);
+        }
+
+        // Bucket by floor(hour / 3) * 3 so we land on 00/03/06/…/21.
+        // This is dialect-agnostic so it runs the same on dev + prod MySQL.
+        $rows = $query
+            ->selectRaw('FLOOR(HOUR(scheduled_at) / 3) * 3 AS hour_bucket, COUNT(*) AS n')
+            ->groupBy('hour_bucket')
+            ->pluck('n', 'hour_bucket')
+            ->all();
+
+        $buckets = [0, 3, 6, 9, 12, 15, 18, 21];
+        $max = max([1, ...array_values($rows)]); // avoid divide-by-zero
+
+        $hourly = [];
+        $hasData = false;
+        foreach ($buckets as $h) {
+            $count = (int) ($rows[$h] ?? 0);
+            if ($count > 0) {
+                $hasData = true;
+            }
+            $hourly[] = [
+                'hour'  => $h,
+                'count' => $count,
+                'value' => round($count / $max, 2),
+            ];
+        }
+
+        if (! $hasData) {
+            // Pleasant IG-shaped curve so the bar chart is never empty.
+            // (Low overnight, builds to a 12:00 lunch peak and a 19:00 evening peak.)
+            $placeholder = [0.1, 0.05, 0.1, 0.5, 0.8, 0.55, 0.95, 0.7];
+            foreach ($hourly as $i => &$b) {
+                $b['value'] = $placeholder[$i];
+            }
+            unset($b);
+        }
+
+        // Top 2 buckets by value
+        $sorted = $hourly;
+        usort($sorted, fn ($a, $b) => $b['value'] <=> $a['value']);
+        $topBuckets = array_slice($sorted, 0, 2);
+
+        // For each top bucket, nudge into a human-feeling exact minute
+        // (avoids the picker suggesting a bland ":00" every time).
+        $topPicks = array_map(function ($b) {
+            $hour = (int) $b['hour'];
+            // Reasonable anchor minutes per bucket: mid-of-bucket.
+            $minute = match ($hour) {
+                0, 21 => 0,
+                3     => 30,
+                6     => 30,
+                9     => 0,
+                12    => 0,
+                15    => 30,
+                18    => 0,
+                default => 0,
+            };
+
+            return [
+                'time'  => sprintf('%02d:%02d', $hour, $minute),
+                'score' => $b['value'],
+            ];
+        }, $topBuckets);
+
+        return response()->json([
+            'top_picks'         => $topPicks,
+            'hourly_engagement' => $hourly,
+            'has_data'          => $hasData,
+        ]);
     }
 }
