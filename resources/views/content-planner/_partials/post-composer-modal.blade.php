@@ -367,9 +367,64 @@
     .cp-device-btn { transition: all 0.15s; }
     .cp-device-btn.active { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
     .cp-device-btn:not(.active):hover { background: rgba(255,255,255,0.5); }
-    /* When phone preview is active, preview card shrinks to ~iPhone width */
-    #composerPreviewCard.device-phone { max-width: 320px; }
+
+    /* Desktop mode — plain card */
     #composerPreviewCard.device-desktop { max-width: 380px; }
+
+    /* Phone mode — wrap card inside an iPhone-like bezel with notch.
+       The .cp-phone-frame pseudo-elements draw the outer bezel and notch
+       so no extra DOM is needed; the card itself sits inside with padding. */
+    #composerPreviewCard.device-phone {
+        max-width: 340px;
+        padding: 12px 10px 26px;
+        background: #111827;
+        border-radius: 42px;
+        box-shadow:
+            0 0 0 2px #1f2937,           /* outer rim */
+            0 20px 50px rgba(0,0,0,0.18); /* drop shadow */
+        position: relative;
+    }
+    /* Notch (speaker + camera pill) */
+    #composerPreviewCard.device-phone::before {
+        content: '';
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 110px;
+        height: 22px;
+        background: #111827;
+        border-radius: 0 0 14px 14px;
+        z-index: 2;
+    }
+    /* Home indicator bar */
+    #composerPreviewCard.device-phone::after {
+        content: '';
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 110px;
+        height: 4px;
+        background: #374151;
+        border-radius: 2px;
+    }
+    /* The card (direct child div) gets rounded inner corners */
+    #composerPreviewCard.device-phone > div {
+        border-radius: 28px !important;
+        overflow: hidden;
+    }
+    /* Photo toolbars sit absolute inside #composerPreviewCard; in phone mode
+       we push them down so they don't overlap the notch, and inward so they
+       stay inside the inner card rather than hovering over the bezel. */
+    #composerPreviewCard.device-phone #composerPhotoToolbarLeft {
+        top: 44px !important;
+        left: 22px !important;
+    }
+    #composerPreviewCard.device-phone #composerPhotoToolbarRight {
+        top: 44px !important;
+        right: 22px !important;
+    }
 
     /* Campaign / Labels pills (top bar) */
     #composerCampaignPill:hover, #composerLabelsPill:hover { background:#f8fafc; border-color:#cbd5e1; color:#1e293b; }
@@ -1123,35 +1178,175 @@
         });
     }
 
-    // ── Campaign / Labels pills (placeholder for Faza 6 polish) ──
-    function openCampaignPicker() {
-        // TODO Faza 6: replace with a proper dropdown fetching /api/campaigns.
-        const name = prompt('Campaign name (leave empty to remove):', '');
+    // ── Campaign / Labels dropdowns ──
+    //
+    // Real dropdowns that fetch from the existing planner API. Clicking the
+    // pill opens a lightweight popover anchored to the pill; clicking any
+    // item selects it and updates the pill label + composerState.
+    async function openCampaignPicker() {
         const pill = document.getElementById('composerCampaignPill');
         const span = pill.querySelector('span[data-default]');
-        if (name && name.trim()) {
-            span.textContent = name.trim();
-            pill.classList.add('has-value');
-        } else if (name === '') {
+
+        // Toggle: if the popover is already open, close it.
+        const existing = document.getElementById('cp-campaign-popover');
+        if (existing) { existing.remove(); return; }
+
+        const pop = buildPopover('cp-campaign-popover', pill);
+        const list = document.createElement('div');
+        list.style.cssText = 'max-height:240px; overflow-y:auto;';
+        const loading = document.createElement('div');
+        loading.style.cssText = 'padding:14px 16px; font-size:12px; color:#94a3b8;';
+        loading.textContent = 'Loading campaigns…';
+        list.appendChild(loading);
+        pop.appendChild(list);
+
+        // 'None' row up top
+        const noneRow = buildPopoverRow('— None (clear)', () => {
+            composerState.campaignId = null;
             span.textContent = span.dataset.default;
             pill.classList.remove('has-value');
-            composerState.campaignId = null;
+            pop.remove();
+        });
+        noneRow.style.color = '#94a3b8';
+
+        try {
+            const res = await fetch('{{ route("marketing.planner.api.campaigns.index") }}', { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            list.innerHTML = '';
+            list.appendChild(noneRow);
+            const items = Array.isArray(data) ? data : (data.data || data.campaigns || []);
+            if (items.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'padding:14px 16px; font-size:12px; color:#94a3b8;';
+                empty.textContent = 'No campaigns yet';
+                list.appendChild(empty);
+            } else {
+                items.forEach(c => {
+                    const row = buildPopoverRow(c.name || ('Campaign #' + c.id), () => {
+                        composerState.campaignId = c.id;
+                        span.textContent = c.name || ('Campaign #' + c.id);
+                        pill.classList.add('has-value');
+                        pop.remove();
+                    });
+                    if (c.color) {
+                        const dot = document.createElement('span');
+                        dot.style.cssText = `width:10px; height:10px; border-radius:50%; background:${c.color}; flex-shrink:0;`;
+                        row.prepend(dot);
+                    }
+                    list.appendChild(row);
+                });
+            }
+        } catch (e) {
+            list.textContent = '';
+            const err = document.createElement('div');
+            err.style.cssText = 'padding:14px 16px; font-size:12px; color:#ef4444;';
+            err.textContent = 'Could not load campaigns';
+            list.appendChild(err);
         }
     }
 
-    function openLabelsPicker() {
-        // TODO Faza 6: replace with a proper dropdown fetching /api/labels.
-        const labels = prompt('Labels (comma-separated, leave empty to clear):', '');
+    async function openLabelsPicker() {
         const pill = document.getElementById('composerLabelsPill');
         const span = pill.querySelector('span[data-default]');
-        if (labels && labels.trim()) {
-            const list = labels.split(',').map(s => s.trim()).filter(Boolean);
-            span.textContent = list.length + ' label' + (list.length === 1 ? '' : 's');
-            pill.classList.add('has-value');
-        } else if (labels === '') {
-            span.textContent = span.dataset.default;
-            pill.classList.remove('has-value');
-            composerState.labelIds = [];
+
+        const existing = document.getElementById('cp-labels-popover');
+        if (existing) { existing.remove(); return; }
+
+        const pop = buildPopover('cp-labels-popover', pill);
+        const list = document.createElement('div');
+        list.style.cssText = 'max-height:280px; overflow-y:auto;';
+        const loading = document.createElement('div');
+        loading.style.cssText = 'padding:14px 16px; font-size:12px; color:#94a3b8;';
+        loading.textContent = 'Loading labels…';
+        list.appendChild(loading);
+        pop.appendChild(list);
+
+        composerState.labelIds = composerState.labelIds || [];
+
+        try {
+            const res = await fetch('{{ route("marketing.planner.api.labels.index") }}', { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            list.innerHTML = '';
+            const items = Array.isArray(data) ? data : (data.data || data.labels || []);
+            if (items.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'padding:14px 16px; font-size:12px; color:#94a3b8;';
+                empty.textContent = 'No labels yet';
+                list.appendChild(empty);
+                return;
+            }
+
+            items.forEach(l => {
+                const row = buildPopoverRow(l.name || ('Label #' + l.id), null);
+                row.style.justifyContent = 'space-between';
+                if (l.color) {
+                    const dot = document.createElement('span');
+                    dot.style.cssText = `width:10px; height:10px; border-radius:50%; background:${l.color}; flex-shrink:0;`;
+                    row.prepend(dot);
+                }
+                const mark = document.createElement('span');
+                mark.style.cssText = 'font-size:14px; color:#6366f1;';
+                const refreshMark = () => {
+                    mark.textContent = composerState.labelIds.includes(l.id) ? '\u2713' : '';
+                };
+                refreshMark();
+                row.appendChild(mark);
+
+                row.onclick = () => {
+                    if (composerState.labelIds.includes(l.id)) {
+                        composerState.labelIds = composerState.labelIds.filter(id => id !== l.id);
+                    } else {
+                        composerState.labelIds.push(l.id);
+                    }
+                    refreshMark();
+                    span.textContent = composerState.labelIds.length
+                        ? composerState.labelIds.length + ' label' + (composerState.labelIds.length === 1 ? '' : 's')
+                        : span.dataset.default;
+                    pill.classList.toggle('has-value', composerState.labelIds.length > 0);
+                };
+                list.appendChild(row);
+            });
+        } catch (e) {
+            list.textContent = '';
+            const err = document.createElement('div');
+            err.style.cssText = 'padding:14px 16px; font-size:12px; color:#ef4444;';
+            err.textContent = 'Could not load labels';
+            list.appendChild(err);
         }
+    }
+
+    // Small helper: build a popover anchored below a trigger element.
+    function buildPopover(id, anchor) {
+        const rect = anchor.getBoundingClientRect();
+        const pop = document.createElement('div');
+        pop.id = id;
+        pop.style.cssText = `position:fixed; z-index:10001; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.08); min-width:220px; top:${rect.bottom + 4}px; left:${rect.left}px; overflow:hidden;`;
+        document.body.appendChild(pop);
+
+        // Click-outside closes (after a tick to avoid catching the current click).
+        setTimeout(() => {
+            const onDocClick = (e) => {
+                if (!pop.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) {
+                    pop.remove();
+                    document.removeEventListener('click', onDocClick);
+                }
+            };
+            document.addEventListener('click', onDocClick);
+        }, 0);
+
+        return pop;
+    }
+
+    function buildPopoverRow(label, onClick) {
+        const row = document.createElement('div');
+        row.style.cssText = 'padding:8px 14px; font-size:13px; color:#1e293b; cursor:pointer; display:flex; align-items:center; gap:8px; transition:background 0.1s;';
+        row.onmouseenter = () => row.style.background = '#f8fafc';
+        row.onmouseleave = () => row.style.background = 'transparent';
+        const text = document.createElement('span');
+        text.style.cssText = 'flex:1;';
+        text.textContent = label;
+        row.appendChild(text);
+        if (onClick) row.onclick = onClick;
+        return row;
     }
 </script>
