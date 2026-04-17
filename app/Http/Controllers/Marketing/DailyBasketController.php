@@ -534,11 +534,21 @@ class DailyBasketController extends Controller
         // not block the publish — the ContentPost can still be created without media.
         $mediaIds = $this->cloneProductImagesToMedia($post);
 
+        // Map the basket's post_type into Content Planner's content_type.
+        // Stories need to go to the Stories strip; everything else is a feed post.
+        // Keep the map explicit so reels/carousels render correctly too.
+        $contentType = match ($post->post_type?->value) {
+            'story'    => 'story',
+            'reel'     => 'reel',
+            'carousel' => 'carousel',
+            default    => 'post',   // photo, video, or null
+        };
+
         $contentPost = $this->contentPostService->createPost([
             'platform' => $platform,
             'platforms' => $platforms,
             'content' => $post->caption,
-            'content_type' => 'post',
+            'content_type' => $contentType,
             'scheduled_at' => $post->scheduled_for?->toIso8601String(),
             'status' => 'scheduled',
             'notes' => $notes,

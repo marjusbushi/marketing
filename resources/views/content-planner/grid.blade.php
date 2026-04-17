@@ -206,7 +206,12 @@
         const storiesTrack = document.getElementById('storiesTrack');
         storiesTrack.querySelectorAll('.story-card').forEach(el => el.remove());
 
-        const storyItems = storyPosts.length ? storyPosts : posts.filter(p => p.extendedProps?.thumbnail).slice(0, 12);
+        // Stories shows ONLY posts explicitly marked as stories.
+        // The previous fallback (show any post with a thumbnail when
+        // there are no real stories) caused feed posts to leak into the
+        // Stories strip — every post in the planner appeared in both
+        // sections, which is what the user reported.
+        const storyItems = storyPosts;
         storyItems.forEach(p => {
             const props = p.extendedProps || {};
             const dt = formatShortDate(p.start);
