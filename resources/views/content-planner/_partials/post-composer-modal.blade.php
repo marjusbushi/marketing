@@ -216,11 +216,8 @@
             {{-- Right: Feedback sidebar --}}
             <div style="width:320px; flex-shrink:0; border-left:1px solid #e5e7eb; display:flex; flex-direction:column; background:#fff;">
                 {{-- Header --}}
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid #f1f5f9;">
                     <span style="font-size:14px; font-weight:600; color:#1e293b;">Feedback</span>
-                    <button onclick="toggleFeedbackPanel()" style="width:24px; height:24px; border:none; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                        <iconify-icon icon="heroicons-outline:x-mark" width="16" style="color:#94a3b8;"></iconify-icon>
-                    </button>
                 </div>
                 {{-- Tabs --}}
                 <div style="display:flex; border-bottom:1px solid #f1f5f9;">
@@ -250,22 +247,16 @@
                     </div>
                 </div>
 
-                {{-- Suggestions panel (shown when tab is active) --}}
+                {{-- Suggestions panel (list only — the composer pops up inline from the caption selection) --}}
                 <div id="cp-panel-suggestions" class="cp-feedback-panel" style="display:none; flex-direction:column; flex:1; min-height:0;">
-                    {{-- New suggestion composer: select text from caption + propose a replacement --}}
-                    <div style="padding:12px 16px; border-bottom:1px solid #f1f5f9; display:flex; flex-direction:column; gap:6px;">
-                        <div style="font-size:10px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em;">Suggest an edit</div>
-                        <input id="suggestOriginal" type="text" placeholder="Original text (what you want to replace)" style="width:100%; padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px; outline:none; font-family:inherit;">
-                        <input id="suggestReplacement" type="text" placeholder="Suggested replacement" style="width:100%; padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px; outline:none; font-family:inherit;" onkeydown="if(event.key==='Enter')addSuggestion()">
-                        <div style="display:flex; justify-content:flex-end; gap:6px;">
-                            <button onclick="fillSuggestionFromSelection()" type="button" style="padding:5px 10px; font-size:11px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#64748b; cursor:pointer;" title="Copy currently-selected caption text into the original field">Use selection</button>
-                            <button onclick="addSuggestion()" type="button" style="padding:5px 12px; font-size:11px; border:none; border-radius:6px; background:#6366f1; color:#fff; cursor:pointer; font-weight:500;">Propose</button>
-                        </div>
+                    <div style="padding:10px 16px; border-bottom:1px solid #f1f5f9; background:#fafbfc; font-size:11px; color:#64748b; display:flex; align-items:center; gap:6px;">
+                        <iconify-icon icon="heroicons-outline:cursor-arrow-rays" width="14" style="color:#94a3b8;"></iconify-icon>
+                        Select any text in the caption to suggest an edit.
                     </div>
                     <div id="feedbackSuggestionsList" style="flex:1; overflow-y:auto; padding:16px;">
                         <div class="cp-feedback-empty" style="text-align:center; padding:40px 16px;">
                             <p style="font-size:13px; font-weight:500; color:#64748b; margin:0 0 4px;">No suggestions yet</p>
-                            <p style="font-size:12px; color:#94a3b8; margin:0;">Propose a wording change and the author can accept it in one click.</p>
+                            <p style="font-size:12px; color:#94a3b8; margin:0;">Highlight text in the caption and propose a replacement.</p>
                         </div>
                     </div>
                 </div>
@@ -288,6 +279,24 @@
             </div>
             <input id="storyFileInput" type="file" accept="image/*,video/*" style="display:none;" onchange="handleStoryMedia(this.files); this.value='';">
         </div>
+    </div>
+</div>
+
+{{-- Floating 'Suggest edit' pill — shown next to the caption textarea
+     whenever the user has selected some text. Clicking it opens a small
+     inline popover with just the replacement input. --}}
+<button type="button" id="suggestFloatBtn" class="cp-suggest-float" onclick="openSuggestFloatPopover()" aria-label="Suggest an edit to the selected text">
+    <iconify-icon icon="heroicons-outline:pencil-square" width="13"></iconify-icon>
+    Suggest edit
+</button>
+
+<div id="suggestFloatPopover" style="position:fixed; z-index:10006; display:none; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.15); padding:10px; width:260px; font-family:Inter,system-ui,sans-serif;">
+    <div style="font-size:10px; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Suggest edit</div>
+    <div id="suggestFloatOriginal" style="font-size:12px; line-height:1.5; color:#991b1b; text-decoration:line-through; padding:6px 8px; background:#fef2f2; border-radius:5px; margin-bottom:6px; word-break:break-word;"></div>
+    <input id="suggestFloatReplacement" type="text" placeholder="Replace with…" style="width:100%; padding:7px 10px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px; outline:none; font-family:inherit; margin-bottom:8px;" onkeydown="if(event.key==='Enter')submitSuggestFloat(); if(event.key==='Escape')closeSuggestFloatPopover();">
+    <div style="display:flex; justify-content:flex-end; gap:6px;">
+        <button type="button" onclick="closeSuggestFloatPopover()" style="padding:5px 10px; font-size:11px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#64748b; cursor:pointer;">Cancel</button>
+        <button type="button" onclick="submitSuggestFloat()" style="padding:5px 12px; font-size:11px; border:none; border-radius:6px; background:#6366f1; color:#fff; cursor:pointer; font-weight:500;">Propose</button>
     </div>
 </div>
 
@@ -542,6 +551,36 @@
     .cp-comment-actions { display: flex; gap: 8px; margin-top: 8px; }
     .cp-comment-action-btn { background: none; border: none; cursor: pointer; font-size: 11px; color: #64748b; padding: 0; }
     .cp-comment-action-btn:hover { color: #1e293b; text-decoration: underline; }
+
+    /* Inline 'Suggest edit' floating pill (shown when caption text is selected) */
+    .cp-suggest-float {
+        position: fixed;
+        z-index: 10005;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: #18181b;
+        color: #fff;
+        border: none;
+        border-radius: 18px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        font-family: inherit;
+        animation: cp-float-in 0.12s ease-out;
+    }
+    .cp-suggest-float:hover { background: #27272a; }
+    .cp-suggest-float.visible { display: inline-flex; }
+    @keyframes cp-float-in { from { opacity: 0; transform: translate(-50%, -4px) scale(0.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+
+    /* Highlight of the caption substring that has a pending suggestion.
+       Textarea can't carry HTML, so we underline via text-decoration on a
+       ghost <span> rendered inside the IG mockup when no edit is happening.
+       Simpler fallback: put a faint bottom-border on the original text in
+       the diff card via class .cp-suggestion-pending. */
+    .cp-suggestion-pending { box-shadow: inset 0 -2px 0 rgba(99,102,241,0.35); }
 
     /* Suggestion diff */
     .cp-suggestion-diff { font-size: 12px; line-height: 1.5; background: #f8fafc; border-radius: 6px; padding: 8px 10px; margin-top: 6px; }
@@ -1074,23 +1113,105 @@
         return card;
     }
 
-    // ── Suggestions ──
-    function fillSuggestionFromSelection() {
+    // ── Suggestions (selection-based, Planable-like) ──
+    //
+    // The flow:
+    //   1. User selects text in the caption <textarea>.
+    //   2. On mouseup / keyup, if there IS a selection, a small pill
+    //      "Suggest edit" appears above the selection (position:fixed).
+    //   3. Clicking the pill opens a popover anchored to the same place.
+    //      The popover shows the selected text (read-only, struck through)
+    //      and a single "Replace with…" input. Enter = submit, Esc = close.
+    //   4. On submit, POST to /api/posts/{id}/suggestions and reload the
+    //      right-panel list. The Suggestions tab is auto-switched active.
+    //
+    // No separate form exists in the right panel any more — the right
+    // panel is read-only (a list of past suggestions with Accept/Reject).
+
+    const suggestFloat = {
+        original: '',
+        selStart: 0,
+        selEnd: 0,
+        // Last known position of the floating button (for the popover anchor)
+        anchorX: 0,
+        anchorY: 0,
+    };
+
+    function _updateSuggestFloatFromSelection() {
         const ta = document.getElementById('composerContent');
-        if (!ta) return;
-        const start = ta.selectionStart, end = ta.selectionEnd;
-        if (start === end) return alert('Select some caption text first.');
-        const text = (ta.value || '').substring(start, end);
-        const orig = document.getElementById('suggestOriginal');
-        orig.value = text;
-        document.getElementById('suggestReplacement').focus();
+        const btn = document.getElementById('suggestFloatBtn');
+        if (!ta || !btn) return;
+
+        const start = ta.selectionStart;
+        const end   = ta.selectionEnd;
+
+        // No selection OR composer not open -> hide.
+        const overlay = document.getElementById('postComposerOverlay');
+        if (!overlay || overlay.style.display === 'none') {
+            btn.classList.remove('visible');
+            return;
+        }
+
+        if (start === end) {
+            btn.classList.remove('visible');
+            return;
+        }
+
+        const selected = (ta.value || '').substring(start, end).trim();
+        if (!selected) {
+            btn.classList.remove('visible');
+            return;
+        }
+
+        // Compute a reasonable floating position near the selection.
+        // Textareas don't expose per-character coords, so we anchor above
+        // the textarea at the horizontal center of the caret approximation.
+        const rect = ta.getBoundingClientRect();
+        suggestFloat.original = selected;
+        suggestFloat.selStart = start;
+        suggestFloat.selEnd   = end;
+        suggestFloat.anchorX  = rect.left + Math.min(rect.width - 40, Math.max(40, rect.width / 2));
+        suggestFloat.anchorY  = rect.top - 10;
+
+        btn.style.left = suggestFloat.anchorX + 'px';
+        btn.style.top  = suggestFloat.anchorY + 'px';
+        btn.style.transform = 'translate(-50%, -100%)';
+        btn.classList.add('visible');
     }
 
-    async function addSuggestion() {
-        if (!composerState.postId) return alert('Save the post first.');
-        const original = document.getElementById('suggestOriginal').value.trim();
-        const replacement = document.getElementById('suggestReplacement').value.trim();
-        if (!original || !replacement) return alert('Both original and suggested text are required.');
+    function openSuggestFloatPopover() {
+        if (!composerState.postId) {
+            alert('Save the post first.');
+            return;
+        }
+        if (!suggestFloat.original) return;
+
+        const pop = document.getElementById('suggestFloatPopover');
+        const orig = document.getElementById('suggestFloatOriginal');
+        const rep  = document.getElementById('suggestFloatReplacement');
+        orig.textContent = suggestFloat.original;
+        rep.value = '';
+
+        // Position the popover just below the floating button.
+        pop.style.left = suggestFloat.anchorX + 'px';
+        pop.style.top  = (suggestFloat.anchorY + 28) + 'px';
+        pop.style.transform = 'translate(-50%, 0)';
+        pop.style.display = 'block';
+        setTimeout(() => rep.focus(), 20);
+
+        // Hide the pill while the popover is open.
+        document.getElementById('suggestFloatBtn').classList.remove('visible');
+    }
+
+    function closeSuggestFloatPopover() {
+        document.getElementById('suggestFloatPopover').style.display = 'none';
+    }
+
+    async function submitSuggestFloat() {
+        const replacement = (document.getElementById('suggestFloatReplacement').value || '').trim();
+        if (!replacement) return;
+        const original = suggestFloat.original;
+        if (!original) return;
 
         try {
             const res = await fetch('{{ url('/marketing/planner/api/posts') }}/' + composerState.postId + '/suggestions', {
@@ -1099,13 +1220,39 @@
                 body: JSON.stringify({ original_text: original, suggested_text: replacement }),
             });
             if (!res.ok) throw new Error('HTTP ' + res.status);
-            document.getElementById('suggestOriginal').value = '';
-            document.getElementById('suggestReplacement').value = '';
-            loadSuggestions();
         } catch (e) {
             alert('Could not save suggestion: ' + e.message);
+            return;
         }
+
+        closeSuggestFloatPopover();
+        loadSuggestions();
+
+        // Switch the side panel to the Suggestions tab so the new card is visible.
+        const suggestionsTab = document.querySelector('.cp-feedback-tab[data-feedback-tab="suggestions"]');
+        if (suggestionsTab) switchFeedbackTab('suggestions', suggestionsTab);
     }
+
+    // Wire selection listeners once on DOM ready. Using capture-mouseup on
+    // document so it fires even when the user releases outside the textarea.
+    document.addEventListener('DOMContentLoaded', () => {
+        const ta = document.getElementById('composerContent');
+        if (!ta) return;
+        ['mouseup', 'keyup', 'select', 'focus'].forEach(evt => {
+            ta.addEventListener(evt, _updateSuggestFloatFromSelection);
+        });
+        // Hide the pill if the user clicks elsewhere (but not on the pill
+        // itself or the popover).
+        document.addEventListener('mousedown', (e) => {
+            const btn = document.getElementById('suggestFloatBtn');
+            const pop = document.getElementById('suggestFloatPopover');
+            if (!btn) return;
+            if (e.target === btn || btn.contains(e.target)) return;
+            if (pop && pop.contains(e.target)) return;
+            if (e.target === ta || ta.contains(e.target)) return;
+            btn.classList.remove('visible');
+        });
+    });
 
     async function loadSuggestions() {
         if (!composerState.postId) return;
