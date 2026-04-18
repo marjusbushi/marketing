@@ -84,7 +84,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'features' => [
-        'tiktok_module' => env('TIKTOK_FEATURE_MODULE', false),
-        'tiktok_organic' => env('TIKTOK_FEATURE_ORGANIC', false),
+        'tiktok_module' => env('TIKTOK_FEATURE_MODULE', true),
+        'tiktok_organic' => env('TIKTOK_FEATURE_ORGANIC', true),
     ],
 ];
