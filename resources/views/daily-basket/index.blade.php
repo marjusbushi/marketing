@@ -934,7 +934,7 @@
         const stats = [
             { val: products.length, lbl: 'Caktuar' },
             { val: totalStock.toLocaleString('sq-AL'), lbl: 'Stok' },
-            { val: '€' + Math.round(totalValue).toLocaleString('sq-AL'), lbl: 'Vlere' },
+            { val: Math.round(totalValue).toLocaleString('sq-AL') + ' L', lbl: 'Vlere' },
             { val: usedCount + '/' + products.length, lbl: 'Posts' },
         ];
         stats.forEach(s => {
@@ -1038,10 +1038,10 @@
         right.className = 'db-pano-card-right';
         const price = document.createElement('div');
         price.className = 'db-pano-card-price';
-        price.textContent = p.avg_price != null ? '€' + Math.round(+p.avg_price) : '—';
+        price.textContent = p.avg_price != null ? Math.round(+p.avg_price).toLocaleString('sq-AL') + ' L' : '—';
         const stock = document.createElement('div');
         stock.className = 'db-pano-card-stock';
-        stock.textContent = (p.total_stock || 0) + ' stk';
+        stock.textContent = (p.total_stock || 0) + ' pcs';
         right.append(price, stock);
         card.appendChild(right);
         return card;
@@ -1536,7 +1536,7 @@
             const bits = [];
             if (p.code) bits.push(p.code);
             if (p.classification) bits.push(p.classification);
-            if (p.avg_price != null) bits.push('€' + Math.round(+p.avg_price));
+            if (p.avg_price != null) bits.push(Math.round(+p.avg_price).toLocaleString('sq-AL') + ' L');
             sub.textContent = bits.join(' · ');
             info.append(name, sub);
 
