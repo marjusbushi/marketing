@@ -324,9 +324,10 @@
     .db-pano-b-rem { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
     .db-pano-b-used { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
     .db-pano-b-unused { background: #f8fafc; color: #94a3b8; border: 1px dashed #cbd5e1; }
-    .db-pano-card-right { text-align: right; flex-shrink: 0; min-width: 50px; }
-    .db-pano-card-price { font-size: 13px; font-weight: 700; color: #0f172a; }
+    .db-pano-card-right { text-align: right; flex-shrink: 0; min-width: 70px; }
+    .db-pano-card-price { font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.2; }
     .db-pano-card-stock { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .db-pano-card-value { font-size: 10px; color: #16a34a; font-weight: 600; margin-top: 1px; }
 
     .db-pano-empty { padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.6; }
     .db-pano-empty strong { color: #475569; display: block; margin-bottom: 6px; }
@@ -1043,6 +1044,17 @@
         stock.className = 'db-pano-card-stock';
         stock.textContent = (p.total_stock || 0) + ' pcs';
         right.append(price, stock);
+
+        // Stock value (price × stock) — e njejta metrike si "Vlere stoku"
+        // per te gjithe diten, por per cdo produkt ne karte.
+        if (p.avg_price != null && (p.total_stock || 0) > 0) {
+            const value = document.createElement('div');
+            value.className = 'db-pano-card-value';
+            const stockValue = Math.round((+p.avg_price) * p.total_stock);
+            value.textContent = stockValue.toLocaleString('sq-AL') + ' L';
+            right.appendChild(value);
+        }
+
         card.appendChild(right);
         return card;
     }
