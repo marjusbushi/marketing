@@ -1003,7 +1003,7 @@
         name.textContent = p.name || '—';
         const meta = document.createElement('div');
         meta.className = 'db-pano-card-meta';
-        meta.textContent = [p.code, p.vendor_name].filter(Boolean).join(' · ');
+        meta.textContent = p.code || '';
         info.append(name, meta);
 
         const badges = document.createElement('div');
