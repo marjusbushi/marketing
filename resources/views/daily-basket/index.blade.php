@@ -259,6 +259,78 @@
     }
     .db-inline-input:focus { outline: none; border-color: var(--db-text); }
     .db-inline-hint { font-size: 10px; color: var(--db-text-3); margin-top: 4px; }
+
+    /* ─── Panorama sidebar (orientim per produktet e dites) ────── */
+    .db-pano-btn {
+        background: #eef2ff; color: #4338ca;
+        border: 1px solid #c7d2fe; border-radius: 6px;
+        padding: 7px 12px; font-size: 12px; font-weight: 500;
+        cursor: pointer; margin-right: 8px;
+    }
+    .db-pano-btn:hover:not(:disabled) { background: #e0e7ff; }
+    .db-pano-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .db-pano {
+        display: none;
+        position: fixed; top: 0; right: 0; bottom: 0;
+        width: 420px; z-index: 9985;
+        background: #fff; border-left: 1px solid #e5e7eb;
+        box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+        font-family: Inter, system-ui, sans-serif;
+        flex-direction: column; overflow: hidden;
+    }
+    .db-pano.open { display: flex; }
+
+    .db-pano-head { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .db-pano-head-title { font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.3; }
+    .db-pano-head-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .db-pano-close { width: 28px; height: 28px; border: none; background: none; cursor: pointer; border-radius: 6px; font-size: 16px; color: #94a3b8; flex-shrink: 0; }
+    .db-pano-close:hover { background: #f1f5f9; color: #0f172a; }
+
+    .db-pano-body { flex: 1; overflow-y: auto; }
+
+    .db-pano-strip { display: flex; padding: 10px 16px; gap: 4px; border-bottom: 1px solid #f1f5f9; }
+    .db-pano-day { flex: 1; text-align: center; padding: 6px 4px; border-radius: 5px; font-size: 9px; color: #94a3b8; cursor: pointer; }
+    .db-pano-day:hover:not(.active) { background: #f8fafc; color: #475569; }
+    .db-pano-day.active { background: #18181b; color: #fff; font-weight: 600; }
+    .db-pano-day .num { font-size: 11px; font-weight: 700; margin-top: 2px; }
+    .db-pano-day .cnt { font-size: 9px; margin-top: 2px; opacity: 0.85; }
+
+    .db-pano-stats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 14px 16px; border-bottom: 1px solid #f1f5f9; gap: 4px; }
+    .db-pano-stat { text-align: center; }
+    .db-pano-stat-val { font-size: 15px; font-weight: 700; color: #0f172a; }
+    .db-pano-stat-lbl { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+    .db-pano-filters { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; }
+    .db-pano-filters-title { font-size: 13px; font-weight: 600; color: #0f172a; }
+    .db-pano-filters-btns { display: flex; gap: 3px; flex-wrap: wrap; }
+    .db-pano-filter-btn { padding: 3px 8px; font-size: 10px; border-radius: 4px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; }
+    .db-pano-filter-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+    .db-pano-filter-btn:hover:not(.active) { background: #f8fafc; }
+
+    .db-pano-card { display: flex; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #f8fafc; }
+    .db-pano-card:hover { background: #fafbfc; }
+    .db-pano-img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #f1f5f9; }
+    .db-pano-img-ph { width: 56px; height: 56px; border-radius: 8px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; color: #cbd5e1; }
+    .db-pano-card-info { flex: 1; min-width: 0; }
+    .db-pano-card-name { font-size: 12px; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .db-pano-card-meta { font-size: 10px; color: #94a3b8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .db-pano-card-badges { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+    .db-pano-badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+    .db-pano-b-best_seller { background: #fef3c7; color: #92400e; }
+    .db-pano-b-karrem { background: #d1fae5; color: #065f46; }
+    .db-pano-b-fashion { background: #fce7f3; color: #9d174d; }
+    .db-pano-b-plotesues { background: #e0e7ff; color: #3730a3; }
+    .db-pano-b-rem { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+    .db-pano-b-used { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .db-pano-b-unused { background: #f8fafc; color: #94a3b8; border: 1px dashed #cbd5e1; }
+    .db-pano-card-right { text-align: right; flex-shrink: 0; min-width: 50px; }
+    .db-pano-card-price { font-size: 13px; font-weight: 700; color: #0f172a; }
+    .db-pano-card-stock { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+    .db-pano-empty { padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.6; }
+    .db-pano-empty strong { color: #475569; display: block; margin-bottom: 6px; }
+    .db-pano-fallback-hint { padding: 12px 16px; background: #fffbeb; border-top: 1px dashed #fde68a; font-size: 11px; color: #92400e; line-height: 1.5; text-align: center; }
 </style>
 @endsection
 
@@ -270,7 +342,24 @@
             <div class="db-title">Shporta Ditore</div>
             <div class="db-meta" id="dbCurrentDate">—</div>
         </div>
-        <button class="db-btn db-btn-primary" id="dbBtnNewPost" disabled>+ Post i ri</button>
+        <div>
+            <button class="db-pano-btn" id="dbBtnPano" disabled>📦 Panorama</button>
+            <button class="db-btn db-btn-primary" id="dbBtnNewPost" disabled>+ Post i ri</button>
+        </div>
+    </div>
+
+    <!-- Panorama sidebar — orientim per produktet e dites -->
+    <div class="db-pano" id="dbPano">
+        <div class="db-pano-head">
+            <div style="flex:1; min-width:0;">
+                <div class="db-pano-head-title" id="dbPanoTitle">Panorama</div>
+                <div class="db-pano-head-sub" id="dbPanoSub">—</div>
+            </div>
+            <button class="db-pano-close" id="dbPanoClose" aria-label="Mbyll">×</button>
+        </div>
+        <div class="db-pano-body" id="dbPanoBody">
+            <div class="db-pano-empty">Po ngarkohet…</div>
+        </div>
     </div>
 
     <!-- New/Edit Post modal -->
@@ -719,11 +808,250 @@
             renderBoard(data);
             renderSheet(null);
 
-            // Enable "+ Post i ri" now that we have a basket
+            // Enable "+ Post i ri" + Panorama now that we have a basket
             document.getElementById('dbBtnNewPost').disabled = false;
+            document.getElementById('dbBtnPano').disabled = false;
+            renderPanorama();
         } catch (e) {
             showError('Ngarkimi i ditës dështoi: ' + e.message);
         }
+    }
+
+    // ── Panorama: orientim per produktet e dites ──────────────
+    const panoState = { filter: 'all' };
+
+    function openPanorama() {
+        if (!state.kanban) return;
+        document.getElementById('dbPano').classList.add('open');
+        renderPanorama();
+    }
+    function closePanorama() {
+        document.getElementById('dbPano').classList.remove('open');
+    }
+
+    function renderPanorama() {
+        if (!document.getElementById('dbPano').classList.contains('open')) return;
+
+        const dt = state.selectedDate ? new Date(state.selectedDate) : null;
+        const collName = state.week?.name || '—';
+        document.getElementById('dbPanoTitle').textContent = dt
+            ? DAY_NAMES[dt.getDay()] + ' · ' + String(dt.getDate()).padStart(2, '0') + ' ' + MONTH_NAMES[dt.getMonth()] + ' ' + dt.getFullYear()
+            : 'Panorama';
+        document.getElementById('dbPanoSub').textContent = collName +
+            (state.week ? ' · ' + state.week.week_start + ' → ' + state.week.week_end : '');
+
+        const all = state.availableProducts || [];
+        const noAssignmentsAtAll = all.length > 0 && all.every(p => !(p.assigned_dates && p.assigned_dates.length));
+
+        let products;
+        let isFallback = false;
+        if (noAssignmentsAtAll) {
+            products = all;
+            isFallback = true;
+        } else {
+            products = all.filter(p => (p.assigned_dates || []).some(a => a.date === state.selectedDate));
+        }
+
+        // Compute per-product flags for the selected day.
+        const postProductIds = new Map();
+        if (state.kanban) {
+            state.kanban.columns.forEach(col => {
+                col.posts.forEach(post => {
+                    (post.products || []).forEach(p => {
+                        postProductIds.set(p.item_group_id, (postProductIds.get(p.item_group_id) || 0) + 1);
+                    });
+                });
+            });
+        }
+        products = products.map(p => {
+            const todayAssignment = (p.assigned_dates || []).find(a => a.date === state.selectedDate);
+            return Object.assign({}, p, {
+                _is_remarketing: todayAssignment ? !todayAssignment.is_primary : false,
+                _post_count: postProductIds.get(p.id) || 0,
+            });
+        });
+
+        const filtered = panoState.filter === 'all'
+            ? products
+            : products.filter(p => (p.classification || 'plotesues') === panoState.filter);
+
+        const body = document.getElementById('dbPanoBody');
+        body.textContent = '';
+
+        body.appendChild(buildPanoStrip());
+        body.appendChild(buildPanoStats(filtered));
+        body.appendChild(buildPanoFilters(products));
+
+        if (filtered.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'db-pano-empty';
+            const heading = document.createElement('strong');
+            heading.textContent = 'Asnje produkt per kete dite';
+            empty.appendChild(heading);
+            empty.appendChild(document.createTextNode('Hap nje dite tjeter ose krijo poste me cdo produkt te kolekcionit (modali i postit nuk kufizohet).'));
+            body.appendChild(empty);
+        } else {
+            filtered.forEach(p => body.appendChild(buildPanoCard(p)));
+        }
+
+        if (isFallback) {
+            const hint = document.createElement('div');
+            hint.className = 'db-pano-fallback-hint';
+            hint.textContent = 'Caktimi behet ne DIS · Po shfaqim te gjithe kolekcionin (fallback per kolekcionet pa caktime).';
+            body.appendChild(hint);
+        }
+    }
+
+    function buildPanoStrip() {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-pano-strip';
+        (state.days || []).forEach(d => {
+            const dt = new Date(d.date);
+            const cell = document.createElement('div');
+            cell.className = 'db-pano-day' + (d.date === state.selectedDate ? ' active' : '');
+            const lbl = document.createElement('div');
+            lbl.textContent = DAY_NAMES[dt.getDay()].toUpperCase();
+            const num = document.createElement('div');
+            num.className = 'num';
+            num.textContent = String(dt.getDate()).padStart(2, '0');
+            const cnt = document.createElement('div');
+            cnt.className = 'cnt';
+            cnt.textContent = (d.posts_total || 0) + ' p';
+            cell.append(lbl, num, cnt);
+            cell.addEventListener('click', () => selectDay(d.date));
+            wrap.appendChild(cell);
+        });
+        return wrap;
+    }
+
+    function buildPanoStats(products) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-pano-stats';
+        const totalStock = products.reduce((s, p) => s + (Number(p.total_stock) || 0), 0);
+        const totalValue = products.reduce((s, p) => s + (Number(p.total_stock) || 0) * (Number(p.avg_price) || 0), 0);
+        const usedCount = products.filter(p => p._post_count > 0).length;
+
+        const stats = [
+            { val: products.length, lbl: 'Caktuar' },
+            { val: totalStock.toLocaleString('sq-AL'), lbl: 'Stok' },
+            { val: '€' + Math.round(totalValue).toLocaleString('sq-AL'), lbl: 'Vlere' },
+            { val: usedCount + '/' + products.length, lbl: 'Posts' },
+        ];
+        stats.forEach(s => {
+            const cell = document.createElement('div');
+            cell.className = 'db-pano-stat';
+            const v = document.createElement('div');
+            v.className = 'db-pano-stat-val';
+            v.textContent = String(s.val);
+            const l = document.createElement('div');
+            l.className = 'db-pano-stat-lbl';
+            l.textContent = s.lbl;
+            cell.append(v, l);
+            wrap.appendChild(cell);
+        });
+        return wrap;
+    }
+
+    function buildPanoFilters(products) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-pano-filters';
+        const title = document.createElement('span');
+        title.className = 'db-pano-filters-title';
+        title.textContent = 'Produkte (' + products.length + ')';
+        wrap.appendChild(title);
+
+        const counts = {};
+        products.forEach(p => {
+            const c = p.classification || 'plotesues';
+            counts[c] = (counts[c] || 0) + 1;
+        });
+
+        const btns = document.createElement('div');
+        btns.className = 'db-pano-filters-btns';
+        const tabs = [['all', 'Te gjitha'], ['best_seller', 'Best'], ['karrem', 'Karrem'], ['fashion', 'Fashion'], ['plotesues', 'Plotes']];
+        tabs.forEach(([key, label]) => {
+            if (key !== 'all' && !counts[key]) return;
+            const b = document.createElement('button');
+            b.className = 'db-pano-filter-btn' + (panoState.filter === key ? ' active' : '');
+            b.textContent = key === 'all' ? label : `${label} (${counts[key]})`;
+            b.addEventListener('click', () => { panoState.filter = key; renderPanorama(); });
+            btns.appendChild(b);
+        });
+        wrap.appendChild(btns);
+        return wrap;
+    }
+
+    function buildPanoCard(p) {
+        const card = document.createElement('div');
+        card.className = 'db-pano-card';
+
+        if (p.image_url) {
+            const img = document.createElement('img');
+            img.className = 'db-pano-img';
+            img.src = p.image_url;
+            img.alt = '';
+            img.onerror = () => { img.replaceWith(makePanoPlaceholder()); };
+            card.appendChild(img);
+        } else {
+            card.appendChild(makePanoPlaceholder());
+        }
+
+        const info = document.createElement('div');
+        info.className = 'db-pano-card-info';
+        const name = document.createElement('div');
+        name.className = 'db-pano-card-name';
+        name.textContent = p.name || '—';
+        const meta = document.createElement('div');
+        meta.className = 'db-pano-card-meta';
+        meta.textContent = [p.code, p.vendor_name].filter(Boolean).join(' · ');
+        info.append(name, meta);
+
+        const badges = document.createElement('div');
+        badges.className = 'db-pano-card-badges';
+        const cls = p.classification || 'plotesues';
+        const clsBadge = document.createElement('span');
+        clsBadge.className = 'db-pano-badge db-pano-b-' + cls;
+        clsBadge.textContent = cls.replace('_', ' ');
+        badges.appendChild(clsBadge);
+
+        if (p._is_remarketing) {
+            const b = document.createElement('span');
+            b.className = 'db-pano-badge db-pano-b-rem';
+            b.textContent = '🔁 Ri-marketim';
+            badges.appendChild(b);
+        }
+        if (p._post_count > 0) {
+            const b = document.createElement('span');
+            b.className = 'db-pano-badge db-pano-b-used';
+            b.textContent = '✓ Ne ' + p._post_count + ' post' + (p._post_count > 1 ? 'e' : '');
+            badges.appendChild(b);
+        } else {
+            const b = document.createElement('span');
+            b.className = 'db-pano-badge db-pano-b-unused';
+            b.textContent = 'Pa post ende';
+            badges.appendChild(b);
+        }
+        info.appendChild(badges);
+        card.appendChild(info);
+
+        const right = document.createElement('div');
+        right.className = 'db-pano-card-right';
+        const price = document.createElement('div');
+        price.className = 'db-pano-card-price';
+        price.textContent = p.avg_price != null ? '€' + Math.round(+p.avg_price) : '—';
+        const stock = document.createElement('div');
+        stock.className = 'db-pano-card-stock';
+        stock.textContent = (p.total_stock || 0) + ' stk';
+        right.append(price, stock);
+        card.appendChild(right);
+        return card;
+    }
+
+    function makePanoPlaceholder() {
+        const ph = document.createElement('div');
+        ph.className = 'db-pano-img-ph';
+        ph.textContent = '📦';
+        return ph;
     }
 
     function renderBoard(data) {
@@ -1303,6 +1631,10 @@
         document.getElementById('dbModalCancel').addEventListener('click', closeNewPostModal);
         document.getElementById('dbModalSubmit').addEventListener('click', submitModal);
 
+        // Panorama
+        document.getElementById('dbBtnPano').addEventListener('click', openPanorama);
+        document.getElementById('dbPanoClose').addEventListener('click', closePanorama);
+
         // Multi-select platforms (edit mode)
         document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => {
             el.addEventListener('click', () => {
@@ -1349,10 +1681,13 @@
             });
         });
 
-        // Esc closes modal
+        // Esc closes modal (or panorama if modal not open)
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.getElementById('dbModal').classList.contains('open')) {
+            if (e.key !== 'Escape') return;
+            if (document.getElementById('dbModal').classList.contains('open')) {
                 closeNewPostModal();
+            } else if (document.getElementById('dbPano').classList.contains('open')) {
+                closePanorama();
             }
         });
     }

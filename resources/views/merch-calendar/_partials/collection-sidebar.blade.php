@@ -1,9 +1,12 @@
 {{-- Collection Detail Sidebar — accessible from Calendar, Timeline, Gantt --}}
 <div id="collectionSidebar" style="display:none; position:fixed; top:0; right:0; bottom:0; width:420px; z-index:9985; background:#fff; border-left:1px solid #e5e7eb; box-shadow:-4px 0 24px rgba(0,0,0,0.08); font-family:Inter,system-ui,sans-serif; flex-direction:column; overflow:hidden;">
     {{-- Header --}}
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #f1f5f9; flex-shrink:0;">
-        <span id="csSidebarTitle" style="font-size:16px; font-weight:700; color:#0f172a;">Collection</span>
-        <button onclick="closeCollectionSidebar()" style="width:28px; height:28px; border:none; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:6px;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #f1f5f9; flex-shrink:0; gap:8px;">
+        <span id="csSidebarTitle" style="font-size:16px; font-weight:700; color:#0f172a; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Collection</span>
+        <a id="csQuickScanBtn" href="#" title="Quick Scan me palmar" style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; font-size:11px; font-weight:600; color:#4338ca; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; text-decoration:none; flex-shrink:0;">
+            📷 Quick Scan
+        </a>
+        <button onclick="closeCollectionSidebar()" style="width:28px; height:28px; border:none; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:6px; flex-shrink:0;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
             <iconify-icon icon="heroicons-outline:x-mark" width="18" style="color:#94a3b8;"></iconify-icon>
         </button>
     </div>
@@ -44,6 +47,31 @@
     .cs-filter-btn { padding:3px 8px; font-size:10px; border-radius:4px; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; }
     .cs-filter-btn.active { background:#6366f1; color:#fff; border-color:#6366f1; }
     .cs-filter-btn:hover:not(.active) { background:#f8fafc; }
+
+    /* ─── Inline date assignment row (per produkt) ──────────────── */
+    .cs-date-row { display:flex; align-items:center; gap:8px; margin-top:10px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px; flex-wrap:wrap; position:relative; }
+    .cs-date-row-icon { font-size:12px; color:#6366f1; flex-shrink:0; }
+    .cs-date-pill { display:inline-flex; align-items:center; gap:4px; background:#eef2ff; color:#3730a3; font-size:11px; font-weight:600; padding:4px 9px; border-radius:14px; border:1px solid #c7d2fe; }
+    .cs-date-pill.is-remarketing { background:#fff7ed; color:#c2410c; border-color:#fed7aa; }
+    .cs-date-pill-x { color:#94a3b8; font-size:11px; cursor:pointer; margin-left:2px; padding:0 2px; line-height:1; }
+    .cs-date-pill-x:hover { color:#ef4444; }
+    .cs-date-add { background:transparent; border:1px dashed #cbd5e1; color:#64748b; font-size:11px; padding:4px 9px; border-radius:14px; cursor:pointer; }
+    .cs-date-add:hover { border-color:#6366f1; color:#6366f1; background:#eef2ff; }
+    .cs-date-add.empty-state { width:100%; text-align:left; padding:5px 10px; }
+
+    /* Date picker dropdown */
+    .cs-date-picker { position:absolute; top:100%; left:0; margin-top:4px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.08); padding:8px; z-index:60; width:240px; }
+    .cs-date-picker-title { font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; padding:4px 8px 8px; }
+    .cs-date-picker-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; }
+    .cs-date-wkd { text-align:center; font-size:9px; color:#94a3b8; padding:4px 0; text-transform:uppercase; }
+    .cs-date-day { text-align:center; padding:7px 2px; border-radius:5px; font-size:11px; cursor:pointer; color:#475569; border:none; background:transparent; }
+    .cs-date-day:hover:not(.disabled) { background:#eef2ff; color:#3730a3; }
+    .cs-date-day.disabled { color:#cbd5e1; cursor:not-allowed; }
+    .cs-date-day.assigned { background:#dbeafe; color:#1e40af; font-weight:600; }
+    .cs-date-day.assigned-remarketing { background:#fed7aa; color:#9a3412; font-weight:600; }
+    .cs-date-add-mode { font-size:10px; color:#64748b; padding:6px 8px 4px; border-top:1px solid #f1f5f9; margin-top:6px; }
+    .cs-date-add-mode label { display:flex; align-items:center; gap:5px; cursor:pointer; }
+    .cs-date-add-mode input { margin:0; }
 </style>
 
 <script>
@@ -73,6 +101,10 @@
         plotesues:   { bg:'#e0e7ff', text:'#3730a3', label:'Plotësues' },
     };
 
+    const DAY_NAMES_SQ = ['Die', 'Hën', 'Mar', 'Mër', 'Enj', 'Pre', 'Sht'];
+    const DAY_INITIALS_SQ = ['D', 'H', 'M', 'M', 'E', 'P', 'S'];
+    const MONTH_NAMES_SQ = ['Jan', 'Shk', 'Mar', 'Pri', 'Maj', 'Qer', 'Kor', 'Gsh', 'Sht', 'Tet', 'Nën', 'Dhj'];
+
     function fmtLek(val) {
         if (!val && val !== 0) return '—';
         return Math.round(Number(val)).toLocaleString('sq-AL') + ' L';
@@ -83,6 +115,37 @@
         return Math.round((1 - discounted / original) * 100);
     }
 
+    // ─── Date helpers ───────────────────────────
+
+    // Parse 'YYYY-MM-DD' as a local date (no timezone shenanigans).
+    function parseYmd(ymd) {
+        const [y, m, d] = String(ymd).split('-').map(Number);
+        return new Date(y, m - 1, d);
+    }
+
+    function toYmd(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function fmtPillLabel(ymd) {
+        const dt = parseYmd(ymd);
+        return `${DAY_NAMES_SQ[dt.getDay()]} · ${dt.getDate()} ${MONTH_NAMES_SQ[dt.getMonth()]}`;
+    }
+
+    function getCollectionDates() {
+        if (!currentSidebarData) return [];
+        const start = parseYmd(currentSidebarData.week_start);
+        const end = parseYmd(currentSidebarData.week_end);
+        const dates = [];
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            dates.push(toYmd(d));
+        }
+        return dates;
+    }
+
     // ─── Sidebar ────────────────────────────────
 
     window.showWeekDetail = async function(weekId) {
@@ -91,6 +154,10 @@
         const sidebar = document.getElementById('collectionSidebar');
         sidebar.style.display = 'flex';
         document.getElementById('csSidebarBody').innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;font-size:12px;">Loading...</div>';
+        const quickScanBtn = document.getElementById('csQuickScanBtn');
+        if (quickScanBtn) {
+            quickScanBtn.href = '/marketing/merch-calendar/quick-scan?week=' + Number(weekId);
+        }
 
         if (weekDetailCache.has(weekId)) {
             currentSidebarData = weekDetailCache.get(weekId);
@@ -290,36 +357,229 @@
 
                 const realIdx = groupIndexMap.get(g) ?? idx;
 
-                html += `<div class="cs-product-card" onclick="openProductModal(${realIdx})">
-                    ${g.image_url
-                        ? `<img class="cs-product-img" src="${proxyImg(g.image_url)}" alt="">`
-                        : `<div class="cs-product-placeholder"><iconify-icon icon="heroicons-outline:photo" width="20" style="color:#d1d5db;"></iconify-icon></div>`}
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:12px; font-weight:600; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${g.name}</div>
-                        <div style="font-size:10px; color:#94a3b8; margin-top:1px;">${g.code || ''} · <span class="cs-vendor-tag">${g.vendor_name || ''}</span></div>
-                        <div style="display:flex; align-items:center; gap:6px; margin-top:5px;">
-                            <span class="cs-class-badge" style="background:${cs.bg};color:${cs.text};">${cs.label}</span>
-                            <span style="font-size:10px; color:#94a3b8;">${g.category_name || ''}</span>
+                html += `<div class="cs-product-card" data-product-card="${Number(g.id)}" onclick="openProductModal(${realIdx})">
+                    <div style="display:flex; gap:10px; width:100%;">
+                        ${g.image_url
+                            ? `<img class="cs-product-img" src="${proxyImg(g.image_url)}" alt="">`
+                            : `<div class="cs-product-placeholder"><iconify-icon icon="heroicons-outline:photo" width="20" style="color:#d1d5db;"></iconify-icon></div>`}
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:12px; font-weight:600; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${g.name}</div>
+                            <div style="font-size:10px; color:#94a3b8; margin-top:1px;">${g.code || ''} · <span class="cs-vendor-tag">${g.vendor_name || ''}</span></div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-top:5px;">
+                                <span class="cs-class-badge" style="background:${cs.bg};color:${cs.text};">${cs.label}</span>
+                                <span style="font-size:10px; color:#94a3b8;">${g.category_name || ''}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
+                                <span style="font-size:10px; color:#475569;">📦 ${g.variations_count || 0} var</span>
+                                <span style="font-size:10px; color:#475569;">📊 ${g.total_stock || 0} stk</span>
+                            </div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:10px; margin-top:5px;">
-                            <span style="font-size:10px; color:#475569;">📦 ${g.variations_count || 0} var</span>
-                            <span style="font-size:10px; color:#475569;">📊 ${g.total_stock || 0} stk</span>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; justify-content:center; flex-shrink:0; min-width:75px;">
+                            ${hasDiscount
+                                ? `<span class="cs-discount-badge">-${discount}%</span>
+                                   <div style="font-size:13px; font-weight:700; color:#dc2626; margin-top:3px;">${fmtLek(g.pricelist_price)}</div>
+                                   <span class="cs-old-price">${fmtLek(g.avg_price)}</span>`
+                                : `<div style="font-size:13px; font-weight:700; color:#0f172a;">${fmtLek(finalPrice)}</div>`}
+                            <div style="font-size:10px; color:#64748b; margin-top:2px;">${g.total_stock || 0} copë</div>
+                            ${g.total_sold ? `<div style="font-size:10px; color:#22c55e; font-weight:500; margin-top:1px;">${g.total_sold} shitur</div>` : ''}
                         </div>
-                    </div>
-                    <div style="display:flex; flex-direction:column; align-items:flex-end; justify-content:center; flex-shrink:0; min-width:75px;">
-                        ${hasDiscount
-                            ? `<span class="cs-discount-badge">-${discount}%</span>
-                               <div style="font-size:13px; font-weight:700; color:#dc2626; margin-top:3px;">${fmtLek(g.pricelist_price)}</div>
-                               <span class="cs-old-price">${fmtLek(g.avg_price)}</span>`
-                            : `<div style="font-size:13px; font-weight:700; color:#0f172a;">${fmtLek(finalPrice)}</div>`}
-                        <div style="font-size:10px; color:#64748b; margin-top:2px;">${g.total_stock || 0} copë</div>
-                        ${g.total_sold ? `<div style="font-size:10px; color:#22c55e; font-weight:500; margin-top:1px;">${g.total_sold} shitur</div>` : ''}
                     </div>
                 </div>`;
             });
         }
 
         body.innerHTML = html;
+
+        // Date row mounted via DOM API (no innerHTML for user-controllable
+        // fields — assigned_dates flow through fmtPillLabel which is a fixed
+        // formatter, but defense in depth keeps this off the innerHTML path).
+        if (groups.length) {
+            groups.forEach(g => {
+                const card = body.querySelector(`[data-product-card="${Number(g.id)}"]`);
+                if (card) card.appendChild(buildDateRow(g));
+            });
+        }
+    }
+
+    // ─── Inline date assignment row (DOM-built, no innerHTML) ──
+
+    function buildDateRow(g) {
+        const groupId = Number(g.id);
+        const assigned = Array.isArray(g.assigned_dates) ? [...g.assigned_dates] : [];
+        assigned.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+        const row = document.createElement('div');
+        row.className = 'cs-date-row';
+        row.addEventListener('click', e => e.stopPropagation());
+
+        const icon = document.createElement('span');
+        icon.className = 'cs-date-row-icon';
+        icon.textContent = '📅';
+        row.appendChild(icon);
+
+        if (assigned.length === 0) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cs-date-add empty-state';
+            btn.textContent = '+ Cakto dite per kete produkt';
+            btn.addEventListener('click', (e) => { e.stopPropagation(); csOpenDatePicker(groupId, btn); });
+            row.appendChild(btn);
+            return row;
+        }
+
+        assigned.forEach(a => {
+            const pill = document.createElement('span');
+            pill.className = a.is_primary ? 'cs-date-pill' : 'cs-date-pill is-remarketing';
+            pill.textContent = (a.is_primary ? '' : '🔁 ') + fmtPillLabel(a.date);
+
+            const x = document.createElement('span');
+            x.className = 'cs-date-pill-x';
+            x.textContent = '×';
+            x.title = 'Hiq caktimin';
+            x.addEventListener('click', (e) => { e.stopPropagation(); csRemoveDate(groupId, Number(a.id)); });
+            pill.appendChild(x);
+
+            row.appendChild(pill);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'cs-date-add';
+        addBtn.textContent = '+ dite re-marketing';
+        addBtn.addEventListener('click', (e) => { e.stopPropagation(); csOpenDatePicker(groupId, addBtn); });
+        row.appendChild(addBtn);
+
+        return row;
+    }
+
+    // Mini-calendar dropdown anchored to the clicked button.
+    // Single-picker policy: any other open picker is removed first.
+    window.csOpenDatePicker = function(groupId, anchorBtn) {
+        document.querySelectorAll('.cs-date-picker').forEach(p => p.remove());
+
+        const group = (currentSidebarData?.item_groups || []).find(g => Number(g.id) === Number(groupId));
+        if (!group) return;
+
+        const assigned = Array.isArray(group.assigned_dates) ? group.assigned_dates : [];
+        const assignedMap = new Map(assigned.map(a => [a.date, a]));
+        const collectionDates = getCollectionDates();
+        if (collectionDates.length === 0) return;
+
+        const picker = document.createElement('div');
+        picker.className = 'cs-date-picker';
+        picker.addEventListener('click', e => e.stopPropagation());
+
+        const title = document.createElement('div');
+        title.className = 'cs-date-picker-title';
+        title.textContent = 'Zgjidh dite (vetem brenda kolekcionit)';
+        picker.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'cs-date-picker-grid';
+
+        DAY_INITIALS_SQ.forEach(letter => {
+            const wkd = document.createElement('div');
+            wkd.className = 'cs-date-wkd';
+            wkd.textContent = letter;
+            grid.appendChild(wkd);
+        });
+
+        const firstDay = parseYmd(collectionDates[0]);
+        const startWeekday = firstDay.getDay(); // 0=Sun..6=Sat
+        for (let i = 0; i < startWeekday; i++) {
+            grid.appendChild(document.createElement('div'));
+        }
+
+        collectionDates.forEach(ymd => {
+            const dt = parseYmd(ymd);
+            const isAssigned = assignedMap.has(ymd);
+            const dayBtn = document.createElement('button');
+            dayBtn.type = 'button';
+            dayBtn.textContent = String(dt.getDate());
+            if (isAssigned) {
+                dayBtn.className = assignedMap.get(ymd).is_primary
+                    ? 'cs-date-day assigned'
+                    : 'cs-date-day assigned-remarketing';
+                dayBtn.title = 'Tashme i caktuar — perdor × per ta hequr';
+            } else {
+                dayBtn.className = 'cs-date-day';
+                dayBtn.title = 'Cakto per ' + fmtPillLabel(ymd);
+                dayBtn.addEventListener('click', () => {
+                    // First click on any product = primary; subsequent = re-marketing.
+                    const primaries = (group.assigned_dates || []).filter(a => a.is_primary).length;
+                    csAssignDate(groupId, ymd, primaries === 0);
+                    picker.remove();
+                });
+            }
+            grid.appendChild(dayBtn);
+        });
+
+        picker.appendChild(grid);
+        anchorBtn.parentNode.appendChild(picker);
+
+        const closeOnOutside = (e) => {
+            if (!picker.contains(e.target) && e.target !== anchorBtn) {
+                picker.remove();
+                document.removeEventListener('click', closeOnOutside, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeOnOutside, true), 0);
+    };
+
+    // POST proxy → DIS internal API. On success, mutate local cache and re-render.
+    window.csAssignDate = async function(groupId, ymd, isPrimary) {
+        if (!currentSidebarWeekId) return;
+        try {
+            const url = `/marketing/merch-calendar/api/weeks/${Number(currentSidebarWeekId)}/groups/${Number(groupId)}/dates`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                body: JSON.stringify({ date: ymd, is_primary: isPrimary }),
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const body = await res.json();
+            applyLocalAssignmentChange(groupId, group => {
+                group.assigned_dates = group.assigned_dates || [];
+                if (body.duplicate) return;
+                group.assigned_dates.push({
+                    id: body.id,
+                    date: body.date,
+                    is_primary: body.is_primary,
+                });
+            });
+        } catch (e) {
+            console.error('Caktimi deshtoi', e);
+            alert('Caktimi i dites deshtoi: ' + e.message);
+        }
+    };
+
+    window.csRemoveDate = async function(groupId, dateId) {
+        if (!currentSidebarWeekId) return;
+        try {
+            const url = `/marketing/merch-calendar/api/weeks/${Number(currentSidebarWeekId)}/groups/${Number(groupId)}/dates/${Number(dateId)}`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            applyLocalAssignmentChange(groupId, group => {
+                group.assigned_dates = (group.assigned_dates || []).filter(a => Number(a.id) !== Number(dateId));
+            });
+        } catch (e) {
+            console.error('Heqja e caktimit deshtoi', e);
+            alert('Heqja e caktimit deshtoi: ' + e.message);
+        }
+    };
+
+    function applyLocalAssignmentChange(groupId, mutator) {
+        if (!currentSidebarData) return;
+        const group = (currentSidebarData.item_groups || []).find(g => Number(g.id) === Number(groupId));
+        if (!group) return;
+        mutator(group);
+        if (currentSidebarWeekId) {
+            weekDetailCache.set(currentSidebarWeekId, currentSidebarData);
+        }
+        renderSidebarContent(currentSidebarData);
     }
 
     // ESC to close

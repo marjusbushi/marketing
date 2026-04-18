@@ -329,6 +329,18 @@ class DailyBasketController extends Controller
                 'pricelist_price' => $g['pricelist_price'] ?? null,
                 'classification' => $g['classification'] ?? null,
                 'total_stock' => $g['total_stock'] ?? 0,
+                // Per-day assignments — empty array when the product has no
+                // caktime yet. Frontend (#1137 panorama) filters by selected
+                // day; modali i postit i injoron (sheh gjithcka — orientim, jo
+                // kufizim). Fallback logjik kalon te frontend.
+                'assigned_dates' => array_values(array_map(
+                    fn ($a) => [
+                        'id' => (int) ($a['id'] ?? 0),
+                        'date' => $a['date'] ?? null,
+                        'is_primary' => (bool) ($a['is_primary'] ?? false),
+                    ],
+                    $g['assigned_dates'] ?? []
+                )),
             ], $groups);
         });
     }

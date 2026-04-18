@@ -31,6 +31,11 @@ class MerchCalendarController extends Controller
         return view('merch-calendar.gantt');
     }
 
+    public function quickScan(): View
+    {
+        return view('merch-calendar.quick-scan');
+    }
+
     // ─── API Proxies (JSON) ──────────────────────
 
     /**
@@ -172,6 +177,75 @@ class MerchCalendarController extends Controller
         ]);
 
         $result = $this->disApi->updateWeekStatus($id, $validated['status']);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Cakto nje produkt te kolekcionit per nje dite specifike.
+     * Proxy ne DIS internal API — ruan ne pivot-in distribution_week_item_group_dates.
+     */
+    public function assignGroupDate(Request $request, int $weekId, int $groupId): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'is_primary' => 'sometimes|boolean',
+        ]);
+
+        $result = $this->disApi->assignGroupDate(
+            $weekId,
+            $groupId,
+            $validated['date'],
+            $validated['is_primary'] ?? true,
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Hiq caktimin e nje produkti per nje dite specifike.
+     */
+    public function removeGroupDate(int $weekId, int $groupId, int $dateId): JsonResponse
+    {
+        $result = $this->disApi->removeGroupDate($weekId, $groupId, $dateId);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Lookup nje produkt nga barcode (per Quick Scan input).
+     */
+    public function lookupBarcode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'barcode' => 'required|string|max:128',
+            'week_id' => 'sometimes|integer',
+        ]);
+
+        $result = $this->disApi->lookupItemByBarcode(
+            $validated['barcode'],
+            $validated['week_id'] ?? null,
+        );
+
+        return response()->json($result);
+    }
+
+    /**
+     * Quick Scan bulk save — proxy ne DIS qe ruan te gjitha skanimet ne nje thirrje atomic.
+     */
+    public function quickScanSave(Request $request, int $weekId): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'item_group_ids' => 'required|array|min:1',
+            'item_group_ids.*' => 'integer',
+        ]);
+
+        $result = $this->disApi->quickScanSave(
+            $weekId,
+            $validated['date'],
+            $validated['item_group_ids'],
+        );
 
         return response()->json($result);
     }

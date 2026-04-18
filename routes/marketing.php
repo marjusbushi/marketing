@@ -180,6 +180,7 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/', [MerchCalendarController::class, 'calendar'])->name('calendar');
         Route::get('/timeline', [MerchCalendarController::class, 'timeline'])->name('timeline');
         Route::get('/gantt', [MerchCalendarController::class, 'gantt'])->name('gantt');
+        Route::get('/quick-scan', [MerchCalendarController::class, 'quickScan'])->name('quick-scan');
 
         // API proxies
         Route::get('/api/weeks', [MerchCalendarController::class, 'weeksJson'])->name('api.weeks');
@@ -191,6 +192,20 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::post('/api/weeks/{id}/status', [MerchCalendarController::class, 'updateStatus'])->name('api.weeks.status');
         Route::get('/api/item-groups/search', [MerchCalendarController::class, 'searchGroups'])->name('api.item-groups.search');
         Route::get('/api/price-lists', [MerchCalendarController::class, 'priceLists'])->name('api.price-lists');
+
+        // Per-product day assignment (UI inline picker — proxy te DIS internal API)
+        Route::post('/api/weeks/{week}/groups/{group}/dates', [MerchCalendarController::class, 'assignGroupDate'])
+            ->name('api.weeks.groups.dates.store');
+        Route::delete('/api/weeks/{week}/groups/{group}/dates/{dateId}', [MerchCalendarController::class, 'removeGroupDate'])
+            ->name('api.weeks.groups.dates.destroy');
+
+        // Quick Scan bulk save — proxy ne DIS internal API
+        Route::post('/api/weeks/{week}/quick-scan', [MerchCalendarController::class, 'quickScanSave'])
+            ->name('api.weeks.quick-scan');
+
+        // Barcode lookup proxy (per Quick Scan UI)
+        Route::get('/api/items/by-barcode', [MerchCalendarController::class, 'lookupBarcode'])
+            ->name('api.items.by-barcode');
     });
 
     // ─── Shporta Ditore ─────────────────────────────

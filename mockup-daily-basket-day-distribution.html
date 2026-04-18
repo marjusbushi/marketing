@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Caktimi produkt→dite (DIS) + Panorama Daily Basket (za-marketing)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    background: #f3f4f6;
+    min-height: 100vh;
+    padding: 24px;
+    color: #0f172a;
+  }
+  .page-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+
+  .layout { display: flex; gap: 20px; align-items: flex-start; }
+  .panel-wrap { flex: 1; min-width: 0; }
+  .panel-label {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #475569;
+  }
+  .panel-label-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .panel-label-dot.dis { background: #4F46E5; }
+  .panel-label-dot.mkt { background: #22c55e; }
+  .panel-caption { font-size: 11px; color: #94a3b8; font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+  .sidebar {
+    width: 100%;
+    max-width: 460px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.04);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .sb-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+  .sb-header h2 { font-size: 16px; font-weight: 700; color: #0f172a; }
+  .sb-close { width: 28px; height: 28px; border: none; background: none; cursor: pointer; border-radius: 6px; font-size: 18px; color: #94a3b8; }
+  .sb-close:hover { background: #f1f5f9; }
+
+  /* Cover */
+  .sb-cover {
+    height: 120px;
+    background: linear-gradient(135deg, #818cf8 0%, #a78bfa 50%, #f472b6 100%);
+    position: relative;
+  }
+  .sb-cover::after {
+    content: 'Whispers of April';
+    position: absolute; bottom: 10px; left: 14px;
+    color: rgba(255,255,255,0.95); font-size: 13px; font-weight: 600;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Date + status */
+  .sb-meta { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+  .sb-date { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+  .sb-statuses { display: flex; gap: 4px; }
+  .sb-status { padding: 5px 12px; font-size: 11px; font-weight: 500; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; }
+  .sb-status.active { font-weight: 600; background: #dcfce7; color: #166534; border-color: #22c55e; }
+
+  /* Stats */
+  .sb-stats { display: grid; grid-template-columns: repeat(5, 1fr); padding: 14px 16px; border-bottom: 1px solid #f1f5f9; gap: 4px; }
+  .sb-stat { text-align: center; }
+  .sb-stat-val { font-size: 16px; font-weight: 700; color: #0f172a; }
+  .sb-stat-lbl { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+
+  /* Filter tabs */
+  .sb-filters { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; }
+  .sb-filters-title { font-size: 13px; font-weight: 600; color: #0f172a; }
+  .sb-filters-btns { display: flex; gap: 3px; flex-wrap: wrap; }
+  .sb-filter-btn { padding: 3px 8px; font-size: 10px; border-radius: 4px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; }
+  .sb-filter-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+  /* Product card */
+  .product-card { padding: 12px 16px; border-bottom: 1px solid #f8fafc; transition: background 0.1s; }
+  .product-card:hover { background: #fafbfc; }
+  .product-card-top { display: flex; gap: 10px; }
+  .product-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #f1f5f9;
+    display: flex; align-items: center; justify-content: center; font-size: 24px; color: #cbd5e1; }
+  .product-info { flex: 1; min-width: 0; }
+  .product-name { font-size: 12px; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .product-code { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+  .product-meta-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+
+  .badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+  .badge-best { background: #fef3c7; color: #92400e; }
+  .badge-karrem { background: #d1fae5; color: #065f46; }
+  .badge-fashion { background: #fce7f3; color: #9d174d; }
+  .badge-plotesues { background: #e0e7ff; color: #3730a3; }
+  .badge-remarketing { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+  .badge-used { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  .badge-unused { background: #f8fafc; color: #94a3b8; border: 1px dashed #cbd5e1; }
+
+  .product-right { display: flex; flex-direction: column; align-items: flex-end; flex-shrink: 0; min-width: 60px; }
+  .product-price { font-size: 13px; font-weight: 700; color: #0f172a; }
+  .product-stock { font-size: 10px; color: #64748b; margin-top: 2px; }
+
+  /* DATE ASSIGNMENT ROW (DIS) — kjo eshte e re */
+  .date-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 10px; padding: 8px 10px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+  }
+  .date-row-icon { font-size: 12px; color: #6366f1; }
+  .date-row-empty { flex: 1; }
+  .date-row-empty button {
+    background: transparent; border: 1px dashed #cbd5e1;
+    color: #64748b; font-size: 11px; padding: 5px 10px;
+    border-radius: 5px; cursor: pointer; width: 100%; text-align: left;
+  }
+  .date-row-empty button:hover { border-color: #6366f1; color: #6366f1; }
+  .date-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #eef2ff; color: #3730a3;
+    font-size: 11px; font-weight: 600;
+    padding: 4px 9px; border-radius: 14px;
+    border: 1px solid #c7d2fe;
+  }
+  .date-pill.remarketing {
+    background: #fff7ed; color: #c2410c; border-color: #fed7aa;
+  }
+  .date-pill-x { color: #94a3b8; font-size: 10px; cursor: pointer; margin-left: 2px; }
+  .date-pill-x:hover { color: #ef4444; }
+  .date-add {
+    background: transparent; border: 1px dashed #cbd5e1;
+    color: #94a3b8; font-size: 11px; padding: 4px 9px;
+    border-radius: 14px; cursor: pointer;
+  }
+  .date-add:hover { border-color: #6366f1; color: #6366f1; }
+
+  /* Daily basket header */
+  .db-header {
+    padding: 14px 16px; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .db-header-left .db-day { font-size: 16px; font-weight: 700; color: #0f172a; }
+  .db-header-left .db-coll { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .db-header-right .db-back {
+    background: transparent; border: 1px solid #e5e7eb;
+    color: #64748b; font-size: 11px; padding: 5px 10px;
+    border-radius: 5px; cursor: pointer;
+  }
+
+  /* Day mini-strip (showing this day in week context) */
+  .db-strip { display: flex; padding: 10px 16px; gap: 4px; border-bottom: 1px solid #f1f5f9; }
+  .db-day-cell {
+    flex: 1; text-align: center; padding: 6px 4px; border-radius: 5px;
+    font-size: 10px; color: #94a3b8; cursor: pointer;
+  }
+  .db-day-cell.active { background: #18181b; color: #fff; font-weight: 600; }
+  .db-day-cell .num { font-size: 12px; font-weight: 700; margin-top: 2px; }
+  .db-day-cell .cnt { font-size: 9px; margin-top: 2px; opacity: 0.8; }
+
+  /* Stats bar in daily-basket — 4 kolona ne vend te 5 */
+  .sb-stats-mkt { grid-template-columns: repeat(4, 1fr); }
+
+  /* Footer note */
+  .footnote {
+    margin-top: 24px; padding: 14px 16px;
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+    font-size: 12px; color: #92400e; line-height: 1.5;
+  }
+  .footnote strong { color: #78350f; }
+
+  /* Date picker dropdown (illustrative) */
+  .picker {
+    position: absolute; top: calc(100% + 4px); left: 0;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    padding: 8px; z-index: 50; width: 240px;
+  }
+  .picker-title { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 8px 8px; }
+  .picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .picker-day {
+    text-align: center; padding: 8px 2px; border-radius: 5px;
+    font-size: 11px; cursor: pointer; color: #475569;
+  }
+  .picker-day:hover { background: #eef2ff; color: #3730a3; }
+  .picker-day.disabled { color: #cbd5e1; cursor: not-allowed; }
+  .picker-day.disabled:hover { background: transparent; }
+  .picker-day.in-range { background: #f8fafc; }
+  .picker-day.selected { background: #6366f1; color: #fff; font-weight: 600; }
+  .picker-wkd { text-align: center; font-size: 9px; color: #94a3b8; padding: 4px 0; text-transform: uppercase; }
+
+  .has-picker { position: relative; }
+</style>
+</head>
+<body>
+
+<div class="page-title">Caktimi i produkteve per dite — design proposal</div>
+<div class="page-sub">DIS merch-calendar (majtas) cakton produktet → za-marketing daily-basket (djathtas) i shfaq si orientim per diten.</div>
+
+<div class="layout">
+
+  <!-- ──────────────── DIS — MERCH CALENDAR SIDEBAR (modified) ──────────────── -->
+  <div class="panel-wrap">
+    <div class="panel-label">
+      <span class="panel-label-dot dis"></span>
+      <span>DIS · Merch Calendar Sidebar</span>
+      <span class="panel-caption">— shtohet rreshti i caktimit te dites per cdo produkt</span>
+    </div>
+
+    <div class="sidebar">
+      <!-- Header -->
+      <div class="sb-header">
+        <h2>Whispers of April</h2>
+        <button class="sb-close">&times;</button>
+      </div>
+
+      <!-- Cover -->
+      <div class="sb-cover"></div>
+
+      <!-- Dates + status -->
+      <div class="sb-meta">
+        <div class="sb-date">📅 2026-04-20 → 2026-04-26</div>
+        <div class="sb-statuses">
+          <button class="sb-status">Planifikuar</button>
+          <button class="sb-status active">Aktiv</button>
+          <button class="sb-status">Kompletuar</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="sb-stats">
+        <div class="sb-stat"><div class="sb-stat-val">12</div><div class="sb-stat-lbl">Grupe</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">847</div><div class="sb-stat-lbl">Stok</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">€32K</div><div class="sb-stat-lbl">Vlere</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">€19</div><div class="sb-stat-lbl">Min</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">€89</div><div class="sb-stat-lbl">Max</div></div>
+      </div>
+
+      <!-- Filter tabs -->
+      <div class="sb-filters">
+        <span class="sb-filters-title">Produkte (12)</span>
+        <div class="sb-filters-btns">
+          <button class="sb-filter-btn active">Te gjitha</button>
+          <button class="sb-filter-btn">Best (3)</button>
+          <button class="sb-filter-btn">Karrem (4)</button>
+          <button class="sb-filter-btn">Fashion (5)</button>
+        </div>
+      </div>
+
+      <!-- Product 1 — me caktim primary -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">👗</div>
+          <div class="product-info">
+            <div class="product-name">Bluze veri klasik</div>
+            <div class="product-code">ZA-001 · Levi's</div>
+            <div class="product-meta-row">
+              <span class="badge badge-best">Best Seller</span>
+              <span style="font-size:10px;color:#94a3b8;">42 stk</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€45</div>
+            <div class="product-stock">Var: 3</div>
+          </div>
+        </div>
+        <div class="date-row">
+          <span class="date-row-icon">📅</span>
+          <span class="date-pill">E Hene · 24 Pri <span class="date-pill-x">×</span></span>
+          <button class="date-add">+ dite re-marketing</button>
+        </div>
+      </div>
+
+      <!-- Product 2 — me caktim primary + re-marketing -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">👖</div>
+          <div class="product-info">
+            <div class="product-name">Pantallon karrige verore</div>
+            <div class="product-code">ZA-002 · Calvin Klein</div>
+            <div class="product-meta-row">
+              <span class="badge badge-fashion">Fashion</span>
+              <span style="font-size:10px;color:#94a3b8;">28 stk</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€68</div>
+            <div class="product-stock">Var: 5</div>
+          </div>
+        </div>
+        <div class="date-row">
+          <span class="date-row-icon">📅</span>
+          <span class="date-pill">E Mart · 25 Pri <span class="date-pill-x">×</span></span>
+          <span class="date-pill remarketing">🔁 E Vne · 28 Pri <span class="date-pill-x">×</span></span>
+        </div>
+      </div>
+
+      <!-- Product 3 — pa caktim ende (state empty) -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">👟</div>
+          <div class="product-info">
+            <div class="product-name">Kepuca verore lehte</div>
+            <div class="product-code">ZA-003 · Nike</div>
+            <div class="product-meta-row">
+              <span class="badge badge-karrem">Karrem</span>
+              <span style="font-size:10px;color:#94a3b8;">15 stk</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€89</div>
+            <div class="product-stock">Var: 4</div>
+          </div>
+        </div>
+        <div class="date-row has-picker">
+          <span class="date-row-icon">📅</span>
+          <div class="date-row-empty">
+            <button>+ Cakto dite per kete produkt</button>
+          </div>
+          <!-- Picker example — i hapur per ilustrim -->
+          <div class="picker" style="left: 32px; top: 40px;">
+            <div class="picker-title">Zgjidh dite (vetem brenda kolekcionit)</div>
+            <div class="picker-grid">
+              <div class="picker-wkd">H</div><div class="picker-wkd">M</div><div class="picker-wkd">M</div>
+              <div class="picker-wkd">E</div><div class="picker-wkd">P</div><div class="picker-wkd">S</div>
+              <div class="picker-wkd">D</div>
+              <div class="picker-day disabled">—</div>
+              <div class="picker-day disabled">—</div>
+              <div class="picker-day disabled">—</div>
+              <div class="picker-day disabled">—</div>
+              <div class="picker-day disabled">—</div>
+              <div class="picker-day disabled">—</div>
+              <div class="picker-day in-range">19</div>
+              <div class="picker-day in-range">20</div>
+              <div class="picker-day in-range">21</div>
+              <div class="picker-day in-range">22</div>
+              <div class="picker-day in-range">23</div>
+              <div class="picker-day in-range">24</div>
+              <div class="picker-day selected">25</div>
+              <div class="picker-day in-range">26</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product 4 — vetem dite primary -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">🧥</div>
+          <div class="product-info">
+            <div class="product-name">Xhaket gjysem-stine</div>
+            <div class="product-code">ZA-004 · H&M</div>
+            <div class="product-meta-row">
+              <span class="badge badge-plotesues">Plotesues</span>
+              <span style="font-size:10px;color:#94a3b8;">19 stk</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€55</div>
+            <div class="product-stock">Var: 2</div>
+          </div>
+        </div>
+        <div class="date-row">
+          <span class="date-row-icon">📅</span>
+          <span class="date-pill">E Mer · 26 Pri <span class="date-pill-x">×</span></span>
+          <button class="date-add">+ dite re-marketing</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ──────────────── ZA-MARKETING — DAILY BASKET PANORAMA (e re) ──────────────── -->
+  <div class="panel-wrap">
+    <div class="panel-label">
+      <span class="panel-label-dot mkt"></span>
+      <span>za-marketing · Daily Basket Panorama</span>
+      <span class="panel-caption">— shfaq vetem produktet e caktuara per kete dite</span>
+    </div>
+
+    <div class="sidebar">
+      <!-- Header me diten konkrete -->
+      <div class="db-header">
+        <div class="db-header-left">
+          <div class="db-day">E Hene · 24 Pri 2026</div>
+          <div class="db-coll">Whispers of April · 24 → 26 Pri</div>
+        </div>
+        <div class="db-header-right">
+          <button class="db-back">Mbyll</button>
+        </div>
+      </div>
+
+      <!-- Mini strip — tregon kontekstin javor -->
+      <div class="db-strip">
+        <div class="db-day-cell"><div>HEN</div><div class="num">19</div><div class="cnt">2</div></div>
+        <div class="db-day-cell"><div>MAR</div><div class="num">20</div><div class="cnt">3</div></div>
+        <div class="db-day-cell"><div>MER</div><div class="num">21</div><div class="cnt">1</div></div>
+        <div class="db-day-cell"><div>ENJ</div><div class="num">22</div><div class="cnt">2</div></div>
+        <div class="db-day-cell"><div>PRE</div><div class="num">23</div><div class="cnt">4</div></div>
+        <div class="db-day-cell active"><div>SHT</div><div class="num">24</div><div class="cnt">3</div></div>
+        <div class="db-day-cell"><div>DIE</div><div class="num">25</div><div class="cnt">2</div></div>
+        <div class="db-day-cell"><div>HEN</div><div class="num">26</div><div class="cnt">1</div></div>
+      </div>
+
+      <!-- Stats: 4 kolona, te orientuara per marketing -->
+      <div class="sb-stats sb-stats-mkt">
+        <div class="sb-stat"><div class="sb-stat-val">3</div><div class="sb-stat-lbl">Caktuar sot</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">85</div><div class="sb-stat-lbl">Stok total</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">€4.2K</div><div class="sb-stat-lbl">Vlere stoku</div></div>
+        <div class="sb-stat"><div class="sb-stat-val">2/3</div><div class="sb-stat-lbl">Ne posts</div></div>
+      </div>
+
+      <!-- Filter tabs — njesoj si DIS -->
+      <div class="sb-filters">
+        <span class="sb-filters-title">Produkte per kete dite (3)</span>
+        <div class="sb-filters-btns">
+          <button class="sb-filter-btn active">Te gjitha</button>
+          <button class="sb-filter-btn">Best (1)</button>
+          <button class="sb-filter-btn">Fashion (1)</button>
+          <button class="sb-filter-btn">Plotes (1)</button>
+        </div>
+      </div>
+
+      <!-- Product 1 — primary, perdorur ne 1 post -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">👗</div>
+          <div class="product-info">
+            <div class="product-name">Bluze veri klasik</div>
+            <div class="product-code">ZA-001 · Levi's</div>
+            <div class="product-meta-row">
+              <span class="badge badge-best">Best Seller</span>
+              <span class="badge badge-used">✓ Ne 1 post</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€45</div>
+            <div class="product-stock">42 stk</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product 2 — re-marketing (nuk eshte primary per kete dite) -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">👟</div>
+          <div class="product-info">
+            <div class="product-name">Sandale plazh basic</div>
+            <div class="product-code">ZA-007 · Nike</div>
+            <div class="product-meta-row">
+              <span class="badge badge-fashion">Fashion</span>
+              <span class="badge badge-remarketing">🔁 Ri-marketim</span>
+              <span class="badge badge-used">✓ Ne 1 post</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€38</div>
+            <div class="product-stock">24 stk</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product 3 — primary, ende pa post -->
+      <div class="product-card">
+        <div class="product-card-top">
+          <div class="product-img">🧥</div>
+          <div class="product-info">
+            <div class="product-name">Xhaket gjysem-stine</div>
+            <div class="product-code">ZA-004 · H&M</div>
+            <div class="product-meta-row">
+              <span class="badge badge-plotesues">Plotesues</span>
+              <span class="badge badge-unused">Pa post ende</span>
+            </div>
+          </div>
+          <div class="product-right">
+            <div class="product-price">€55</div>
+            <div class="product-stock">19 stk</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty hint, nese asnje produkt nuk eshte caktuar (per kolekcione te reja) -->
+      <div style="padding: 14px 16px; background: #fafafa; border-top: 1px dashed #e5e7eb; font-size: 11px; color: #94a3b8; text-align: center; font-style: italic;">
+        Caktimi behet nga merch-i ne DIS. Nese kolekcioni ende s'ka caktime, kjo zone shfaq <strong>te gjithe</strong> produktet e kolekcionit (fallback).
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footnote">
+  <strong>Si ta lexosh kete mockup:</strong>
+  Majtas — DIS merch team cakton cdo produkt te kolekcionit ne nje (ose me shume) dite te javes.
+  Djathtas — Marketing-u, kur hap nje dite te shportes ditore, sheh vetem produktet e caktuara per ate dite,
+  me badge per ato qe jane ne re-marketim dhe per ato qe tashme jane perdorur ne nje post.
+  Nese asnje produkt s'eshte caktuar ende, daily basket bie ne <em>fallback</em> dhe shfaq tere kolekcionin
+  (sjellja aktuale) — pra zero risk per kolekcionet ekzistuese.
+</div>
+
+</body>
+</html>

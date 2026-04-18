@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — DIS Quick Scan: ndertim shporte me palmar</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    background: #f3f4f6;
+    min-height: 100vh;
+    color: #0f172a;
+  }
+
+  /* Top header (DIS chrome) */
+  .topbar {
+    height: 52px; padding: 0 20px;
+    background: #fff; border-bottom: 1px solid #e5e7eb;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
+  .topbar-back { color: #64748b; font-size: 13px; cursor: pointer; }
+  .topbar-back:hover { color: #0f172a; }
+  .topbar-title { font-size: 15px; font-weight: 700; }
+  .topbar-mode {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    background: #eef2ff; color: #4338ca;
+    padding: 3px 9px; border-radius: 5px; letter-spacing: 0.05em;
+  }
+  .topbar-actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    border-radius: 6px; border: 1px solid #e2e8f0;
+    background: #fff; color: #475569; cursor: pointer;
+  }
+  .btn:hover { background: #f8fafc; }
+  .btn-primary {
+    background: #18181b; color: #fff; border-color: #18181b;
+  }
+  .btn-primary:hover { background: #27272a; color: #fff; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-danger {
+    color: #b91c1c; border-color: #fecaca;
+  }
+  .btn-danger:hover { background: #fef2f2; }
+
+  /* Context bar */
+  .ctx {
+    background: #fafafa; border-bottom: 1px solid #e5e7eb;
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 24px;
+  }
+  .ctx-item { display: flex; align-items: center; gap: 8px; }
+  .ctx-lbl {
+    font-size: 10px; color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 0.05em; font-weight: 600;
+  }
+  .ctx-val {
+    font-size: 13px; font-weight: 600; color: #0f172a;
+    background: #fff; padding: 5px 10px; border: 1px solid #e2e8f0;
+    border-radius: 5px;
+  }
+  .ctx-val .caret { color: #94a3b8; margin-left: 4px; }
+  .ctx-coll-bar {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #64748b;
+  }
+  .ctx-coll-bar strong { color: #0f172a; font-weight: 600; }
+
+  /* Main scan zone */
+  .main { padding: 28px 20px; }
+  .scan-zone {
+    background: #fff; border: 2px dashed #c7d2fe;
+    border-radius: 14px; padding: 28px;
+    text-align: center; max-width: 720px; margin: 0 auto 20px;
+    transition: all 0.2s;
+  }
+  .scan-zone.focused {
+    border-color: #6366f1; background: #eef2ff;
+  }
+  .scan-icon { font-size: 36px; color: #818cf8; margin-bottom: 12px; }
+  .scan-title { font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 4px; }
+  .scan-hint { font-size: 12px; color: #94a3b8; margin-bottom: 18px; }
+  .scan-input {
+    width: 100%; max-width: 480px;
+    padding: 14px 18px; font-size: 18px; font-family: 'SF Mono', monospace;
+    border: 1px solid #cbd5e1; border-radius: 8px;
+    text-align: center; letter-spacing: 0.05em;
+    color: #0f172a; background: #fff;
+  }
+  .scan-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .scan-input::placeholder { color: #cbd5e1; letter-spacing: 0.1em; }
+
+  /* Last scan feedback */
+  .last-scan {
+    max-width: 720px; margin: 0 auto 20px;
+    padding: 12px 16px; border-radius: 8px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 13px;
+  }
+  .last-scan.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+  .last-scan.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  .last-scan.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .last-scan-icon { font-size: 18px; }
+  .last-scan-msg { flex: 1; }
+  .last-scan-msg strong { font-weight: 700; }
+  .last-scan-action button {
+    background: transparent; border: 1px solid currentColor;
+    color: inherit; padding: 4px 10px; border-radius: 5px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+  }
+
+  /* Counter + bulk controls */
+  .summary {
+    max-width: 720px; margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 4px;
+  }
+  .summary-count {
+    font-size: 13px; color: #475569;
+  }
+  .summary-count strong {
+    color: #0f172a; font-weight: 700; font-size: 16px;
+  }
+  .summary-actions { display: flex; gap: 8px; }
+  .summary-actions .btn { font-size: 12px; padding: 5px 10px; }
+
+  /* Scanned product list */
+  .scanned-list {
+    max-width: 720px; margin: 0 auto;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    overflow: hidden;
+  }
+  .scanned-list-empty {
+    padding: 60px 20px; text-align: center; color: #94a3b8;
+    font-size: 13px;
+  }
+  .scanned-list-empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+
+  .scanned-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px; border-bottom: 1px solid #f1f5f9;
+    transition: background 0.1s;
+  }
+  .scanned-row:last-child { border-bottom: 0; }
+  .scanned-row:hover { background: #fafbfc; }
+  .scanned-row.just-added {
+    background: #ecfdf5;
+    animation: flash-green 1.2s ease-out;
+  }
+  @keyframes flash-green {
+    0% { background: #d1fae5; }
+    100% { background: #fff; }
+  }
+
+  .scanned-num {
+    width: 32px; height: 32px; flex-shrink: 0;
+    background: #f1f5f9; color: #475569;
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+  }
+  .scanned-img {
+    width: 48px; height: 48px; flex-shrink: 0;
+    background: #f1f5f9; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .scanned-info { flex: 1; min-width: 0; }
+  .scanned-name { font-size: 13px; font-weight: 600; color: #0f172a; }
+  .scanned-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .scanned-meta-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+  .badge-best { background: #fef3c7; color: #92400e; }
+  .badge-karrem { background: #d1fae5; color: #065f46; }
+  .badge-fashion { background: #fce7f3; color: #9d174d; }
+  .badge-plotesues { background: #e0e7ff; color: #3730a3; }
+  .badge-new {
+    background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;
+  }
+
+  .scanned-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  .scanned-price { font-size: 13px; font-weight: 700; color: #0f172a; }
+  .scanned-stock { font-size: 11px; color: #64748b; }
+  .scanned-remove {
+    width: 28px; height: 28px; border: 1px solid transparent;
+    background: transparent; color: #94a3b8; cursor: pointer;
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .scanned-remove:hover { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+
+  /* Footer save bar */
+  .savebar {
+    position: sticky; bottom: 0;
+    max-width: 720px; margin: 14px auto 0;
+    background: #18181b; color: #fff;
+    border-radius: 10px; padding: 14px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  .savebar-info { font-size: 13px; }
+  .savebar-info strong { font-weight: 700; }
+  .savebar-info .small { color: #a1a1aa; font-size: 11px; margin-top: 2px; display: block; }
+  .savebar-actions { display: flex; gap: 8px; }
+  .savebar .btn-primary {
+    background: #22c55e; border-color: #22c55e; color: #fff;
+  }
+  .savebar .btn-primary:hover { background: #16a34a; }
+  .savebar .btn { background: transparent; color: #d4d4d8; border-color: #3f3f46; }
+  .savebar .btn:hover { background: #27272a; color: #fff; }
+
+  /* Mode toggle entry point — shown at top of merch-calendar normally */
+  .entry-hint {
+    max-width: 720px; margin: 18px auto 0;
+    padding: 12px 16px;
+    background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+    font-size: 12px; color: #92400e; line-height: 1.5;
+  }
+  .entry-hint strong { color: #78350f; }
+
+  /* Variations of last-scan to show — multi-state demo */
+  .demo-states {
+    max-width: 720px; margin: 30px auto 0;
+    padding-top: 24px; border-top: 1px dashed #e5e7eb;
+  }
+  .demo-states-title {
+    font-size: 11px; color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 0.05em; font-weight: 700; margin-bottom: 12px;
+    text-align: center;
+  }
+  .demo-states-grid {
+    display: grid; gap: 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- TOP BAR -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-back">← Kthe te calendar</span>
+    <span class="topbar-title">Quick Build</span>
+    <span class="topbar-mode">📷 Scan Mode</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-danger">Anulo</button>
+    <button class="btn btn-primary" disabled>Ruaj shporten</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- CONTEXT (collection + day) -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div class="ctx">
+  <div class="ctx-item">
+    <span class="ctx-lbl">Kolekcioni</span>
+    <span class="ctx-val">Whispers of April <span class="caret">▾</span></span>
+  </div>
+  <div class="ctx-item">
+    <span class="ctx-lbl">Dita</span>
+    <span class="ctx-val">📅 E Hene · 24 Pri 2026 <span class="caret">▾</span></span>
+  </div>
+  <div class="ctx-coll-bar">
+    Kolekcioni ka <strong>12 grupe</strong> · Sot do shtosh produkte per kete dite
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<!-- MAIN SCAN ZONE -->
+<!-- ════════════════════════════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- Scanner input -->
+  <div class="scan-zone focused">
+    <div class="scan-icon">📷</div>
+    <div class="scan-title">Skano barcode-in</div>
+    <div class="scan-hint">Palmar-i dergon code + Enter automatikisht. Mund te shkruash dhe me dore.</div>
+    <input type="text" class="scan-input" placeholder="Skano ose shkruaj barcode..." autofocus>
+  </div>
+
+  <!-- Last scan feedback -->
+  <div class="last-scan success">
+    <span class="last-scan-icon">✓</span>
+    <div class="last-scan-msg">
+      <strong>Bluze veri klasik</strong> u shtua ne shporten e dites · ZA-001
+    </div>
+    <div class="last-scan-action">
+      <button>Hiq</button>
+    </div>
+  </div>
+
+  <!-- Counter + bulk controls -->
+  <div class="summary">
+    <div class="summary-count">
+      <strong>4</strong> produkte ne shporte · <span style="color:#94a3b8;">€207 vlere kombinuar</span>
+    </div>
+    <div class="summary-actions">
+      <button class="btn">Pastro te gjitha</button>
+      <button class="btn">Eksporto liste</button>
+    </div>
+  </div>
+
+  <!-- Scanned product list -->
+  <div class="scanned-list">
+
+    <div class="scanned-row just-added">
+      <div class="scanned-num">4</div>
+      <div class="scanned-img">👗</div>
+      <div class="scanned-info">
+        <div class="scanned-name">Bluze veri klasik</div>
+        <div class="scanned-meta">ZA-001 · Levi's · 5012345678906</div>
+        <div class="scanned-meta-row">
+          <span class="badge badge-best">Best Seller</span>
+        </div>
+      </div>
+      <div class="scanned-right">
+        <div>
+          <div class="scanned-price">€45</div>
+          <div class="scanned-stock">42 stk</div>
+        </div>
+        <button class="scanned-remove">×</button>
+      </div>
+    </div>
+
+    <div class="scanned-row">
+      <div class="scanned-num">3</div>
+      <div class="scanned-img">👖</div>
+      <div class="scanned-info">
+        <div class="scanned-name">Pantallon karrige verore</div>
+        <div class="scanned-meta">ZA-002 · Calvin Klein · 5012345678906</div>
+        <div class="scanned-meta-row">
+          <span class="badge badge-fashion">Fashion</span>
+        </div>
+      </div>
+      <div class="scanned-right">
+        <div>
+          <div class="scanned-price">€68</div>
+          <div class="scanned-stock">28 stk</div>
+        </div>
+        <button class="scanned-remove">×</button>
+      </div>
+    </div>
+
+    <div class="scanned-row">
+      <div class="scanned-num">2</div>
+      <div class="scanned-img">👟</div>
+      <div class="scanned-info">
+        <div class="scanned-name">Kepuca verore lehte</div>
+        <div class="scanned-meta">ZA-003 · Nike · 5012345678906</div>
+        <div class="scanned-meta-row">
+          <span class="badge badge-karrem">Karrem</span>
+          <span class="badge badge-new">+ I shtuar ne kolekcion</span>
+        </div>
+      </div>
+      <div class="scanned-right">
+        <div>
+          <div class="scanned-price">€89</div>
+          <div class="scanned-stock">15 stk</div>
+        </div>
+        <button class="scanned-remove">×</button>
+      </div>
+    </div>
+
+    <div class="scanned-row">
+      <div class="scanned-num">1</div>
+      <div class="scanned-img">🧥</div>
+      <div class="scanned-info">
+        <div class="scanned-name">Xhaket gjysem-stine</div>
+        <div class="scanned-meta">ZA-004 · H&M · 5012345678906</div>
+        <div class="scanned-meta-row">
+          <span class="badge badge-plotesues">Plotesues</span>
+        </div>
+      </div>
+      <div class="scanned-right">
+        <div>
+          <div class="scanned-price">€55</div>
+          <div class="scanned-stock">19 stk</div>
+        </div>
+        <button class="scanned-remove">×</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Floating save bar -->
+  <div class="savebar">
+    <div class="savebar-info">
+      <strong>4 produkte</strong> per E Hene · 24 Pri
+      <span class="small">Klik "Ruaj" per te krijuar caktimet ne pivot-in distribution_week_item_group_dates</span>
+    </div>
+    <div class="savebar-actions">
+      <button class="btn">Anulo</button>
+      <button class="btn btn-primary">Ruaj shporten →</button>
+    </div>
+  </div>
+
+  <!-- Entry hint (where this mode lives) -->
+  <div class="entry-hint">
+    <strong>Si hapet ky mode:</strong> ne merch-calendar (DIS), ne header-in e collection-sidebar shtohet
+    butoni <code style="background:#fff; padding:2px 6px; border-radius:3px; border:1px solid #fde68a;">📷 Quick Scan</code>
+    qe te dergon ketu me kolekcionin e zgjedhur. Default-i i dites = sot, por mund te ndryshohet me dropdown-in lart.
+  </div>
+
+  <!-- Demo: variations of last-scan feedback -->
+  <div class="demo-states">
+    <div class="demo-states-title">— Variantet e feedback-ut per cdo skanim —</div>
+    <div class="demo-states-grid">
+
+      <div class="last-scan success">
+        <span class="last-scan-icon">✓</span>
+        <div class="last-scan-msg">
+          <strong>Pantallon karrige verore</strong> u shtua · ZA-002
+        </div>
+      </div>
+
+      <div class="last-scan warning">
+        <span class="last-scan-icon">⚠️</span>
+        <div class="last-scan-msg">
+          <strong>Bluze veri klasik</strong> eshte tashme ne shporte · u kapercye
+        </div>
+      </div>
+
+      <div class="last-scan warning">
+        <span class="last-scan-icon">📦</span>
+        <div class="last-scan-msg">
+          <strong>Kepuca Nike</strong> nuk ishte ne kete kolekcion. <strong>U shtua + caktua per E Hene.</strong>
+        </div>
+        <div class="last-scan-action"><button>Undo</button></div>
+      </div>
+
+      <div class="last-scan error">
+        <span class="last-scan-icon">❌</span>
+        <div class="last-scan-msg">
+          Barcode-i <strong>5012999999999</strong> nuk u gjet ne sistem
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

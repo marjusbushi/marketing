@@ -204,6 +204,73 @@ class DisApiClient
     }
 
     /**
+     * Assign a single group → date for a distribution week.
+     *
+     * Used by the inline date picker in the merch-calendar collection sidebar.
+     * Use bulkAssignDates() for the Quick Scan workflow instead — it is one
+     * round-trip per call instead of N.
+     */
+    public function assignGroupDate(int $weekId, int $groupId, string $date, bool $isPrimary = true): array
+    {
+        $response = $this->post(
+            "/api/internal/merch-calendar/weeks/{$weekId}/groups/{$groupId}/dates",
+            ['date' => $date, 'is_primary' => $isPrimary],
+        );
+
+        return $this->parseResponse($response);
+    }
+
+    /**
+     * Remove a single group → date assignment.
+     */
+    public function removeGroupDate(int $weekId, int $groupId, int $dateId): array
+    {
+        $response = $this->delete(
+            "/api/internal/merch-calendar/weeks/{$weekId}/groups/{$groupId}/dates/{$dateId}"
+        );
+
+        return $this->parseResponse($response);
+    }
+
+    /**
+     * Lookup an item by barcode (SKU, item_group code, ose partial match).
+     *
+     * Kthen full meta per Quick Scan UI: item_group_id, name, image, cmim, etc.
+     * `weekId` opsional — kur pasohet, pergjigja perfshin classification per ate week.
+     */
+    public function lookupItemByBarcode(string $barcode, ?int $weekId = null): array
+    {
+        $params = ['barcode' => $barcode];
+        if ($weekId) {
+            $params['week_id'] = $weekId;
+        }
+
+        $response = $this->get('/api/internal/merch-calendar/items/by-barcode', $params);
+
+        return $this->parseResponse($response);
+    }
+
+    /**
+     * Quick Scan bulk save — ruan te gjitha grupet e skanuar per nje dite ne nje thirrje atomic.
+     *
+     * Logjika ne DIS: grupet jashte kolekcionit shtohen automatikisht dhe shenjohen
+     * is_primary=false (re-marketing). Grupet ne kolekcion shenjohen is_primary=true.
+     * Caktime ekzistuese per (week, group, date) kapercehen pa error.
+     */
+    public function quickScanSave(int $weekId, string $date, array $itemGroupIds): array
+    {
+        $response = $this->post(
+            "/api/internal/merch-calendar/weeks/{$weekId}/quick-scan",
+            [
+                'date' => $date,
+                'item_group_ids' => array_values($itemGroupIds),
+            ],
+        );
+
+        return $this->parseResponse($response);
+    }
+
+    /**
      * Search item groups (for autocomplete in week edit).
      */
     public function searchItemGroups(string $query = ''): array
