@@ -1,0 +1,36 @@
+name: Diagnostic
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnostic.yml'
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run diagnostic via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          script: |
+            set -e
+            cd "$APP_PATH"
+            echo "=== PATH ==="
+            pwd
+            echo "=== GIT ==="
+            git log --oneline -3
+            echo "=== DIS ENV ==="
+            grep -E "^DIS_DB_" .env | grep -v PASSWORD || echo "no DIS_DB_ vars in .env"
+            echo "=== DB COUNTS ==="
+            php artisan tinker --no-interaction --execute='echo "dis db: ".config("database.connections.dis.database").PHP_EOL; echo "ads total: ".App\Models\Meta\MetaAdsInsight::count().PHP_EOL; echo "ads apr26: ".App\Models\Meta\MetaAdsInsight::whereBetween("date",["2026-04-01","2026-04-30"])->count().PHP_EOL; echo "ads max: ".(App\Models\Meta\MetaAdsInsight::max("date") ?: "none").PHP_EOL; echo "fb total: ".App\Models\Meta\MetaPageInsight::count().PHP_EOL; echo "fb apr26: ".App\Models\Meta\MetaPageInsight::whereBetween("date",["2026-04-01","2026-04-30"])->count().PHP_EOL; echo "fb max: ".(App\Models\Meta\MetaPageInsight::max("date") ?: "none").PHP_EOL; echo "ig total: ".App\Models\Meta\MetaIgInsight::count().PHP_EOL; echo "ig apr26: ".App\Models\Meta\MetaIgInsight::whereBetween("date",["2026-04-01","2026-04-30"])->count().PHP_EOL; echo "ig max: ".(App\Models\Meta\MetaIgInsight::max("date") ?: "none").PHP_EOL; echo "tt total: ".App\Models\TikTok\TikTokAdsInsight::count().PHP_EOL;'
+            echo "=== RESOLVER (last 30d) ==="
+            php artisan tinker --no-interaction --execute='$r = app(App\Services\Meta\MetaDataResolverService::class); echo "ads: ".json_encode($r->resolveAdsTotals("2026-03-19","2026-04-17")).PHP_EOL; echo "fb: ".json_encode($r->resolveFbTotals("2026-03-19","2026-04-17")).PHP_EOL; echo "ig: ".json_encode($r->resolveIgTotals("2026-03-19","2026-04-17")).PHP_EOL;'
+            echo "=== DONE ==="
