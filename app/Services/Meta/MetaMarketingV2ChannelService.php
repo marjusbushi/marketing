@@ -11,12 +11,12 @@ class MetaMarketingV2ChannelService
 {
     public function __construct(
         private readonly MetaApiService $api,
-        private readonly ?MetaDataResolverService $resolver = null,
+        private readonly MetaDataResolverService $resolver,
     ) {}
 
     private function isDbFirst(): bool
     {
-        return config('meta.features.db_first_mode', false) && $this->resolver !== null;
+        return (bool) config('meta.features.db_first_mode', false);
     }
 
     public function getApiVersion(): string
