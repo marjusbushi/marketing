@@ -71,7 +71,7 @@ return [
     'features' => [
         'facebook_module' => env('META_FEATURE_FACEBOOK_MODULE', false),
         'ads_platform_split' => env('META_FEATURE_ADS_PLATFORM_SPLIT', false),
-        'db_first_mode' => env('META_DB_FIRST_MODE', false),
+        'db_first_mode' => env('META_DB_FIRST_MODE', true),
     ],
 
     /*
