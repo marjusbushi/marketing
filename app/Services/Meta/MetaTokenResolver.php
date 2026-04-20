@@ -3,6 +3,7 @@
 namespace App\Services\Meta;
 
 use App\Models\Meta\MetaToken;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -59,19 +60,38 @@ class MetaTokenResolver
     }
 
     /**
+     * Token sources, in priority order:
+     *   1. meta_tokens (OAuth flow) — plaintext access_token, our native format
+     *   2. hrms_meta_credentials (HRMS-managed) — Crypt::encryptString'd with HRMS's APP_KEY
+     *
+     * The HRMS fallback exists because the HRMS app seeded this table before
+     * the Marketing OAuth flow existed; a production instance may still rely
+     * on HRMS as the single source of truth for the Meta page token.
+     *
      * @return array{page_token:?string,page_id:?string,ig_account_id:?string,user_token:?string}|null
      */
     private static function loadFromDb(): ?array
     {
-        // Safety: if DIS connection isn't configured (e.g. running artisan before
-        // migrations), bail instead of throwing mid-boot.
         if (! self::disConnectionReady()) {
             return null;
         }
 
-        // Page token: most recent active page token that still works.
-        // Unlike long-lived user tokens, page tokens derived from a long-lived
-        // user token never expire — but we order by id desc to grab the freshest.
+        $fromMetaTokens = self::loadFromMetaTokens();
+        if ($fromMetaTokens) {
+            return $fromMetaTokens;
+        }
+
+        return self::loadFromHrmsCredentials();
+    }
+
+    /**
+     * @return array{page_token:?string,page_id:?string,ig_account_id:?string,user_token:?string}|null
+     */
+    private static function loadFromMetaTokens(): ?array
+    {
+        // Page token: most recent active page token. Page tokens derived from
+        // a long-lived user token never expire — we still order by id desc to
+        // grab the freshest (most recently refreshed) one.
         $pageToken = MetaToken::active()
             ->where('token_type', 'page')
             ->whereNotNull('page_id')
@@ -92,17 +112,81 @@ class MetaTokenResolver
         }
 
         return [
-            'page_token'     => $pageToken?->access_token,
-            'page_id'        => $pageToken?->page_id,
-            'ig_account_id'  => $pageToken?->ig_account_id,
-            'user_token'     => $userToken?->access_token,
+            'page_token'    => $pageToken?->access_token,
+            'page_id'       => $pageToken?->page_id,
+            'ig_account_id' => $pageToken?->ig_account_id,
+            'user_token'    => $userToken?->access_token,
         ];
     }
 
-    private static function disConnectionReady(): bool
+    /**
+     * HRMS stores one active credential row with the page access token
+     * encrypted via Laravel's Crypt facade (HRMS's APP_KEY, AES-256-CBC).
+     *
+     * We decrypt with an Encrypter instantiated from config('meta.hrms_credentials_key'),
+     * which the operator sets to HRMS's APP_KEY in this app's .env. Falling
+     * back to the local APP_KEY only works when the two apps share a key.
+     *
+     * @return array{page_token:?string,page_id:?string,ig_account_id:?string,user_token:?string}|null
+     */
+    private static function loadFromHrmsCredentials(): ?array
+    {
+        if (! self::disConnectionReady('hrms_meta_credentials')) {
+            return null;
+        }
+
+        $row = DB::connection('dis')
+            ->table('hrms_meta_credentials')
+            ->where('is_active', 1)
+            ->where(function ($q) {
+                $q->whereNull('token_expires_at')->orWhere('token_expires_at', '>', now());
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $row || empty($row->access_token)) {
+            return null;
+        }
+
+        $decrypted = self::decryptHrmsToken($row->access_token);
+        if (! $decrypted) {
+            return null;
+        }
+
+        return [
+            'page_token'    => $decrypted,
+            'page_id'       => $row->page_id ?? null,
+            'ig_account_id' => $row->instagram_id ?? null,
+            'user_token'    => null,
+        ];
+    }
+
+    private static function decryptHrmsToken(string $payload): ?string
+    {
+        $rawKey = (string) (config('meta.hrms_credentials_key') ?: config('app.key'));
+        if ($rawKey === '') {
+            return null;
+        }
+
+        // Laravel keys are stored base64-prefixed (base64:...); strip + decode.
+        $binaryKey = str_starts_with($rawKey, 'base64:')
+            ? base64_decode(substr($rawKey, 7))
+            : $rawKey;
+
+        try {
+            $encrypter = new Encrypter($binaryKey, (string) config('app.cipher', 'AES-256-CBC'));
+            return $encrypter->decryptString($payload);
+        } catch (Throwable $e) {
+            // Wrong key, corrupted payload, or plaintext row — skip silently
+            // so the resolver doesn't break boot.
+            return null;
+        }
+    }
+
+    private static function disConnectionReady(string $table = 'meta_tokens'): bool
     {
         try {
-            return DB::connection('dis')->getSchemaBuilder()->hasTable('meta_tokens');
+            return DB::connection('dis')->getSchemaBuilder()->hasTable($table);
         } catch (Throwable $e) {
             return false;
         }

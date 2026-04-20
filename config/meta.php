@@ -23,6 +23,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Legacy credential source (hrms_meta_credentials)
+    |--------------------------------------------------------------------------
+    |
+    | When meta_tokens (OAuth) is empty, MetaTokenResolver falls back to
+    | the hrms_meta_credentials table in the DIS database — seeded by the
+    | HRMS app which stores page tokens encrypted with its own APP_KEY.
+    |
+    | Set HRMS_APP_KEY in this app's .env to HRMS's exact APP_KEY value so
+    | the encrypter can decrypt. If empty, the resolver defaults to this
+    | app's APP_KEY (only works when HRMS & Marketing share a key).
+    |
+    */
+    'hrms_credentials_key' => env('HRMS_APP_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | OAuth Settings
     |--------------------------------------------------------------------------
     |
