@@ -441,6 +441,172 @@
         100% { background: #fff; }
     }
 
+    /* ─── Kanban / Plan mode switch ──────────────────────────── */
+    .db-mode-switch { display: inline-flex; gap: 2px; background: var(--db-accent-soft); padding: 3px; border-radius: 7px; }
+    .db-mode-btn {
+        padding: 6px 12px; font-size: 12px; border-radius: 5px;
+        border: none; background: transparent; cursor: pointer;
+        color: var(--db-text-2); font-weight: 500;
+    }
+    .db-mode-btn.active { background: #fff; color: var(--db-text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+    .db-mode-btn:hover:not(.active) { color: var(--db-text); }
+
+    /* ─── Plan grid (3×3) ─────────────────────────────────────── */
+    .db-plan-wrap { margin-top: 4px; }
+    .db-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .db-plan-cell {
+        background: var(--db-surface);
+        border: 1px solid var(--db-border);
+        border-radius: 10px;
+        padding: 12px;
+        min-height: 260px;
+        display: flex; flex-direction: column; gap: 10px;
+        min-width: 0;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .db-plan-cell.selected { border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.06); }
+    .db-plan-cell.empty {
+        border-style: dashed; cursor: pointer;
+        justify-content: center; align-items: center;
+        color: var(--db-text-3);
+    }
+    .db-plan-cell.empty:hover { border-color: var(--db-text); background: var(--db-accent-soft); color: var(--db-text-2); }
+    .db-plan-cell-num {
+        font-size: 10px; font-weight: 600; color: var(--db-text-3);
+        text-transform: uppercase; letter-spacing: 0.08em;
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .db-plan-stage-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--db-text-3); }
+    .db-plan-stage-dot[data-stage="production"] { background: #f59e0b; }
+    .db-plan-stage-dot[data-stage="editing"]    { background: #8b5cf6; }
+    .db-plan-stage-dot[data-stage="scheduling"] { background: #3b82f6; }
+    .db-plan-stage-dot[data-stage="published"]  { background: #22c55e; }
+    .db-plan-empty-icon { font-size: 28px; line-height: 1; }
+    .db-plan-empty-txt { font-size: 11px; margin-top: 4px; }
+
+    .db-plan-field { display: flex; flex-direction: column; gap: 4px; }
+    .db-plan-field-lbl {
+        font-size: 9px; font-weight: 600; color: var(--db-text-3);
+        text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .db-plan-input, .db-plan-textarea {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid var(--db-border);
+        border-radius: 5px;
+        font-family: inherit; font-size: 11px;
+        color: var(--db-text); background: #fff;
+    }
+    .db-plan-input:focus, .db-plan-textarea:focus { outline: none; border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.05); }
+    .db-plan-textarea { resize: none; min-height: 44px; }
+
+    /* Product chips */
+    .db-plan-chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .db-plan-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 6px 2px 3px;
+        border-radius: 10px; background: var(--db-accent-soft);
+        font-size: 10px; color: var(--db-text-2);
+        max-width: 100%;
+    }
+    .db-plan-chip-thumb { width: 14px; height: 14px; border-radius: 3px; object-fit: cover; flex-shrink: 0; background: #f4f4f5; }
+    .db-plan-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px; }
+    .db-plan-chip-del { margin-left: 2px; cursor: pointer; color: var(--db-text-3); font-size: 12px; line-height: 1; }
+    .db-plan-chip-del:hover { color: #dc2626; }
+    .db-plan-chip-add {
+        padding: 2px 7px; border-radius: 10px;
+        border: 1px dashed var(--db-border-strong);
+        background: transparent; font-size: 10px; color: var(--db-text-3);
+        cursor: pointer;
+    }
+    .db-plan-chip-add:hover { border-color: var(--db-text); color: var(--db-text); }
+
+    /* Mini product picker popover */
+    .db-plan-pop {
+        position: absolute; z-index: 9900;
+        background: var(--db-surface); border: 1px solid var(--db-border);
+        border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        padding: 6px; width: 260px; max-height: 340px; overflow-y: auto;
+    }
+    .db-plan-pop-item {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px 8px; border-radius: 5px; cursor: pointer;
+    }
+    .db-plan-pop-item:hover { background: var(--db-accent-soft); }
+    .db-plan-pop-item.selected { background: #eef2ff; }
+    .db-plan-pop-thumb { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; background: #f4f4f5; flex-shrink: 0; }
+    .db-plan-pop-name { font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .db-plan-pop-sub { font-size: 9px; color: var(--db-text-3); }
+    .db-plan-pop-search {
+        width: 100%; padding: 6px 8px; font-size: 11px;
+        border: 1px solid var(--db-border); border-radius: 5px;
+        margin-bottom: 6px;
+    }
+    .db-plan-pop-empty { padding: 16px; text-align: center; color: var(--db-text-3); font-size: 11px; }
+
+    /* Inline media thumb */
+    .db-plan-media {
+        position: relative; width: 100%; aspect-ratio: 4/3;
+        border: 1.5px dashed var(--db-border-strong);
+        border-radius: 6px; background: #fafafa;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; overflow: hidden;
+    }
+    .db-plan-media:hover { border-color: var(--db-text); background: var(--db-accent-soft); }
+    .db-plan-media.has-media { border-style: solid; cursor: default; }
+    .db-plan-media.is-dragover { border-color: var(--db-text); background: #eef2ff; }
+    .db-plan-media img, .db-plan-media video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .db-plan-media-empty { font-size: 10px; color: var(--db-text-3); text-align: center; padding: 4px 6px; }
+    .db-plan-media-empty strong { font-size: 18px; display: block; color: var(--db-text-3); margin-bottom: 2px; }
+    .db-plan-media-del {
+        position: absolute; top: 4px; right: 4px;
+        width: 20px; height: 20px; border-radius: 50%;
+        background: rgba(0,0,0,0.7); color: #fff;
+        border: none; cursor: pointer; font-size: 12px;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .db-plan-media-count {
+        position: absolute; bottom: 4px; right: 4px;
+        background: rgba(0,0,0,0.7); color: #fff;
+        font-size: 9px; font-weight: 600;
+        padding: 2px 6px; border-radius: 8px;
+    }
+
+    /* Ref preview inside plan cell */
+    .db-plan-ref {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 2px 8px 2px 5px;
+        border-radius: 10px; background: var(--db-accent-soft);
+        color: var(--db-text-2); font-size: 10px;
+        max-width: 100%; text-decoration: none;
+    }
+    .db-plan-ref:hover { background: var(--db-border-strong); color: var(--db-text); }
+    .db-plan-ref img { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
+    .db-plan-ref span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .db-plan-empty-note { padding: 24px; text-align: center; color: var(--db-text-3); font-size: 12px; }
+
+    /* Delete button on a filled plan cell */
+    .db-plan-cell-del {
+        width: 18px; height: 18px; border: none; background: transparent;
+        color: var(--db-text-3); cursor: pointer; border-radius: 50%;
+        font-size: 14px; line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+        margin-left: 4px;
+    }
+    .db-plan-cell-del:hover { background: #fee2e2; color: #dc2626; }
+
+    /* "+ Shto post" button under the plan grid */
+    .db-plan-add-row { margin-top: 14px; display: flex; justify-content: center; }
+    .db-plan-add-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; font-size: 12px; font-weight: 500;
+        background: var(--db-surface); color: var(--db-text-2);
+        border: 1px dashed var(--db-border-strong); border-radius: 20px;
+        cursor: pointer;
+    }
+    .db-plan-add-btn:hover { border-color: var(--db-text); color: var(--db-text); background: var(--db-accent-soft); }
+
     /* Smart URL preview (favicon + short domain, clickable) */
     .db-url-preview { margin-top: 6px; font-size: 11px; color: var(--db-text-3); min-height: 18px; }
     .db-url-preview.empty { font-style: italic; }
@@ -527,7 +693,11 @@
             <div class="db-title">Shporta Ditore</div>
             <div class="db-meta" id="dbCurrentDate">—</div>
         </div>
-        <div>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div class="db-mode-switch" id="dbModeSwitch">
+                <button class="db-mode-btn active" data-mode="kanban">Kanban</button>
+                <button class="db-mode-btn" data-mode="plan">📋 Plan</button>
+            </div>
             <button class="db-pano-btn" id="dbBtnPano" disabled>📦 Panorama</button>
             <button class="db-btn db-btn-primary" id="dbBtnNewPost" disabled>+ Post i ri</button>
         </div>
@@ -635,6 +805,13 @@
         @endforeach
     </div>
 
+    <div class="db-plan-wrap" id="dbPlanWrap" hidden>
+        <div class="db-plan-grid" id="dbPlanGrid"></div>
+        <div class="db-plan-add-row">
+            <button type="button" class="db-plan-add-btn" id="dbPlanAddBtn">+ Shto post</button>
+        </div>
+    </div>
+
     <div class="db-sheet-label">Posti i zgjedhur</div>
     <div class="db-sheet" id="dbSheet">
         <div class="db-sheet-placeholder">Kliko një kartë më lart për të parë detajet.</div>
@@ -686,6 +863,7 @@
         selectedPostId: null,
         kanban: null,
         availableProducts: [],
+        viewMode: (typeof localStorage !== 'undefined' && localStorage.getItem('dbViewMode')) || 'kanban',
         // Create-post modal state (edits happen inline in the panel).
         modal: {
             title: '',
@@ -1248,6 +1426,10 @@
     }
 
     function renderBoard(data) {
+        // Apply the current view mode (kanban visible, plan hidden — or vice versa).
+        applyViewMode();
+
+        // Kanban render (always runs so it's ready when user toggles back).
         data.columns.forEach(col => {
             const body = document.querySelector('.db-col-body[data-column="' + col.key + '"]');
             const count = document.querySelector('.db-col-count[data-count="' + col.key + '"]');
@@ -1265,6 +1447,506 @@
 
             col.posts.forEach(post => body.appendChild(buildPostCard(post)));
         });
+
+        if (state.viewMode === 'plan') {
+            renderPlanView(data);
+        }
+    }
+
+    function applyViewMode() {
+        const board = document.getElementById('dbBoard');
+        const plan = document.getElementById('dbPlanWrap');
+        board.hidden = state.viewMode !== 'kanban';
+        plan.hidden = state.viewMode !== 'plan';
+
+        document.querySelectorAll('#dbModeSwitch .db-mode-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.mode === state.viewMode);
+        });
+    }
+
+    function setViewMode(mode) {
+        if (mode !== 'kanban' && mode !== 'plan') return;
+        state.viewMode = mode;
+        try { localStorage.setItem('dbViewMode', mode); } catch (_) {}
+        applyViewMode();
+        if (state.kanban) {
+            if (mode === 'plan') renderPlanView(state.kanban);
+            else renderBoard(state.kanban);
+        }
+    }
+
+    // ── Plan view (3×3 grid — cells create posts immediately) ────
+    function allPostsOrderedForPlan(data) {
+        // The plan grid is stage-agnostic — posts from every column are
+        // flattened into one list, ordered by sort_order then id.
+        const flat = [];
+        data.columns.forEach(col => col.posts.forEach(p => flat.push(p)));
+        flat.sort((a, b) => {
+            const ao = a.sort_order ?? 0, bo = b.sort_order ?? 0;
+            if (ao !== bo) return ao - bo;
+            return a.id - b.id;
+        });
+        return flat;
+    }
+
+    function renderPlanView(data) {
+        const grid = document.getElementById('dbPlanGrid');
+        grid.textContent = '';
+
+        const basketId = data.basket?.id;
+        if (!basketId) {
+            const msg = document.createElement('div');
+            msg.className = 'db-plan-empty-note';
+            msg.textContent = 'Zgjidh nje dite ne kalendar per te filluar planin.';
+            grid.appendChild(msg);
+            return;
+        }
+
+        const posts = allPostsOrderedForPlan(data);
+        const slotCount = Math.max(9, Math.ceil(posts.length / 3) * 3); // always multiple of 3, min 9
+
+        for (let i = 0; i < slotCount; i++) {
+            const post = posts[i];
+            grid.appendChild(post ? buildPlanCellFilled(post, i + 1) : buildPlanCellEmpty(i + 1));
+        }
+    }
+
+    function buildPlanCellEmpty(slotNumber) {
+        const cell = document.createElement('div');
+        cell.className = 'db-plan-cell empty';
+        cell.tabIndex = 0;
+
+        const ic = document.createElement('div');
+        ic.className = 'db-plan-empty-icon';
+        ic.textContent = '+';
+        const tx = document.createElement('div');
+        tx.className = 'db-plan-empty-txt';
+        tx.textContent = 'Post ' + slotNumber;
+        cell.append(ic, tx);
+
+        const trigger = () => createPostForSlot(slotNumber);
+        cell.addEventListener('click', trigger);
+        cell.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); }
+        });
+        return cell;
+    }
+
+    async function createPostForSlot(slotNumber) {
+        const basketId = state.kanban?.basket?.id;
+        if (!basketId) return;
+        try {
+            await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
+                title: 'Post ' + slotNumber,
+                post_type: 'photo',
+                priority: 'normal',
+            });
+            await selectDay(state.selectedDate);
+        } catch (e) {
+            showError('Krijimi deshtoi: ' + e.message);
+        }
+    }
+
+    function buildPlanCellFilled(post, slotNumber) {
+        const cell = document.createElement('div');
+        cell.className = 'db-plan-cell';
+        if (post.id === state.selectedPostId) cell.classList.add('selected');
+        cell.addEventListener('click', (e) => {
+            // Clicks inside inputs / buttons shouldn't re-select.
+            if (e.target.closest('input, textarea, button, a, .db-plan-pop')) return;
+            selectPost(num(post.id));
+        });
+
+        // Header: slot number + stage dot + delete
+        const hdr = document.createElement('div');
+        hdr.className = 'db-plan-cell-num';
+        const left = document.createElement('span');
+        left.textContent = 'Post ' + slotNumber + ' · ' + (post.post_type_label || post.post_type);
+
+        const right = document.createElement('span');
+        right.style.cssText = 'display:flex; align-items:center; gap:2px;';
+
+        const dot = document.createElement('span');
+        dot.className = 'db-plan-stage-dot';
+        dot.dataset.stage = post.stage;
+        dot.title = post.stage_label || post.stage;
+        right.appendChild(dot);
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'db-plan-cell-del';
+        del.title = 'Hiq postin';
+        del.textContent = '×';
+        del.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Te hiqet ky post? (' + (post.title || '') + ')')) return;
+            try {
+                await apiDelete('/marketing/daily-basket/api/posts/' + num(post.id));
+                if (state.selectedPostId === post.id) state.selectedPostId = null;
+                await selectDay(state.selectedDate);
+            } catch (err) { showError('Heqja deshtoi: ' + err.message); }
+        });
+        right.appendChild(del);
+
+        hdr.append(left, right);
+        cell.appendChild(hdr);
+
+        // Media block
+        cell.appendChild(buildPlanMediaBlock(post));
+
+        // Reference URL — input + favicon preview
+        const refField = document.createElement('div');
+        refField.className = 'db-plan-field';
+        const refLbl = document.createElement('span');
+        refLbl.className = 'db-plan-field-lbl';
+        refLbl.textContent = 'Reference URL';
+        refField.appendChild(refLbl);
+
+        const refPreview = document.createElement('div');
+        refPreview.style.cssText = 'margin-top: 2px;';
+
+        const renderRefPreview = (url) => {
+            refPreview.textContent = '';
+            if (!url) return;
+            let host;
+            try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (_) { host = url; }
+            const a = document.createElement('a');
+            a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            a.className = 'db-plan-ref'; a.title = url;
+            const fav = document.createElement('img');
+            fav.src = 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(host) + '&sz=32';
+            fav.onerror = () => { fav.style.display = 'none'; };
+            const nm = document.createElement('span');
+            nm.textContent = host;
+            a.append(fav, nm);
+            refPreview.appendChild(a);
+        };
+
+        const refInput = document.createElement('input');
+        refInput.type = 'url';
+        refInput.className = 'db-plan-input';
+        refInput.placeholder = 'https://…';
+        refInput.value = post.reference_url || '';
+        const saveRef = async () => {
+            const v = refInput.value.trim() || null;
+            if (v === (post.reference_url || null)) return;
+            try {
+                await savePostField(post, { reference_url: v });
+                flashSaved(refInput);
+                renderRefPreview(v);
+            } catch (e) {
+                showError('Ruajtja deshtoi: ' + e.message);
+                refInput.value = post.reference_url || '';
+            }
+        };
+        refInput.addEventListener('blur', saveRef);
+        refInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); refInput.blur(); }
+            if (e.key === 'Escape') { refInput.value = post.reference_url || ''; refInput.blur(); }
+        });
+        refField.append(refInput, refPreview);
+        renderRefPreview(post.reference_url);
+        cell.appendChild(refField);
+
+        // Products chips
+        cell.appendChild(buildPlanProductsBlock(post));
+
+        // Note (= reference_notes)
+        const noteField = document.createElement('div');
+        noteField.className = 'db-plan-field';
+        const noteLbl = document.createElement('span');
+        noteLbl.className = 'db-plan-field-lbl';
+        noteLbl.textContent = 'Note';
+        const noteTa = document.createElement('textarea');
+        noteTa.className = 'db-plan-textarea';
+        noteTa.rows = 2;
+        noteTa.placeholder = 'Mood, location, model…';
+        noteTa.value = post.reference_notes || '';
+        const saveNote = async () => {
+            const v = noteTa.value.trim() || null;
+            if (v === (post.reference_notes || null)) return;
+            try {
+                await savePostField(post, { reference_notes: v });
+                flashSaved(noteTa);
+            } catch (e) {
+                showError('Ruajtja deshtoi: ' + e.message);
+                noteTa.value = post.reference_notes || '';
+            }
+        };
+        noteTa.addEventListener('blur', saveNote);
+        noteTa.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { noteTa.value = post.reference_notes || ''; noteTa.blur(); }
+        });
+        noteField.append(noteLbl, noteTa);
+        cell.appendChild(noteField);
+
+        return cell;
+    }
+
+    // Products block — chips + "+ Shto" opens a compact popover.
+    function buildPlanProductsBlock(post) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-plan-field';
+        const lbl = document.createElement('span');
+        lbl.className = 'db-plan-field-lbl';
+        lbl.textContent = 'Produktet';
+        wrap.appendChild(lbl);
+
+        const chips = document.createElement('div');
+        chips.className = 'db-plan-chips';
+        (post.products || []).forEach(p => chips.appendChild(buildProductChip(post, p)));
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'db-plan-chip-add';
+        addBtn.textContent = '+ Shto';
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPlanProductPicker(post, addBtn);
+        });
+        chips.appendChild(addBtn);
+
+        wrap.appendChild(chips);
+        return wrap;
+    }
+
+    function buildProductChip(post, p) {
+        const chip = document.createElement('span');
+        chip.className = 'db-plan-chip';
+        chip.title = p.name || '';
+
+        if (p.image_url) {
+            const img = document.createElement('img');
+            img.className = 'db-plan-chip-thumb';
+            img.src = p.image_url;
+            img.alt = '';
+            img.onerror = () => { img.replaceWith(document.createElement('span')); };
+            chip.appendChild(img);
+        } else {
+            const th = document.createElement('span');
+            th.className = 'db-plan-chip-thumb';
+            chip.appendChild(th);
+        }
+        const nm = document.createElement('span');
+        nm.className = 'db-plan-chip-name';
+        nm.textContent = p.name || ('#' + num(p.item_group_id));
+        chip.appendChild(nm);
+
+        const del = document.createElement('span');
+        del.className = 'db-plan-chip-del';
+        del.textContent = '×';
+        del.title = 'Hiq';
+        del.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const nextIds = (post.products || [])
+                .filter(x => num(x.item_group_id) !== num(p.item_group_id))
+                .map(x => num(x.item_group_id));
+            try {
+                await apiPutJson('/marketing/daily-basket/api/posts/' + num(post.id) + '/products', {
+                    product_ids: nextIds,
+                    hero_product_id: nextIds[0] || null,
+                });
+                await selectDay(state.selectedDate);
+            } catch (err) { showError('Heqja deshtoi: ' + err.message); }
+        });
+        chip.appendChild(del);
+        return chip;
+    }
+
+    function openPlanProductPicker(post, triggerEl) {
+        // Close any existing popover first.
+        document.querySelectorAll('.db-plan-pop').forEach(p => p.remove());
+
+        const pop = document.createElement('div');
+        pop.className = 'db-plan-pop';
+        const rect = triggerEl.getBoundingClientRect();
+        pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+        pop.style.left = (window.scrollX + rect.left) + 'px';
+
+        const search = document.createElement('input');
+        search.className = 'db-plan-pop-search';
+        search.type = 'text';
+        search.placeholder = 'Kerko produkt…';
+        pop.appendChild(search);
+
+        const listHost = document.createElement('div');
+        pop.appendChild(listHost);
+
+        const assignedIds = new Set((post.products || []).map(p => num(p.item_group_id)));
+        const renderList = (query) => {
+            listHost.textContent = '';
+            const q = (query || '').toLowerCase().trim();
+            const filtered = (state.availableProducts || []).filter(p => {
+                if (!q) return true;
+                return (p.name || '').toLowerCase().includes(q)
+                    || (p.code || '').toLowerCase().includes(q);
+            });
+            if (filtered.length === 0) {
+                const e = document.createElement('div');
+                e.className = 'db-plan-pop-empty';
+                e.textContent = 'Pa rezultate';
+                listHost.appendChild(e);
+                return;
+            }
+            filtered.slice(0, 40).forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'db-plan-pop-item' + (assignedIds.has(num(p.id)) ? ' selected' : '');
+
+                if (p.image_url) {
+                    const img = document.createElement('img');
+                    img.className = 'db-plan-pop-thumb';
+                    img.src = p.image_url;
+                    img.onerror = () => { img.replaceWith(document.createElement('div')); };
+                    item.appendChild(img);
+                } else {
+                    item.appendChild(document.createElement('div'));
+                }
+
+                const info = document.createElement('div');
+                info.style.cssText = 'flex:1; min-width:0;';
+                const nm = document.createElement('div');
+                nm.className = 'db-plan-pop-name';
+                nm.textContent = p.name;
+                const sub = document.createElement('div');
+                sub.className = 'db-plan-pop-sub';
+                sub.textContent = [p.code, p.classification].filter(Boolean).join(' · ');
+                info.append(nm, sub);
+                item.appendChild(info);
+
+                item.addEventListener('click', async () => {
+                    const existing = (post.products || []).map(x => num(x.item_group_id));
+                    const nextIds = assignedIds.has(num(p.id))
+                        ? existing.filter(x => x !== num(p.id))
+                        : [...existing, num(p.id)];
+                    try {
+                        await apiPutJson('/marketing/daily-basket/api/posts/' + num(post.id) + '/products', {
+                            product_ids: nextIds,
+                            hero_product_id: nextIds[0] || null,
+                        });
+                        pop.remove();
+                        await selectDay(state.selectedDate);
+                    } catch (err) { showError('Ndryshimi deshtoi: ' + err.message); }
+                });
+                listHost.appendChild(item);
+            });
+        };
+        renderList('');
+        search.addEventListener('input', () => renderList(search.value));
+
+        document.body.appendChild(pop);
+        setTimeout(() => search.focus(), 10);
+
+        // Close on outside click or Escape
+        const onDoc = (ev) => {
+            if (!pop.contains(ev.target) && ev.target !== triggerEl) {
+                pop.remove();
+                document.removeEventListener('click', onDoc);
+                document.removeEventListener('keydown', onKey);
+            }
+        };
+        const onKey = (ev) => {
+            if (ev.key === 'Escape') {
+                pop.remove();
+                document.removeEventListener('click', onDoc);
+                document.removeEventListener('keydown', onKey);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener('click', onDoc);
+            document.addEventListener('keydown', onKey);
+        }, 0);
+    }
+
+    // Compact media block inside a plan cell — 4:3 thumbnail. Uploading
+    // appends to post.media (replacing for non-carousel types is handled
+    // server-side, same as the detail panel).
+    function buildPlanMediaBlock(post) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-plan-media';
+
+        const media = Array.isArray(post.media) ? post.media : [];
+        const first = media[0];
+
+        if (first) {
+            wrap.classList.add('has-media');
+            if (first.is_video) {
+                const v = document.createElement('video');
+                v.src = first.url;
+                v.muted = true;
+                v.playsInline = true;
+                v.preload = 'metadata';
+                wrap.appendChild(v);
+            } else {
+                const img = document.createElement('img');
+                img.src = first.thumbnail_url || first.url;
+                wrap.appendChild(img);
+            }
+
+            if (media.length > 1) {
+                const cnt = document.createElement('div');
+                cnt.className = 'db-plan-media-count';
+                cnt.textContent = '+' + (media.length - 1);
+                wrap.appendChild(cnt);
+            }
+
+            const del = document.createElement('button');
+            del.className = 'db-plan-media-del';
+            del.type = 'button';
+            del.title = 'Hiq';
+            del.textContent = '×';
+            del.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!confirm('Te hiqet kjo media?')) return;
+                try {
+                    await apiDelete('/marketing/daily-basket/api/posts/' + num(post.id) + '/media/' + num(first.id));
+                    await selectDay(state.selectedDate);
+                } catch (err) { showError('Fshirja deshtoi: ' + err.message); }
+            });
+            wrap.appendChild(del);
+            return wrap;
+        }
+
+        // Empty state — click/drop uploads.
+        const ph = document.createElement('div');
+        ph.className = 'db-plan-media-empty';
+        const icon = document.createElement('strong');
+        icon.textContent = '⬆';
+        ph.appendChild(icon);
+        const tx = document.createElement('div');
+        tx.textContent = 'Kliko ose terhiq material';
+        ph.appendChild(tx);
+        wrap.appendChild(ph);
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = acceptFor(post.post_type);
+        input.style.display = 'none';
+        wrap.appendChild(input);
+
+        wrap.addEventListener('click', () => input.click());
+        wrap.addEventListener('dragover', (e) => { e.preventDefault(); wrap.classList.add('is-dragover'); });
+        wrap.addEventListener('dragleave', () => wrap.classList.remove('is-dragover'));
+        wrap.addEventListener('drop', (e) => {
+            e.preventDefault();
+            wrap.classList.remove('is-dragover');
+            if (e.dataTransfer?.files?.length) {
+                uploadToPlanCell(post, e.dataTransfer.files[0]);
+            }
+        });
+        input.addEventListener('change', () => {
+            if (input.files?.length) uploadToPlanCell(post, input.files[0]);
+        });
+
+        return wrap;
+    }
+
+    async function uploadToPlanCell(post, file) {
+        try {
+            await apiUploadFile('/marketing/daily-basket/api/posts/' + num(post.id) + '/media', file);
+            await selectDay(state.selectedDate);
+        } catch (e) {
+            showError('Ngarkimi deshtoi: ' + e.message);
+        }
     }
 
     function buildPostCard(post) {
@@ -2305,6 +2987,19 @@
         // Panorama
         document.getElementById('dbBtnPano').addEventListener('click', openPanorama);
         document.getElementById('dbPanoClose').addEventListener('click', closePanorama);
+
+        // Kanban / Plan mode switch
+        document.querySelectorAll('#dbModeSwitch .db-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => setViewMode(btn.dataset.mode));
+        });
+
+        // "+ Shto post" in plan view — always appends a new post at the end.
+        document.getElementById('dbPlanAddBtn').addEventListener('click', () => {
+            const nextIndex = state.kanban
+                ? allPostsOrderedForPlan(state.kanban).length + 1
+                : 1;
+            createPostForSlot(nextIndex);
+        });
 
         // (The legacy #dbFieldPlatforms wiring lived in the edit modal; that
         // modal is gone — platforms are now edited inline in the panel.)

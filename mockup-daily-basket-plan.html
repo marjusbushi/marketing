@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Daily Basket Plan (3×3)</title>
+<style>
+  :root {
+    --db-bg: #fafaf9;
+    --db-surface: #ffffff;
+    --db-border: #eeeeec;
+    --db-border-strong: #e4e4e2;
+    --db-text: #18181b;
+    --db-text-2: #71717a;
+    --db-text-3: #a1a1aa;
+    --db-accent-soft: #f4f4f5;
+    --plan-ring: #6366f1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--db-bg);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    color: var(--db-text); font-size: 13px; line-height: 1.5;
+    padding: 24px;
+  }
+
+  .mockup-hdr { max-width: 1100px; margin: 0 auto 24px; }
+  .mockup-hdr h1 { font-size: 22px; margin: 0 0 4px; }
+  .mockup-hdr p { font-size: 12px; color: var(--db-text-3); margin: 0; }
+
+  /* Top bar — Kanban / Plan toggle */
+  .toolbar {
+    max-width: 1100px; margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: #fff; border-radius: 10px;
+    border: 1px solid var(--db-border);
+  }
+  .toolbar-left { display: flex; align-items: center; gap: 10px; }
+  .toolbar-title { font-weight: 600; font-size: 14px; }
+  .toolbar-sub { font-size: 12px; color: var(--db-text-3); }
+  .mode-switch { display: flex; gap: 2px; background: var(--db-accent-soft); padding: 3px; border-radius: 7px; }
+  .mode-btn {
+    padding: 6px 12px; font-size: 12px; border-radius: 5px;
+    border: none; background: transparent; cursor: pointer;
+    color: var(--db-text-2); font-weight: 500;
+  }
+  .mode-btn.active { background: #fff; color: var(--db-text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+
+  /* Plan grid */
+  .plan-wrap { max-width: 1100px; margin: 0 auto; }
+  .plan-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .plan-hdr-title { font-size: 15px; font-weight: 600; }
+  .plan-hdr-title small { color: var(--db-text-3); font-weight: 400; margin-left: 8px; font-size: 12px; }
+
+  .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+  .plan-cell {
+    background: #fff;
+    border: 1px solid var(--db-border);
+    border-radius: 10px;
+    padding: 12px;
+    min-height: 180px;
+    display: flex; flex-direction: column; gap: 10px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .plan-cell:focus-within { border-color: var(--plan-ring); box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+  .plan-cell.empty { border-style: dashed; justify-content: center; align-items: center; color: var(--db-text-3); cursor: pointer; }
+  .plan-cell.empty:hover { border-color: var(--plan-ring); background: #f5f3ff; }
+
+  .plan-cell-num {
+    font-size: 10px; font-weight: 600; color: var(--db-text-3);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .plan-cell-empty-icon { font-size: 26px; color: var(--db-text-3); }
+  .plan-cell-empty-txt { font-size: 11px; color: var(--db-text-3); }
+
+  .plan-field { display: flex; flex-direction: column; gap: 4px; }
+  .plan-field-lbl {
+    font-size: 9px; font-weight: 600; color: var(--db-text-3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .plan-input, .plan-textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--db-border);
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--db-text);
+    background: #fff;
+  }
+  .plan-input:focus, .plan-textarea:focus { outline: none; border-color: var(--plan-ring); }
+  .plan-textarea { resize: none; min-height: 44px; }
+
+  .plan-products { display: flex; gap: 4px; flex-wrap: wrap; }
+  .plan-product-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 7px 2px 3px;
+    border-radius: 10px; background: var(--db-accent-soft);
+    font-size: 10px; color: var(--db-text-2);
+  }
+  .plan-product-chip-thumb { width: 14px; height: 14px; border-radius: 3px; background: linear-gradient(135deg, #fde68a, #fca5a5); }
+  .plan-product-add {
+    padding: 2px 8px; border-radius: 10px; border: 1px dashed var(--db-border-strong);
+    background: transparent; font-size: 10px; color: var(--db-text-3); cursor: pointer;
+  }
+  .plan-product-add:hover { border-color: var(--plan-ring); color: var(--plan-ring); }
+
+  .plan-ref-preview {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px 2px 5px;
+    border-radius: 10px; background: var(--db-accent-soft);
+    color: var(--db-text-2); font-size: 10px;
+    max-width: 100%;
+  }
+  .plan-ref-favicon { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
+  .plan-ref-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .plan-foot {
+    max-width: 1100px; margin: 22px auto 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px; background: #fff; border: 1px solid var(--db-border); border-radius: 10px;
+  }
+  .plan-foot-stat { font-size: 12px; color: var(--db-text-2); }
+  .plan-foot-stat strong { color: var(--db-text); font-weight: 600; }
+  .db-btn { padding: 9px 18px; font-size: 13px; border-radius: 7px; border: 1px solid transparent; cursor: pointer; font-weight: 600; background: var(--db-text); color: #fff; }
+  .db-btn:hover { background: #27272a; }
+  .db-btn-ghost { background: transparent; color: var(--db-text-2); border-color: var(--db-border-strong); font-weight: 500; }
+  .db-btn-ghost:hover { background: var(--db-accent-soft); color: var(--db-text); }
+
+  .note { max-width: 1100px; margin: 18px auto 0; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 12px; color: #78350f; }
+</style>
+</head>
+<body>
+
+<div class="mockup-hdr">
+  <h1>Mockup — Plani i Dites (3×3)</h1>
+  <p>9 qeliza ku planifikon postet. Klik "Krijo 9 postet" = 9 poste ne stage Planifikim, gati per pune.</p>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <span class="toolbar-title">Shporta Ditore · Henë, 20 Prill</span>
+    <span class="toolbar-sub">Colektivi Summer Drop '26</span>
+  </div>
+  <div class="mode-switch">
+    <button class="mode-btn">Kanban</button>
+    <button class="mode-btn active">📋 Plan</button>
+  </div>
+</div>
+
+<div class="plan-wrap">
+  <div class="plan-hdr">
+    <div class="plan-hdr-title">Plani i dites <small>9 qeliza · plotesoji sic ke ide, s'duhen te gjitha</small></div>
+    <button class="db-btn db-btn-ghost">Pastro planin</button>
+  </div>
+
+  <div class="plan-grid">
+
+    <!-- Cell 1 — filled -->
+    <div class="plan-cell">
+      <div class="plan-cell-num">Post 1</div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Reference URL</span>
+        <input class="plan-input" type="url" value="https://pinterest.com/pin/12345/">
+        <span class="plan-ref-preview">
+          <img class="plan-ref-favicon" src="https://www.google.com/s2/favicons?domain=pinterest.com&sz=32" alt="">
+          <span class="plan-ref-host">pinterest.com</span>
+        </span>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Produktet</span>
+        <div class="plan-products">
+          <span class="plan-product-chip"><span class="plan-product-chip-thumb"></span>Pantallona Karrem</span>
+          <button class="plan-product-add">+ Shto</button>
+        </div>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Note</span>
+        <textarea class="plan-textarea">Mood minimalist, sfond beige, foto full-body.</textarea>
+      </div>
+    </div>
+
+    <!-- Cell 2 — filled, carousel -->
+    <div class="plan-cell">
+      <div class="plan-cell-num">Post 2</div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Reference URL</span>
+        <input class="plan-input" type="url" value="https://instagram.com/p/abc123/">
+        <span class="plan-ref-preview">
+          <img class="plan-ref-favicon" src="https://www.google.com/s2/favicons?domain=instagram.com&sz=32" alt="">
+          <span class="plan-ref-host">instagram.com</span>
+        </span>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Produktet</span>
+        <div class="plan-products">
+          <span class="plan-product-chip"><span class="plan-product-chip-thumb"></span>Bluze Linen</span>
+          <span class="plan-product-chip"><span class="plan-product-chip-thumb"></span>Shalvar</span>
+          <button class="plan-product-add">+ Shto</button>
+        </div>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Note</span>
+        <textarea class="plan-textarea">Carousel me 4 foto, flat-lay + portrait.</textarea>
+      </div>
+    </div>
+
+    <!-- Cell 3 — partial (only reference + note) -->
+    <div class="plan-cell">
+      <div class="plan-cell-num">Post 3</div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Reference URL</span>
+        <input class="plan-input" type="url" placeholder="—">
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Produktet</span>
+        <div class="plan-products">
+          <button class="plan-product-add">+ Shto produkt</button>
+        </div>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Note</span>
+        <textarea class="plan-textarea">Reel i shkurter (15s) — highlight new drop.</textarea>
+      </div>
+    </div>
+
+    <!-- Cell 4 — filled -->
+    <div class="plan-cell">
+      <div class="plan-cell-num">Post 4</div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Reference URL</span>
+        <input class="plan-input" type="url" value="https://tiktok.com/@brand/video/999">
+        <span class="plan-ref-preview">
+          <img class="plan-ref-favicon" src="https://www.google.com/s2/favicons?domain=tiktok.com&sz=32" alt="">
+          <span class="plan-ref-host">tiktok.com</span>
+        </span>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Produktet</span>
+        <div class="plan-products">
+          <span class="plan-product-chip"><span class="plan-product-chip-thumb"></span>Aksesor Set</span>
+          <button class="plan-product-add">+ Shto</button>
+        </div>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Note</span>
+        <textarea class="plan-textarea">TikTok — trend ditor, beat aktual.</textarea>
+      </div>
+    </div>
+
+    <!-- Cell 5 — empty -->
+    <div class="plan-cell empty">
+      <div class="plan-cell-empty-icon">+</div>
+      <div class="plan-cell-empty-txt">Post 5</div>
+    </div>
+
+    <!-- Cell 6 — empty -->
+    <div class="plan-cell empty">
+      <div class="plan-cell-empty-icon">+</div>
+      <div class="plan-cell-empty-txt">Post 6</div>
+    </div>
+
+    <!-- Cell 7 — partial -->
+    <div class="plan-cell">
+      <div class="plan-cell-num">Post 7</div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Reference URL</span>
+        <input class="plan-input" type="url" placeholder="—">
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Produktet</span>
+        <div class="plan-products">
+          <span class="plan-product-chip"><span class="plan-product-chip-thumb"></span>Kepuce</span>
+          <button class="plan-product-add">+ Shto</button>
+        </div>
+      </div>
+      <div class="plan-field">
+        <span class="plan-field-lbl">Note</span>
+        <textarea class="plan-textarea" placeholder="Shkruaj note…"></textarea>
+      </div>
+    </div>
+
+    <!-- Cell 8 — empty -->
+    <div class="plan-cell empty">
+      <div class="plan-cell-empty-icon">+</div>
+      <div class="plan-cell-empty-txt">Post 8</div>
+    </div>
+
+    <!-- Cell 9 — empty -->
+    <div class="plan-cell empty">
+      <div class="plan-cell-empty-icon">+</div>
+      <div class="plan-cell-empty-txt">Post 9</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="plan-foot">
+  <div class="plan-foot-stat">
+    <strong>5</strong> qeliza te plotesuara · <strong>4</strong> bosh · do krijohen <strong>5 poste</strong> ne Planifikim
+  </div>
+  <div style="display:flex; gap:8px;">
+    <button class="db-btn db-btn-ghost">Anulo</button>
+    <button class="db-btn">Krijo 5 postet →</button>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Si punon:</strong> Klik "Krijo 5 postet" → per cdo qelize te plotesuar krijohet nje <code>DailyBasketPost</code> ne stage <strong>Planifikim</strong> me reference/produkte/note te kopjuara. Qelizat bosh anashkalohen. Pastaj puna vazhdon ne kanban-in e zakonshem (Prodhim → Editim → Skedulim → auto-publish).
+</div>
+
+</body>
+</html>
