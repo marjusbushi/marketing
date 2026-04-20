@@ -263,16 +263,21 @@
             const permalink = p.permalink || p.url || '';
             const dataAttr = isExternal ? 'data-external="1"' : `data-id="${event.id}"`;
 
-            // Media — square crop via CSS
+            // Media — square crop via CSS.
+            // onerror replaces a broken image with the photo-placeholder icon,
+            // so users never see the browser's default broken-image symbol.
+            const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
+            const onErr = `this.onerror=null;this.outerHTML='${placeholderHtml.replace(/'/g, "\\'")}';`;
+
             let mediaHtml = '';
             if (thumb) {
-                mediaHtml = `<img src="${thumb}" alt="" loading="lazy">`;
+                mediaHtml = `<img src="${thumb}" alt="" loading="lazy" onerror="${onErr}">`;
             } else if (isVideo && mediaUrl) {
-                mediaHtml = `<video src="${mediaUrl}" muted preload="metadata"></video>`;
+                mediaHtml = `<video src="${mediaUrl}" muted preload="metadata" onerror="${onErr}"></video>`;
             } else if (mediaUrl) {
-                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy">`;
+                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy" onerror="${onErr}">`;
             } else {
-                mediaHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
+                mediaHtml = placeholderHtml;
             }
 
             // Hover overlay — minimal

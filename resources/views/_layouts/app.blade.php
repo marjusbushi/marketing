@@ -120,10 +120,12 @@
                 @if(request()->routeIs('marketing.planner.*'))
                 <div class="relative" id="viewSwitcherWrap">
                     @php
+                        // Default landing at /planner/ (name: index) serves the grid view.
                         $currentView = request()->routeIs('marketing.planner.calendar') ? 'Calendar'
                             : (request()->routeIs('marketing.planner.list') ? 'List'
-                            : (request()->routeIs('marketing.planner.grid') ? 'Grid'
-                            : (request()->routeIs('marketing.planner.media') ? 'Media' : 'Calendar')));
+                            : (request()->routeIs('marketing.planner.media') ? 'Media'
+                            : (request()->routeIs('marketing.planner.grid') || request()->routeIs('marketing.planner.index') ? 'Grid'
+                            : 'Grid')));
                         $viewIcons = ['Calendar' => 'heroicons-outline:calendar-days', 'List' => 'heroicons-outline:list-bullet', 'Grid' => 'heroicons-outline:squares-2x2', 'Media' => 'heroicons-outline:photo'];
                     @endphp
                     <button onclick="document.getElementById('viewSwitcherPanel').classList.toggle('hidden')"
