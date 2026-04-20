@@ -183,6 +183,28 @@
         el.replaceWith(ph);
     };
 
+    // Wrap IG/FB CDN URLs through our server-side proxy. These CDNs block
+    // hotlinking (Referer check) and use expiring tokens, so direct use from
+    // the browser fails. The proxy fetches server-side (no browser Referer)
+    // and caches, giving us working images in the planner.
+    const META_PROXY = @json(route('marketing.meta-image'));
+    const META_HOSTS = ['cdninstagram.com', 'fbcdn.net', 'instagram.com', 'graph.facebook.com', 'lookaside.fbsbx.com'];
+    function proxyMetaUrl(url) {
+        if (!url || typeof url !== 'string') return url;
+        // Already routed through us? Leave it alone.
+        if (url.indexOf('/marketing/') === 0 || url.indexOf(location.origin + '/marketing/') === 0) {
+            return url;
+        }
+        try {
+            const u = new URL(url, location.origin);
+            const isMeta = META_HOSTS.some(h => u.hostname === h || u.hostname.endsWith('.' + h));
+            if (isMeta) {
+                return META_PROXY + '?url=' + encodeURIComponent(url);
+            }
+        } catch (e) { /* malformed URL — pass through */ }
+        return url;
+    }
+
     async function refreshGrid() {
         const platform = document.getElementById('filterPlatform').value;
         const params = new URLSearchParams();
@@ -284,16 +306,19 @@
             // browser's default broken-image icon.
             const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
 
-            // referrerpolicy="no-referrer" eshte kritik per Instagram/Facebook CDN:
-            // ata bllokojne serving kur Referer eshte nje domain i jashtem.
-            // Pa kete, postet e importuara nga IG shfaqen si broken-image.
+            // IG/FB CDN URLs routed through /marketing/meta-image (server proxy)
+            // to sidestep hotlink protection + expiring tokens.
+            // referrerpolicy stays as a belt-and-suspenders measure.
+            const proxiedThumb = proxyMetaUrl(thumb);
+            const proxiedMedia = proxyMetaUrl(mediaUrl);
+
             let mediaHtml = '';
-            if (thumb) {
-                mediaHtml = `<img src="${thumb}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
-            } else if (isVideo && mediaUrl) {
-                mediaHtml = `<video src="${mediaUrl}" muted preload="metadata" onerror="feedTileOnErr(this)"></video>`;
-            } else if (mediaUrl) {
-                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
+            if (proxiedThumb) {
+                mediaHtml = `<img src="${proxiedThumb}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
+            } else if (isVideo && proxiedMedia) {
+                mediaHtml = `<video src="${proxiedMedia}" muted preload="metadata" onerror="feedTileOnErr(this)"></video>`;
+            } else if (proxiedMedia) {
+                mediaHtml = `<img src="${proxiedMedia}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
             } else {
                 mediaHtml = placeholderHtml;
             }

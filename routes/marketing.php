@@ -250,6 +250,55 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->header('Cache-Control', 'public, max-age=86400');
     })->name('cdn-image');
 
+    // Proxy per imazhet e Instagram/Facebook — IG CDN bllokon hotlink-un kur
+    // Referer-i eshte domain i jashtem, dhe tokens-at e URL-ve skadojne ne
+    // ~1-2 ore. Server-i yne i merr direkt (zero referer) dhe i kesh ne
+    // response, keshtu browseri i sheh gjithmone.
+    //
+    // Allowlist i saktë — vetem hostet e njohura te IG/FB/CDN-ve te tyre.
+    Route::get('/meta-image', function (\Illuminate\Http\Request $request) {
+        $url = $request->query('url');
+        if (!$url) {
+            abort(400);
+        }
+        $host = parse_url($url, PHP_URL_HOST) ?? '';
+        $allowed = [
+            'scontent.cdninstagram.com',
+            'cdninstagram.com',
+            'fbcdn.net',
+            'instagram.com',
+            'graph.facebook.com',
+            'lookaside.fbsbx.com',
+        ];
+        $isAllowed = false;
+        foreach ($allowed as $suffix) {
+            if ($host === $suffix || str_ends_with($host, '.' . $suffix)) {
+                $isAllowed = true;
+                break;
+            }
+        }
+        if (! $isAllowed) {
+            abort(400, 'Host not allowed');
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->timeout(12)
+                ->withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; za-marketing-proxy)'])
+                ->get($url);
+        } catch (\Throwable $e) {
+            abort(502);
+        }
+
+        if ($response->failed()) {
+            abort(404);
+        }
+
+        return response($response->body(), 200)
+            ->header('Content-Type', $response->header('Content-Type') ?: 'image/jpeg')
+            ->header('Cache-Control', 'public, max-age=3600'); // IG URLs expire fast; 1h cache
+    })->name('meta-image');
+
     // ─── Analytics ──────────────────────────────────
     Route::prefix('analytics')->as('analytics.')->middleware('marketing.permission:' . P::ANALYTICS_VIEW->value)->group(function () {
         Route::get('/', [MetaMarketingV2Controller::class, 'index'])->name('index');
