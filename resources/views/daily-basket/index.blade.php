@@ -404,8 +404,9 @@
 
     /* ─── Inline 3-column edit panel ─────────────────────────────── */
     .db-sheet-body-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
-    .db-col-group { padding: 20px 24px; border-right: 1px solid var(--db-border); }
+    .db-col-group { padding: 20px 24px; border-right: 1px solid var(--db-border); min-width: 0; }
     .db-col-group:last-child { border-right: 0; }
+    .db-field-inline { min-width: 0; }
     .db-col-group-title {
         font-size: 10px; color: var(--db-text-3); text-transform: uppercase;
         letter-spacing: 0.08em; font-weight: 700; margin-bottom: 14px;
@@ -439,6 +440,24 @@
         25% { background: #dcfce7; }
         100% { background: #fff; }
     }
+
+    /* Smart URL preview (favicon + short domain, clickable) */
+    .db-url-preview { margin-top: 6px; font-size: 11px; color: var(--db-text-3); min-height: 18px; }
+    .db-url-preview.empty { font-style: italic; }
+    .db-url-link {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 3px 9px 3px 6px;
+        border-radius: 14px;
+        background: var(--db-accent-soft);
+        color: var(--db-text-2); text-decoration: none;
+        font-size: 11px; font-weight: 500;
+        max-width: 100%;
+        transition: background 0.1s, color 0.1s;
+    }
+    .db-url-link:hover { background: var(--db-border-strong); color: var(--db-text); }
+    .db-url-favicon { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; background: #fff; }
+    .db-url-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .db-url-ext { font-size: 10px; opacity: 0.7; flex-shrink: 0; }
 
     /* ─── Media uploader ─────────────────────────────────────────── */
     .db-media-slot {
@@ -1400,14 +1419,7 @@
 
         col1.appendChild(labeledField('Produktet', renderProductsBlock(post)));
 
-        col1.appendChild(labeledField('Reference URL', inlineInput({
-            value: post.reference_url,
-            type: 'url',
-            placeholder: 'https://pinterest.com/pin/… (Enter per ruajtje)',
-            save: (v) => savePostField(post, { reference_url: v }),
-        }), post.reference_url
-            ? 'Hap ▸ ' + post.reference_url
-            : 'Guard-i i Fazes 1 kerkon nje reference para prodhimit'));
+        col1.appendChild(buildReferenceUrlBlock(post));
 
         col1.appendChild(labeledField('Reference notes', inlineTextarea({
             value: post.reference_notes,
@@ -1719,6 +1731,75 @@
                 // Update the local copy so subsequent renders see the new value.
                 Object.assign(post, payload);
             });
+    }
+
+    // ── Reference URL field (smart favicon + short domain preview) ──
+    //
+    // The preview is compact (pill with favicon + hostname + ↗) so the first
+    // column stays narrow. Clicking opens the link in a new tab. Updates
+    // reactively after save via onSaved.
+    function buildReferenceUrlBlock(post) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-field-inline';
+
+        const lbl = document.createElement('label');
+        lbl.className = 'db-field-lbl';
+        lbl.textContent = 'Reference URL';
+        wrap.appendChild(lbl);
+
+        const preview = document.createElement('div');
+        preview.className = 'db-url-preview';
+
+        const renderPreview = (url) => {
+            preview.textContent = '';
+            preview.classList.toggle('empty', !url);
+            if (!url) {
+                preview.textContent = 'Guard-i i Fazës 1 kërkon një reference para prodhimit';
+                return;
+            }
+            let host;
+            try { host = new URL(url).hostname.replace(/^www\./, ''); }
+            catch (_) { host = url; }
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.className = 'db-url-link';
+            a.title = url;
+
+            const fav = document.createElement('img');
+            fav.className = 'db-url-favicon';
+            // Google's favicon service works for any domain and falls back
+            // automatically; onerror hides the img so the layout doesn't jump.
+            fav.src = 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(host) + '&sz=32';
+            fav.alt = '';
+            fav.onerror = () => { fav.style.display = 'none'; };
+
+            const name = document.createElement('span');
+            name.className = 'db-url-host';
+            name.textContent = host;
+
+            const ext = document.createElement('span');
+            ext.className = 'db-url-ext';
+            ext.textContent = '↗';
+
+            a.append(fav, name, ext);
+            preview.appendChild(a);
+        };
+
+        const input = inlineInput({
+            value: post.reference_url,
+            type: 'url',
+            placeholder: 'https://pinterest.com/pin/… (Enter per ruajtje)',
+            save: (v) => savePostField(post, { reference_url: v }),
+            onSaved: (v) => renderPreview(v),
+        });
+
+        wrap.appendChild(input);
+        wrap.appendChild(preview);
+        renderPreview(post.reference_url);
+        return wrap;
     }
 
     // ── Inline media uploader (adapts per post_type) ────────────
