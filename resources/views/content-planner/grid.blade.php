@@ -167,6 +167,22 @@
         return { day: d.getDate(), month: months[d.getMonth()] };
     }
 
+    // Replace a broken img/video with a clean placeholder icon instead of the
+    // browser's default broken-image symbol. Defined on window so the inline
+    // `onerror` handlers rendered by refreshGrid() can call it.
+    window.feedTileOnErr = function (el) {
+        if (!el || !el.parentNode) return;
+        el.onerror = null;
+        const ph = document.createElement('div');
+        ph.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;';
+        const icon = document.createElement('iconify-icon');
+        icon.setAttribute('icon', 'heroicons-outline:photo');
+        icon.setAttribute('width', '28');
+        icon.style.color = '#e2e8f0';
+        ph.appendChild(icon);
+        el.replaceWith(ph);
+    };
+
     async function refreshGrid() {
         const platform = document.getElementById('filterPlatform').value;
         const params = new URLSearchParams();
@@ -263,19 +279,18 @@
             const permalink = p.permalink || p.url || '';
             const dataAttr = isExternal ? 'data-external="1"' : `data-id="${event.id}"`;
 
-            // Media — square crop via CSS.
-            // onerror replaces a broken image with the photo-placeholder icon,
-            // so users never see the browser's default broken-image symbol.
+            // Media — square crop via CSS. `feedTileOnErr` (global) swaps a
+            // broken image with the photo-placeholder so users never see the
+            // browser's default broken-image icon.
             const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
-            const onErr = `this.onerror=null;this.outerHTML='${placeholderHtml.replace(/'/g, "\\'")}';`;
 
             let mediaHtml = '';
             if (thumb) {
-                mediaHtml = `<img src="${thumb}" alt="" loading="lazy" onerror="${onErr}">`;
+                mediaHtml = `<img src="${thumb}" alt="" loading="lazy" onerror="feedTileOnErr(this)">`;
             } else if (isVideo && mediaUrl) {
-                mediaHtml = `<video src="${mediaUrl}" muted preload="metadata" onerror="${onErr}"></video>`;
+                mediaHtml = `<video src="${mediaUrl}" muted preload="metadata" onerror="feedTileOnErr(this)"></video>`;
             } else if (mediaUrl) {
-                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy" onerror="${onErr}">`;
+                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy" onerror="feedTileOnErr(this)">`;
             } else {
                 mediaHtml = placeholderHtml;
             }
