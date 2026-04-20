@@ -233,6 +233,14 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->name('api.posts.transition');
         Route::delete('/api/posts/{post}', [DailyBasketController::class, 'deletePost'])
             ->name('api.posts.destroy');
+
+        // Post media (inline uploader)
+        Route::post('/api/posts/{post}/media', [DailyBasketController::class, 'uploadMedia'])
+            ->name('api.posts.media.upload');
+        Route::put('/api/posts/{post}/media/reorder', [DailyBasketController::class, 'reorderPostMedia'])
+            ->name('api.posts.media.reorder');
+        Route::delete('/api/posts/{post}/media/{mediaId}', [DailyBasketController::class, 'deletePostMedia'])
+            ->name('api.posts.media.destroy');
     });
 
     // ─── CDN Image Proxy (bypasses hotlink protection) ──

@@ -401,6 +401,102 @@
     .db-pano-empty { padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.6; }
     .db-pano-empty strong { color: #475569; display: block; margin-bottom: 6px; }
     .db-pano-fallback-hint { padding: 12px 16px; background: #fffbeb; border-top: 1px dashed #fde68a; font-size: 11px; color: #92400e; line-height: 1.5; text-align: center; }
+
+    /* ─── Inline 3-column edit panel ─────────────────────────────── */
+    .db-sheet-body-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+    .db-col-group { padding: 20px 24px; border-right: 1px solid var(--db-border); }
+    .db-col-group:last-child { border-right: 0; }
+    .db-col-group-title {
+        font-size: 10px; color: var(--db-text-3); text-transform: uppercase;
+        letter-spacing: 0.08em; font-weight: 700; margin-bottom: 14px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .db-col-group-icon { font-size: 14px; }
+
+    .db-field-inline { margin-bottom: 14px; }
+    .db-field-inline:last-child { margin-bottom: 0; }
+
+    .db-inline-textarea {
+        width: 100%;
+        padding: 7px 9px;
+        border: 1px solid var(--db-border);
+        border-radius: 5px;
+        font-family: inherit;
+        font-size: 12px;
+        color: var(--db-text);
+        background: #fff;
+        resize: vertical;
+        min-height: 76px;
+    }
+    .db-inline-textarea:focus { outline: none; border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.05); }
+
+    .db-inline-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+    .db-inline-seg .db-seg-opt { padding: 5px 10px; font-size: 11px; border-radius: 5px; }
+
+    .db-save-flash { animation: dbSaveFlash 1.2s; }
+    @keyframes dbSaveFlash {
+        0% { background: #fff; }
+        25% { background: #dcfce7; }
+        100% { background: #fff; }
+    }
+
+    /* ─── Media uploader ─────────────────────────────────────────── */
+    .db-media-slot {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        border: 1.5px dashed var(--db-border-strong);
+        border-radius: 8px;
+        background: #fafafa;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        cursor: pointer; transition: all 0.15s;
+        overflow: hidden;
+    }
+    .db-media-slot:hover { border-color: var(--db-text); background: var(--db-accent-soft); }
+    .db-media-slot.is-dragover { border-color: var(--db-text); background: #eef2ff; }
+    .db-media-slot.has-media { border-style: solid; cursor: default; padding: 0; }
+    .db-media-slot.has-media:hover { background: transparent; border-color: var(--db-border-strong); }
+    .db-media-slot.is-uploading { cursor: wait; }
+    .db-media-slot-icon { font-size: 28px; color: var(--db-text-3); margin-bottom: 4px; }
+    .db-media-slot-txt { font-size: 11px; color: var(--db-text-2); text-align: center; padding: 0 8px; }
+    .db-media-preview { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .db-media-video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+    .db-media-del {
+        position: absolute; top: 6px; right: 6px;
+        width: 22px; height: 22px; border-radius: 50%;
+        background: rgba(0,0,0,0.7); color: #fff;
+        border: none; cursor: pointer; font-size: 14px;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2;
+    }
+    .db-media-del:hover { background: #dc2626; }
+    .db-media-meta {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.6));
+        color: #fff; padding: 14px 8px 6px;
+        font-size: 10px; font-weight: 500;
+        pointer-events: none;
+    }
+    .db-media-order {
+        position: absolute; top: 6px; left: 6px;
+        width: 22px; height: 22px; border-radius: 50%;
+        background: rgba(0,0,0,0.75); color: #fff;
+        font-size: 11px; font-weight: 600;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2;
+    }
+    .db-media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .db-media-grid .db-media-slot { aspect-ratio: 1/1; }
+
+    .db-media-reel { aspect-ratio: 9/16; max-width: 180px; }
+
+    .db-media-progress {
+        position: absolute; inset: 0;
+        background: rgba(255,255,255,0.9);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; color: var(--db-text-2); font-weight: 500;
+    }
+
 </style>
 @endsection
 
@@ -463,44 +559,6 @@
                         <div class="db-seg-opt active" data-value="normal">Normal</div>
                         <div class="db-seg-opt" data-value="high">High</div>
                         <div class="db-seg-opt" data-value="urgent">Urgent</div>
-                    </div>
-                </div>
-
-                <!-- Edit-only fields (hidden when creating) -->
-                <div id="dbEditOnly" style="display:none;">
-                    <div class="db-field">
-                        <label class="db-field-lbl">Reference URL <span style="color:#a1a1aa; font-weight: 400;">(Faza 1)</span></label>
-                        <input type="url" class="db-input" id="dbFieldRefUrl" placeholder="https://pinterest.com/pin/…">
-                    </div>
-
-                    <div class="db-field">
-                        <label class="db-field-lbl">Reference notes</label>
-                        <input type="text" class="db-input" id="dbFieldRefNotes" placeholder="Mood, location, model…">
-                    </div>
-
-                    <div class="db-field">
-                        <label class="db-field-lbl">Caption <span style="color:#a1a1aa; font-weight: 400;">(Faza 3)</span></label>
-                        <textarea class="db-input" id="dbFieldCaption" rows="4" placeholder="Shkruaj tekstin e postit…"></textarea>
-                    </div>
-
-                    <div class="db-field">
-                        <label class="db-field-lbl">Hashtags</label>
-                        <input type="text" class="db-input" id="dbFieldHashtags" placeholder="#zeroabsolute #drop #sale">
-                    </div>
-
-                    <div class="db-field">
-                        <label class="db-field-lbl">Skeduluar për <span style="color:#a1a1aa; font-weight: 400;">(Faza 4)</span></label>
-                        <input type="datetime-local" class="db-input" id="dbFieldScheduled">
-                    </div>
-
-                    <div class="db-field">
-                        <label class="db-field-lbl">Platformat</label>
-                        <div class="db-seg" id="dbFieldPlatforms">
-                            <div class="db-seg-opt" data-value="instagram">Instagram</div>
-                            <div class="db-seg-opt" data-value="facebook">Facebook</div>
-                            <div class="db-seg-opt" data-value="tiktok">TikTok</div>
-                            <div class="db-seg-opt" data-value="web">Web</div>
-                        </div>
                     </div>
                 </div>
 
@@ -609,17 +667,13 @@
         selectedPostId: null,
         kanban: null,
         availableProducts: [],
-        // Modal state (shared between "new post" and "edit post")
+        // Create-post modal state (edits happen inline in the panel).
         modal: {
-            mode: 'create',         // 'create' | 'edit'
-            editingPostId: null,
             title: '',
             post_type: null,
             priority: 'normal',
             selectedProductIds: new Set(),
             heroProductId: null,
-            // Edit-only
-            platforms: new Set(),
         },
     };
 
@@ -646,6 +700,29 @@
                 'X-CSRF-TOKEN': CSRF,
             },
             body: body ? JSON.stringify(body) : null,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
+        return data;
+    }
+
+    async function apiDelete(url) {
+        const res = await fetch(url, {
+            method: 'DELETE',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
+        return data;
+    }
+
+    async function apiUploadFile(url, file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            body: fd,
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.message || ('HTTP ' + res.status));
@@ -1279,7 +1356,7 @@
 
         const currentIdx = STAGE_ORDER.indexOf(post.stage);
 
-        // Head (title on the left, prominent Edit button on the right)
+        // Head — just title; Edit button removed (everything editable inline).
         const head = document.createElement('div');
         head.className = 'db-sheet-head';
 
@@ -1293,18 +1370,6 @@
         title.textContent = post.title;
         headText.append(crumb, title);
         head.appendChild(headText);
-
-        const headEdit = document.createElement('button');
-        headEdit.className = 'db-btn-edit';
-        headEdit.type = 'button';
-        const editIcon = document.createElement('span');
-        editIcon.className = 'db-btn-edit-icon';
-        editIcon.textContent = '✎';
-        const editLabel = document.createElement('span');
-        editLabel.textContent = 'Edit post';
-        headEdit.append(editIcon, editLabel);
-        headEdit.addEventListener('click', () => openEditPostModal(post));
-        head.appendChild(headEdit);
 
         sheet.appendChild(head);
 
@@ -1325,125 +1390,77 @@
         });
         sheet.appendChild(track);
 
-        // Body
+        // Body — 3 columns (Burimi / Publikimi / Kontenti), every field
+        // edits inline with auto-save on blur/Enter. No more edit modal.
         const body = document.createElement('div');
-        body.className = 'db-sheet-body';
+        body.className = 'db-sheet-body-3';
 
-        body.appendChild(section('Produktet', () => {
-            if (!post.products || post.products.length === 0) {
-                const v = document.createElement('div');
-                v.className = 'db-sec-val muted';
-                v.textContent = 'Asnjë produkt i caktuar';
-                return v;
-            }
-            const wrap = document.createElement('div');
-            post.products.forEach(p => {
-                const row = document.createElement('div');
-                row.className = 'db-prod-row';
+        // ── Col 1: Burimi (products + reference) ──
+        const col1 = colGroup('📦', 'Burimi');
 
-                if (p.image_url) {
-                    const img = document.createElement('img');
-                    img.className = 'db-thumb';
-                    img.src = p.image_url;
-                    img.alt = p.name || '';
-                    img.onerror = () => {
-                        const fb = document.createElement('div');
-                        fb.className = 'db-thumb';
-                        img.replaceWith(fb);
-                    };
-                    row.appendChild(img);
-                } else {
-                    const thumb = document.createElement('div');
-                    thumb.className = 'db-thumb';
-                    row.appendChild(thumb);
-                }
+        col1.appendChild(labeledField('Produktet', renderProductsBlock(post)));
 
-                const info = document.createElement('div');
-                info.style.cssText = 'flex: 1; min-width: 0;';
-                const name = document.createElement('div');
-                name.className = 'db-prod-row-name';
-                name.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-                name.textContent = p.name || ('Product #' + num(p.item_group_id));
-                const role = document.createElement('div');
-                role.className = 'db-prod-row-role';
-                const bits = [];
-                if (p.is_hero) bits.push('Hero');
-                if (p.code) bits.push(p.code);
-                if (p.classification) bits.push(p.classification);
-                role.textContent = bits.join(' · ') || 'Anëtar';
-                info.append(name, role);
-                row.appendChild(info);
-                wrap.appendChild(row);
-            });
-            return wrap;
-        }));
+        col1.appendChild(labeledField('Reference URL', inlineInput({
+            value: post.reference_url,
+            type: 'url',
+            placeholder: 'https://pinterest.com/pin/… (Enter per ruajtje)',
+            save: (v) => savePostField(post, { reference_url: v }),
+        }), post.reference_url
+            ? 'Hap ▸ ' + post.reference_url
+            : 'Guard-i i Fazes 1 kerkon nje reference para prodhimit'));
 
-        body.appendChild(section('Reference', () => {
-            // Always-editable inline input — Enter or blur saves, no modal needed.
-            const wrap = document.createElement('div');
+        col1.appendChild(labeledField('Reference notes', inlineTextarea({
+            value: post.reference_notes,
+            rows: 3,
+            placeholder: 'Mood, location, model…',
+            save: (v) => savePostField(post, { reference_notes: v }),
+        })));
 
-            const input = document.createElement('input');
-            input.type = 'url';
-            input.className = 'db-inline-input';
-            input.placeholder = 'https://pinterest.com/pin/… (shtyp Enter për ruajtje)';
-            input.value = post.reference_url || '';
+        body.appendChild(col1);
 
-            const hint = document.createElement('div');
-            hint.className = 'db-inline-hint';
-            hint.textContent = post.reference_url
-                ? 'Hap ▸ ' + post.reference_url
-                : 'Guard-i i Fazës 1 kërkon një reference para prodhimit';
+        // ── Col 2: Publikimi (platforms + schedule + priority) ──
+        const col2 = colGroup('📅', 'Publikimi');
 
-            const save = async (newValue) => {
-                const trimmed = (newValue || '').trim();
-                if (trimmed === (post.reference_url || '')) return;
-                try {
-                    await apiPutJson('/marketing/daily-basket/api/posts/' + num(post.id), {
-                        reference_url: trimmed || null,
-                    });
-                    post.reference_url = trimmed || null;
-                    hint.textContent = trimmed
-                        ? 'Hap ▸ ' + trimmed
-                        : 'Guard-i i Fazës 1 kërkon një reference para prodhimit';
-                } catch (e) {
-                    showError('Ruajtja dështoi: ' + e.message);
-                    input.value = post.reference_url || '';
-                }
-            };
+        col2.appendChild(labeledField('Platformat', inlineSegmented({
+            options: PLATFORM_OPTIONS,
+            value: post.target_platforms,
+            multi: true,
+            save: (arr) => savePostField(post, { target_platforms: arr }),
+        })));
 
-            input.addEventListener('blur', () => save(input.value));
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-                if (e.key === 'Escape') { input.value = post.reference_url || ''; input.blur(); }
-            });
+        col2.appendChild(labeledField('Data/Ora (skedulim)', inlineDateTime({
+            value: post.scheduled_for,
+            save: (v) => savePostField(post, { scheduled_for: v }),
+        })));
 
-            wrap.append(input, hint);
-            return wrap;
-        }));
+        col2.appendChild(labeledField('Prioriteti', inlineSegmented({
+            options: PRIORITY_OPTIONS,
+            value: post.priority,
+            multi: false,
+            save: (v) => savePostField(post, { priority: v }),
+        })));
 
-        body.appendChild(section('Platformat', () => {
-            const v = document.createElement('div');
-            v.className = 'db-sec-val';
-            if (post.target_platforms && post.target_platforms.length) {
-                v.textContent = post.target_platforms.join(', ');
-            } else {
-                v.classList.add('muted');
-                v.textContent = 'Pa platforma ende';
-            }
-            return v;
-        }));
+        body.appendChild(col2);
 
-        body.appendChild(section('Caption', () => {
-            const v = document.createElement('div');
-            v.className = 'db-sec-val';
-            if (post.caption) {
-                v.textContent = post.caption;
-            } else {
-                v.classList.add('muted');
-                v.textContent = 'Do plotësohet në fazën e editimit';
-            }
-            return v;
-        }));
+        // ── Col 3: Kontenti (media + caption + hashtags) ──
+        const col3 = colGroup('✍️', 'Kontenti');
+
+        col3.appendChild(labeledField(mediaLabelFor(post.post_type), buildMediaWidget(post)));
+
+        col3.appendChild(labeledField('Caption', inlineTextarea({
+            value: post.caption,
+            rows: 4,
+            placeholder: 'Shkruaj tekstin e postit…',
+            save: (v) => savePostField(post, { caption: v }),
+        })));
+
+        col3.appendChild(labeledField('Hashtags', inlineInput({
+            value: post.hashtags,
+            placeholder: '#zeroabsolute #drop #sale',
+            save: (v) => savePostField(post, { hashtags: v }),
+        })));
+
+        body.appendChild(col3);
 
         sheet.appendChild(body);
 
@@ -1461,7 +1478,7 @@
         const group = document.createElement('div');
         group.className = 'db-btn-group';
 
-        // Edit lives in the sheet header now (prominent). Footer focuses on stage moves only.
+        // Every field is edited inline above; footer only drives stage moves.
         const btnForward = document.createElement('button');
         btnForward.className = 'db-btn db-btn-primary';
         const canForward = currentIdx < STAGE_ORDER.length - 1;
@@ -1487,6 +1504,471 @@
         return wrap;
     }
 
+    // ── Inline editor helpers ──────────────────────────────────
+    //
+    // Every editable field follows the same pattern:
+    //   blur/Enter → call `save(newValue)` which wraps apiPutJson();
+    //   Escape → revert to previous value, blur;
+    //   on success → flash green briefly;
+    //   on error → toast + revert DOM to the last known good value.
+
+    function colGroup(icon, title) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-col-group';
+        const h = document.createElement('div');
+        h.className = 'db-col-group-title';
+        const ic = document.createElement('span');
+        ic.className = 'db-col-group-icon';
+        ic.textContent = icon;
+        const tx = document.createElement('span');
+        tx.textContent = title;
+        h.append(ic, tx);
+        wrap.appendChild(h);
+        return wrap;
+    }
+
+    function labeledField(label, body, hint) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-field-inline';
+        const lbl = document.createElement('label');
+        lbl.className = 'db-field-lbl';
+        lbl.textContent = label;
+        wrap.append(lbl, body);
+        if (hint) {
+            const h = document.createElement('div');
+            h.className = 'db-inline-hint';
+            h.textContent = hint;
+            wrap.appendChild(h);
+        }
+        return wrap;
+    }
+
+    function flashSaved(el) {
+        el.classList.add('db-save-flash');
+        setTimeout(() => el.classList.remove('db-save-flash'), 1200);
+    }
+
+    function makeInlineSaver(el, { initial, save, onError }) {
+        let last = initial;
+        return async function commit(raw) {
+            const next = raw == null ? null : raw;
+            if ((next || '') === (last || '')) return;
+            try {
+                await save(next);
+                last = next;
+                flashSaved(el);
+            } catch (e) {
+                showError('Ruajtja deshtoi: ' + e.message);
+                if (onError) onError(last);
+            }
+        };
+    }
+
+    function inlineInput({ value, placeholder, type, save, onSaved }) {
+        const input = document.createElement('input');
+        input.type = type || 'text';
+        input.className = 'db-inline-input';
+        if (placeholder) input.placeholder = placeholder;
+        input.value = value == null ? '' : value;
+
+        const commit = makeInlineSaver(input, {
+            initial: input.value,
+            save: async (next) => {
+                await save(next ? next.trim() : null);
+                if (onSaved) onSaved(next ? next.trim() : null);
+            },
+            onError: (prev) => { input.value = prev == null ? '' : prev; },
+        });
+
+        input.addEventListener('blur', () => commit(input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') { input.value = value == null ? '' : value; input.blur(); }
+        });
+        return input;
+    }
+
+    function inlineTextarea({ value, placeholder, rows, save, onSaved }) {
+        const ta = document.createElement('textarea');
+        ta.className = 'db-inline-textarea';
+        ta.rows = rows || 3;
+        if (placeholder) ta.placeholder = placeholder;
+        ta.value = value == null ? '' : value;
+
+        const commit = makeInlineSaver(ta, {
+            initial: ta.value,
+            save: async (next) => {
+                await save(next ? next.trim() : null);
+                if (onSaved) onSaved(next ? next.trim() : null);
+            },
+            onError: (prev) => { ta.value = prev == null ? '' : prev; },
+        });
+
+        ta.addEventListener('blur', () => commit(ta.value));
+        ta.addEventListener('keydown', (e) => {
+            // Enter-without-modifier in a textarea should keep inserting newline
+            // (that's the natural thing for captions/hashtags). Escape reverts.
+            if (e.key === 'Escape') { ta.value = value == null ? '' : value; ta.blur(); }
+        });
+        return ta;
+    }
+
+    function inlineDateTime({ value, save, onSaved }) {
+        const input = document.createElement('input');
+        input.type = 'datetime-local';
+        input.className = 'db-inline-input';
+        // datetime-local wants 'YYYY-MM-DDTHH:MM' in local time; reuse the same
+        // formatting the edit modal used so the displayed value matches what
+        // the server stores.
+        if (value) {
+            const d = new Date(value);
+            const pad = (n) => String(n).padStart(2, '0');
+            input.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+
+        const initial = input.value;
+        const commit = makeInlineSaver(input, {
+            initial,
+            save: async (next) => {
+                await save(next || null);
+                if (onSaved) onSaved(next || null);
+            },
+            onError: (prev) => { input.value = prev || ''; },
+        });
+
+        input.addEventListener('blur', () => commit(input.value));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+            if (e.key === 'Escape') { input.value = initial; input.blur(); }
+        });
+        return input;
+    }
+
+    function inlineSegmented({ options, value, multi, save }) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-inline-seg db-seg';
+
+        // Normalize state: multi holds a Set of strings; single holds string|null.
+        const state = multi
+            ? new Set(Array.isArray(value) ? value : [])
+            : { v: value || null };
+
+        options.forEach(opt => {
+            const el = document.createElement('div');
+            el.className = 'db-seg-opt';
+            el.dataset.value = opt.value;
+            el.textContent = opt.label;
+            const isActive = multi ? state.has(opt.value) : state.v === opt.value;
+            el.classList.toggle('active', isActive);
+            el.addEventListener('click', async () => {
+                if (multi) {
+                    if (state.has(opt.value)) state.delete(opt.value);
+                    else state.add(opt.value);
+                    el.classList.toggle('active');
+                    try {
+                        await save(Array.from(state));
+                        flashSaved(el);
+                    } catch (e) {
+                        showError('Ruajtja deshtoi: ' + e.message);
+                        // Revert local state + DOM
+                        if (state.has(opt.value)) state.delete(opt.value);
+                        else state.add(opt.value);
+                        el.classList.toggle('active');
+                    }
+                } else {
+                    const prev = state.v;
+                    if (prev === opt.value) return;
+                    state.v = opt.value;
+                    wrap.querySelectorAll('.db-seg-opt').forEach(o => {
+                        o.classList.toggle('active', o.dataset.value === opt.value);
+                    });
+                    try {
+                        await save(opt.value);
+                        flashSaved(el);
+                    } catch (e) {
+                        showError('Ruajtja deshtoi: ' + e.message);
+                        state.v = prev;
+                        wrap.querySelectorAll('.db-seg-opt').forEach(o => {
+                            o.classList.toggle('active', o.dataset.value === prev);
+                        });
+                    }
+                }
+            });
+            wrap.appendChild(el);
+        });
+        return wrap;
+    }
+
+    const PLATFORM_OPTIONS = [
+        { value: 'instagram', label: 'Instagram' },
+        { value: 'facebook',  label: 'Facebook' },
+        { value: 'tiktok',    label: 'TikTok' },
+        { value: 'web',       label: 'Web' },
+    ];
+    const PRIORITY_OPTIONS = [
+        { value: 'low',    label: 'Low' },
+        { value: 'normal', label: 'Normal' },
+        { value: 'high',   label: 'High' },
+        { value: 'urgent', label: 'Urgent' },
+    ];
+
+    function savePostField(post, payload) {
+        return apiPutJson('/marketing/daily-basket/api/posts/' + num(post.id), payload)
+            .then(() => {
+                // Update the local copy so subsequent renders see the new value.
+                Object.assign(post, payload);
+            });
+    }
+
+    // ── Inline media uploader (adapts per post_type) ────────────
+    //
+    // photo/video/reel/story → a single slot. Uploading replaces the current
+    // asset. Carousel → a grid of slots with a trailing "+ Shto" tile.
+
+    function mediaLabelFor(postType) {
+        switch (postType) {
+            case 'photo':    return '📸 Foto e postimit';
+            case 'video':    return '🎥 Video e postimit';
+            case 'reel':     return '🎬 Video (Reel)';
+            case 'story':    return '✨ Story (foto ose video)';
+            case 'carousel': return '🖼️ Carousel (shume foto)';
+            default:         return 'Media';
+        }
+    }
+
+    function buildMediaWidget(post) {
+        const isCarousel = post.post_type === 'carousel';
+        const isVertical = post.post_type === 'reel' || post.post_type === 'story';
+
+        const wrap = document.createElement('div');
+        const media = Array.isArray(post.media) ? post.media.slice() : [];
+
+        if (isCarousel) {
+            const grid = document.createElement('div');
+            grid.className = 'db-media-grid';
+            media.forEach((m, i) => grid.appendChild(buildMediaTile(post, m, i + 1)));
+            grid.appendChild(buildUploadTile(post, { isCarousel: true }));
+            wrap.appendChild(grid);
+            return wrap;
+        }
+
+        // Single-asset modes (photo/video/reel/story)
+        if (media.length > 0) {
+            wrap.appendChild(buildMediaTile(post, media[0], null, { isVertical }));
+        } else {
+            wrap.appendChild(buildUploadTile(post, { isVertical }));
+        }
+        return wrap;
+    }
+
+    function buildMediaTile(post, media, orderNum, opts = {}) {
+        const tile = document.createElement('div');
+        tile.className = 'db-media-slot has-media';
+        if (opts.isVertical) tile.classList.add('db-media-reel');
+
+        if (orderNum != null) {
+            const order = document.createElement('div');
+            order.className = 'db-media-order';
+            order.textContent = String(orderNum);
+            tile.appendChild(order);
+        }
+
+        if (media.is_video) {
+            const video = document.createElement('video');
+            video.className = 'db-media-video';
+            video.src = media.url;
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
+            video.addEventListener('click', () => {
+                if (video.paused) video.play(); else video.pause();
+            });
+            tile.appendChild(video);
+        } else {
+            const img = document.createElement('img');
+            img.className = 'db-media-preview';
+            img.src = media.thumbnail_url || media.url;
+            img.alt = media.original_filename || '';
+            tile.appendChild(img);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'db-media-meta';
+        const parts = [];
+        if (media.original_filename) parts.push(media.original_filename);
+        if (media.size_bytes) parts.push(humanSize(media.size_bytes));
+        meta.textContent = parts.join(' · ');
+        tile.appendChild(meta);
+
+        const del = document.createElement('button');
+        del.className = 'db-media-del';
+        del.type = 'button';
+        del.title = 'Hiq';
+        del.textContent = '×';
+        del.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Te hiqet kjo media?')) return;
+            try {
+                await apiDelete('/marketing/daily-basket/api/posts/' + num(post.id) + '/media/' + num(media.id));
+                post.media = (post.media || []).filter(m => m.id !== media.id);
+                renderSheet(post);
+            } catch (err) {
+                showError('Fshirja deshtoi: ' + err.message);
+            }
+        });
+        tile.appendChild(del);
+        return tile;
+    }
+
+    function buildUploadTile(post, opts = {}) {
+        const tile = document.createElement('div');
+        tile.className = 'db-media-slot';
+        if (opts.isVertical) tile.classList.add('db-media-reel');
+        tile.tabIndex = 0;
+
+        const icon = document.createElement('div');
+        icon.className = 'db-media-slot-icon';
+        icon.textContent = opts.isCarousel ? '+' : '⬆';
+        tile.appendChild(icon);
+
+        const txt = document.createElement('div');
+        txt.className = 'db-media-slot-txt';
+        txt.textContent = opts.isCarousel
+            ? 'Shto foto'
+            : 'Kliko ose tërhiq skedarin ketu';
+        tile.appendChild(txt);
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = acceptFor(post.post_type);
+        input.style.display = 'none';
+        if (opts.isCarousel) input.multiple = true;
+        tile.appendChild(input);
+
+        const trigger = () => input.click();
+        tile.addEventListener('click', trigger);
+        tile.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); }
+        });
+
+        // Drag-drop
+        tile.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            tile.classList.add('is-dragover');
+        });
+        tile.addEventListener('dragleave', () => tile.classList.remove('is-dragover'));
+        tile.addEventListener('drop', (e) => {
+            e.preventDefault();
+            tile.classList.remove('is-dragover');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+                handleUpload(post, tile, Array.from(e.dataTransfer.files));
+            }
+        });
+
+        input.addEventListener('change', () => {
+            if (input.files && input.files.length) {
+                handleUpload(post, tile, Array.from(input.files));
+            }
+        });
+
+        return tile;
+    }
+
+    async function handleUpload(post, tile, files) {
+        tile.classList.add('is-uploading');
+        const progress = document.createElement('div');
+        progress.className = 'db-media-progress';
+        progress.textContent = 'Po ngarkohet…';
+        tile.appendChild(progress);
+
+        try {
+            for (const f of files) {
+                const uploaded = await apiUploadFile(
+                    '/marketing/daily-basket/api/posts/' + num(post.id) + '/media',
+                    f,
+                );
+                if (!Array.isArray(post.media)) post.media = [];
+                if (post.post_type !== 'carousel') post.media = [];
+                post.media.push(uploaded);
+            }
+            renderSheet(post);
+        } catch (e) {
+            showError('Ngarkimi deshtoi: ' + e.message);
+            tile.classList.remove('is-uploading');
+            if (progress.parentNode) progress.remove();
+        }
+    }
+
+    function acceptFor(postType) {
+        switch (postType) {
+            case 'photo':    return 'image/*';
+            case 'video':
+            case 'reel':     return 'video/*';
+            case 'story':    return 'image/*,video/*';
+            case 'carousel': return 'image/*';
+            default:         return 'image/*,video/*';
+        }
+    }
+
+    function humanSize(bytes) {
+        if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+        if (bytes >= 1024)    return Math.round(bytes / 1024) + ' KB';
+        return bytes + ' B';
+    }
+
+    // Products display is still read-only inline — edits happen through the
+    // existing product picker in the create modal. Here we just list them.
+    function renderProductsBlock(post) {
+        if (!post.products || post.products.length === 0) {
+            const v = document.createElement('div');
+            v.className = 'db-sec-val muted';
+            v.style.fontSize = '12px';
+            v.textContent = 'Asnjë produkt i caktuar';
+            return v;
+        }
+        const wrap = document.createElement('div');
+        post.products.forEach(p => {
+            const row = document.createElement('div');
+            row.className = 'db-prod-row';
+
+            if (p.image_url) {
+                const img = document.createElement('img');
+                img.className = 'db-thumb';
+                img.src = p.image_url;
+                img.alt = p.name || '';
+                img.onerror = () => {
+                    const fb = document.createElement('div');
+                    fb.className = 'db-thumb';
+                    img.replaceWith(fb);
+                };
+                row.appendChild(img);
+            } else {
+                const thumb = document.createElement('div');
+                thumb.className = 'db-thumb';
+                row.appendChild(thumb);
+            }
+
+            const info = document.createElement('div');
+            info.style.cssText = 'flex: 1; min-width: 0;';
+            const name = document.createElement('div');
+            name.className = 'db-prod-row-name';
+            name.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+            name.textContent = p.name || ('Product #' + num(p.item_group_id));
+            const role = document.createElement('div');
+            role.className = 'db-prod-row-role';
+            const bits = [];
+            if (p.is_hero) bits.push('Hero');
+            if (p.code) bits.push(p.code);
+            if (p.classification) bits.push(p.classification);
+            role.textContent = bits.join(' · ') || 'Anëtar';
+            info.append(name, role);
+            row.appendChild(info);
+            wrap.appendChild(row);
+        });
+        return wrap;
+    }
+
     async function transition(post, targetStage) {
         if (!targetStage) return;
         try {
@@ -1503,31 +1985,24 @@
         }
     }
 
-    // ── New/Edit modal ─────────────────────────────────
+    // ── Create-post modal ─────────────────────────────────
+    // Only the "create new post" flow uses the modal. Every field that
+    // used to live in the edit modal is edited inline in the panel.
     function resetModalFields() {
         state.modal = {
-            mode: 'create',
-            editingPostId: null,
             title: '',
             post_type: null,
             priority: 'normal',
             selectedProductIds: new Set(),
             heroProductId: null,
-            platforms: new Set(),
         };
 
         document.getElementById('dbFieldTitle').value = '';
-        document.getElementById('dbFieldRefUrl').value = '';
-        document.getElementById('dbFieldRefNotes').value = '';
-        document.getElementById('dbFieldCaption').value = '';
-        document.getElementById('dbFieldHashtags').value = '';
-        document.getElementById('dbFieldScheduled').value = '';
 
         document.querySelectorAll('#dbFieldType .db-seg-opt').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('#dbFieldPriority .db-seg-opt').forEach(el => {
             el.classList.toggle('active', el.dataset.value === 'normal');
         });
-        document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => el.classList.remove('active'));
     }
 
     // Returns Set<int> of item_group_ids assigned for selectedDate, or empty set if none.
@@ -1557,7 +2032,6 @@
         }
         titleEl.textContent = title;
         document.getElementById('dbModalSubmit').textContent = 'Krijo post';
-        document.getElementById('dbEditOnly').style.display = 'none';
 
         if (preselectedProductId != null) {
             state.modal.selectedProductIds.add(num(preselectedProductId));
@@ -1576,49 +2050,9 @@
         setTimeout(() => document.getElementById('dbFieldTitle').focus(), 50);
     }
 
-    function openEditPostModal(post) {
-        resetModalFields();
-        state.modal.mode = 'edit';
-        state.modal.editingPostId = post.id;
-        state.modal.post_type = post.post_type;
-        state.modal.priority = post.priority || 'normal';
-        state.modal.platforms = new Set(post.target_platforms || []);
-        (post.products || []).forEach(p => state.modal.selectedProductIds.add(p.item_group_id));
-        const hero = (post.products || []).find(p => p.is_hero);
-        state.modal.heroProductId = hero ? hero.item_group_id : null;
-
-        document.getElementById('dbModalTitle').textContent = 'Edito postin';
-        document.getElementById('dbModalSubmit').textContent = 'Ruaj';
-        document.getElementById('dbEditOnly').style.display = 'block';
-
-        document.getElementById('dbFieldTitle').value = post.title || '';
-        document.getElementById('dbFieldRefUrl').value = post.reference_url || '';
-        document.getElementById('dbFieldRefNotes').value = post.reference_notes || '';
-        document.getElementById('dbFieldCaption').value = post.caption || '';
-        document.getElementById('dbFieldHashtags').value = post.hashtags || '';
-        // datetime-local expects 'YYYY-MM-DDTHH:MM'
-        if (post.scheduled_for) {
-            const d = new Date(post.scheduled_for);
-            const pad = (n) => String(n).padStart(2, '0');
-            document.getElementById('dbFieldScheduled').value =
-                d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-                'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-        }
-
-        document.querySelectorAll('#dbFieldType .db-seg-opt').forEach(el => {
-            el.classList.toggle('active', el.dataset.value === post.post_type);
-        });
-        document.querySelectorAll('#dbFieldPriority .db-seg-opt').forEach(el => {
-            el.classList.toggle('active', el.dataset.value === (post.priority || 'normal'));
-        });
-        document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => {
-            el.classList.toggle('active', state.modal.platforms.has(el.dataset.value));
-        });
-
-        renderProductPicker();
-        document.getElementById('dbModal').classList.add('open');
-        setTimeout(() => document.getElementById('dbFieldTitle').focus(), 50);
-    }
+    // NOTE: openEditPostModal has been removed — every post field is now
+    // editable inline inside the selected-post panel. The modal is reserved
+    // for creation only (title + type + priority + product picker).
 
     function closeNewPostModal() {
         document.getElementById('dbModal').classList.remove('open');
@@ -1745,67 +2179,40 @@
     }
 
     async function submitModal() {
+        // The modal is create-only now; every field after creation is
+        // edited inline in the selected-post panel.
         const title = document.getElementById('dbFieldTitle').value.trim();
         const postType = state.modal.post_type;
 
         if (!title) { showError('Titulli është i detyrueshëm'); return; }
         if (!postType) { showError('Zgjidh një tip posti'); return; }
 
+        const basketId = state.kanban?.basket?.id;
+        if (!basketId) { showError('Basket-i nuk është i ngarkuar'); return; }
+
         const productIds = Array.from(state.modal.selectedProductIds);
 
-        if (state.modal.mode === 'create') {
-            const basketId = state.kanban?.basket?.id;
-            if (!basketId) { showError('Basket-i nuk është i ngarkuar'); return; }
-
-            try {
-                await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
-                    title,
-                    post_type: postType,
-                    priority: state.modal.priority,
-                    product_ids: productIds,
-                    hero_product_id: state.modal.heroProductId,
-                });
-            } catch (e) {
-                showError('Krijimi i postit dështoi: ' + e.message);
-                return;
-            }
-        } else {
-            // edit mode — two calls: PUT post + PUT products (sync)
-            const postId = num(state.modal.editingPostId);
-            const refUrl = document.getElementById('dbFieldRefUrl').value.trim();
-            const refNotes = document.getElementById('dbFieldRefNotes').value.trim();
-            const caption = document.getElementById('dbFieldCaption').value.trim();
-            const hashtags = document.getElementById('dbFieldHashtags').value.trim();
-            const scheduledLocal = document.getElementById('dbFieldScheduled').value;
-            const scheduledFor = scheduledLocal ? new Date(scheduledLocal).toISOString() : null;
-
-            try {
-                await apiPutJson('/marketing/daily-basket/api/posts/' + postId, {
-                    title,
-                    post_type: postType,
-                    priority: state.modal.priority,
-                    reference_url: refUrl || null,
-                    reference_notes: refNotes || null,
-                    caption: caption || null,
-                    hashtags: hashtags || null,
-                    scheduled_for: scheduledFor,
-                    target_platforms: Array.from(state.modal.platforms),
-                });
-
-                if (productIds.length > 0) {
-                    await apiPutJson('/marketing/daily-basket/api/posts/' + postId + '/products', {
-                        product_ids: productIds,
-                        hero_product_id: state.modal.heroProductId,
-                    });
-                }
-            } catch (e) {
-                showError('Ruajtja e postit dështoi: ' + e.message);
-                return;
-            }
+        let createdId = null;
+        try {
+            const resp = await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
+                title,
+                post_type: postType,
+                priority: state.modal.priority,
+                product_ids: productIds,
+                hero_product_id: state.modal.heroProductId,
+            });
+            createdId = resp && resp.id ? resp.id : null;
+        } catch (e) {
+            showError('Krijimi i postit dështoi: ' + e.message);
+            return;
         }
 
         closeNewPostModal();
         await selectDay(state.selectedDate);
+
+        // Auto-open the new post in the panel so the user can fill the
+        // remaining inline fields without an extra click.
+        if (createdId != null) selectPost(num(createdId));
     }
 
     function wireModalOnce() {
@@ -1818,19 +2225,8 @@
         document.getElementById('dbBtnPano').addEventListener('click', openPanorama);
         document.getElementById('dbPanoClose').addEventListener('click', closePanorama);
 
-        // Multi-select platforms (edit mode)
-        document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => {
-            el.addEventListener('click', () => {
-                const v = el.dataset.value;
-                if (state.modal.platforms.has(v)) {
-                    state.modal.platforms.delete(v);
-                    el.classList.remove('active');
-                } else {
-                    state.modal.platforms.add(v);
-                    el.classList.add('active');
-                }
-            });
-        });
+        // (The legacy #dbFieldPlatforms wiring lived in the edit modal; that
+        // modal is gone — platforms are now edited inline in the panel.)
 
         document.getElementById('dbModal').addEventListener('click', (e) => {
             if (e.target.id === 'dbModal') closeNewPostModal();

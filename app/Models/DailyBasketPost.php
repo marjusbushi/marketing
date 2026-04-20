@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -84,6 +85,13 @@ class DailyBasketPost extends Model
     public function contentPost(): BelongsTo
     {
         return $this->belongsTo(ContentPost::class, 'content_post_id');
+    }
+
+    public function media(): HasMany
+    {
+        return $this->hasMany(DailyBasketPostMedia::class, 'daily_basket_post_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     // ── Scopes ──────────────────────────────────────────────

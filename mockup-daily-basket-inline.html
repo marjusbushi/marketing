@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Daily Basket Inline Panel</title>
+<style>
+  :root {
+    --db-bg: #fafaf9;
+    --db-surface: #ffffff;
+    --db-border: #eeeeec;
+    --db-border-strong: #e4e4e2;
+    --db-text: #18181b;
+    --db-text-2: #71717a;
+    --db-text-3: #a1a1aa;
+    --db-accent-soft: #f4f4f5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--db-bg);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    color: var(--db-text); font-size: 13px; line-height: 1.5;
+    padding: 24px;
+  }
+
+  .mockup-hdr { max-width: 1200px; margin: 0 auto 24px; }
+  .mockup-hdr h1 { font-size: 22px; margin: 0 0 4px; }
+  .mockup-hdr p { font-size: 12px; color: var(--db-text-3); margin: 0; }
+
+  .mockup-switcher {
+    max-width: 1200px; margin: 0 auto 20px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding: 10px 14px; background: #fff; border-radius: 10px;
+    border: 1px solid var(--db-border);
+  }
+  .mockup-switcher-lbl { font-size: 11px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-right: 8px; align-self: center; }
+  .mockup-btn {
+    padding: 6px 12px; font-size: 12px; border-radius: 6px;
+    border: 1px solid var(--db-border-strong); background: #fff;
+    cursor: pointer; color: var(--db-text-2);
+  }
+  .mockup-btn.active { background: var(--db-text); color: #fff; border-color: var(--db-text); }
+  .mockup-btn:hover:not(.active) { background: var(--db-accent-soft); }
+
+  .db-sheet { max-width: 1200px; margin: 0 auto; background: var(--db-surface); border: 1px solid var(--db-border); border-radius: 12px; overflow: hidden; }
+  .db-sheet-head { padding: 20px 24px; border-bottom: 1px solid var(--db-border); }
+  .db-sheet-crumb { font-size: 11px; color: var(--db-text-3); margin-bottom: 4px; }
+  .db-sheet-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+
+  .db-track { display: flex; padding: 16px 24px; background: #fafafa; border-bottom: 1px solid var(--db-border); gap: 4px; }
+  .db-track-step { flex: 1; padding: 4px 0; }
+  .db-track-line { height: 2px; background: var(--db-border); border-radius: 1px; margin-bottom: 6px; }
+  .db-track-step.done .db-track-line { background: #22c55e; }
+  .db-track-step.current .db-track-line { background: var(--db-text); }
+  .db-track-lbl { font-size: 10px; color: var(--db-text-3); font-weight: 500; }
+  .db-track-step.done .db-track-lbl { color: #22c55e; }
+  .db-track-step.current .db-track-lbl { color: var(--db-text); font-weight: 600; }
+
+  .db-sheet-body-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  .db-col-group { padding: 20px 24px; border-right: 1px solid var(--db-border); }
+  .db-col-group:last-child { border-right: 0; }
+  .db-col-group-title {
+    font-size: 10px; color: var(--db-text-3); text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 700; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .db-col-group-icon { font-size: 14px; }
+
+  .db-field-inline { margin-bottom: 14px; }
+  .db-field-inline:last-child { margin-bottom: 0; }
+  .db-field-lbl { font-size: 10px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 6px; display: block; }
+
+  .db-inline-input, .db-inline-textarea {
+    width: 100%;
+    padding: 7px 9px;
+    border: 1px solid var(--db-border);
+    border-radius: 5px;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--db-text);
+    background: #fff;
+  }
+  .db-inline-input:focus, .db-inline-textarea:focus { outline: none; border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.05); }
+  .db-inline-textarea { resize: vertical; min-height: 80px; }
+  .db-inline-hint { font-size: 10px; color: var(--db-text-3); margin-top: 4px; }
+  .db-inline-hint.saved { color: #22c55e; }
+
+  .db-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .db-seg-opt {
+    padding: 5px 10px; border: 1px solid var(--db-border-strong);
+    border-radius: 5px; cursor: pointer; font-size: 11px;
+    background: #fff; color: var(--db-text-2);
+  }
+  .db-seg-opt:hover { background: var(--db-accent-soft); }
+  .db-seg-opt.active { background: var(--db-text); color: #fff; border-color: var(--db-text); }
+
+  .db-prod-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--db-border); }
+  .db-prod-row:last-child { border-bottom: 0; }
+  .db-prod-thumb { width: 32px; height: 32px; border-radius: 5px; background: linear-gradient(135deg, #fde68a 0%, #fca5a5 100%); flex-shrink: 0; }
+  .db-prod-name { font-size: 12px; font-weight: 500; }
+  .db-prod-sub { font-size: 10px; color: var(--db-text-3); }
+
+  .db-media-slot {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 1.5px dashed var(--db-border-strong);
+    border-radius: 8px;
+    background: #fafafa;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+    overflow: hidden;
+  }
+  .db-media-slot:hover { border-color: var(--db-text); background: var(--db-accent-soft); }
+  .db-media-slot-icon { font-size: 28px; color: var(--db-text-3); margin-bottom: 4px; }
+  .db-media-slot-txt { font-size: 11px; color: var(--db-text-2); text-align: center; padding: 0 8px; }
+  .db-media-slot.has-media { border-style: solid; cursor: default; padding: 0; }
+  .db-media-slot.has-media:hover { background: transparent; }
+  .db-media-preview { width: 100%; height: 100%; object-fit: cover; }
+  .db-media-video-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.35); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; pointer-events: none;
+  }
+  .db-media-del {
+    position: absolute; top: 6px; right: 6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.7); color: #fff;
+    border: none; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .db-media-del:hover { background: #dc2626; }
+  .db-media-meta {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.6));
+    color: #fff; padding: 14px 8px 6px;
+    font-size: 10px; font-weight: 500;
+  }
+
+  .db-media-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .db-media-grid .db-media-slot { aspect-ratio: 1/1; }
+  .db-media-order {
+    position: absolute; top: 6px; left: 6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.75); color: #fff;
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .db-type-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px;
+    background: var(--db-accent-soft); color: var(--db-text-2);
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .db-sheet-foot { display: flex; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--db-border); background: #fafafa; }
+  .db-btn { padding: 7px 14px; font-size: 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-weight: 500; background: transparent; color: var(--db-text-2); }
+  .db-btn:hover { background: var(--db-accent-soft); color: var(--db-text); }
+  .db-btn-primary { background: var(--db-text); color: #fff; }
+  .db-btn-primary:hover { background: #27272a; }
+
+  .mockup-create { max-width: 1200px; margin: 32px auto 0; }
+  .mockup-create h2 { font-size: 14px; color: var(--db-text-2); margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .mockup-create-box { background: #fff; border: 1px solid var(--db-border); border-radius: 12px; padding: 20px 24px; max-width: 520px; }
+  .mockup-create-box .db-field-lbl { margin-bottom: 6px; }
+  .mockup-create-note { font-size: 11px; color: var(--db-text-3); margin-top: 10px; font-style: italic; }
+
+  .save-flash { animation: flash 1.5s; }
+  @keyframes flash {
+    0% { background: #fff; }
+    20% { background: #dcfce7; }
+    100% { background: #fff; }
+  }
+
+  /* Variants — hide all except active */
+  .variant { display: none; }
+  .variant.active { display: block; }
+  .variant-reel, .variant-story { max-width: 180px; aspect-ratio: 9/16; }
+</style>
+</head>
+<body>
+
+<div class="mockup-hdr">
+  <h1>Mockup — Panel inline, me adaptim sipas post_type</h1>
+  <p>Zgjidh nje lloj postimi me siper per te pare si ndryshon media-slot.</p>
+</div>
+
+<div class="mockup-switcher">
+  <span class="mockup-switcher-lbl">Post type:</span>
+  <button class="mockup-btn active" data-type="photo">📸 Photo</button>
+  <button class="mockup-btn" data-type="video">🎥 Video</button>
+  <button class="mockup-btn" data-type="reel">🎬 Reel</button>
+  <button class="mockup-btn" data-type="carousel">🖼️ Carousel</button>
+  <button class="mockup-btn" data-type="story">✨ Story</button>
+</div>
+
+<div class="db-sheet">
+  <div class="db-sheet-head">
+    <div class="db-sheet-crumb">
+      <span id="postTypeBadge" class="db-type-badge">📸 Photo</span>
+      · 2026-04-20
+    </div>
+    <div class="db-sheet-title">Pantallona Karrem</div>
+  </div>
+
+  <div class="db-track">
+    <div class="db-track-step done"><div class="db-track-line"></div><div class="db-track-lbl">Planifikim</div></div>
+    <div class="db-track-step done"><div class="db-track-line"></div><div class="db-track-lbl">Prodhim</div></div>
+    <div class="db-track-step done"><div class="db-track-line"></div><div class="db-track-lbl">Editim</div></div>
+    <div class="db-track-step current"><div class="db-track-line"></div><div class="db-track-lbl">Skedulim</div></div>
+    <div class="db-track-step"><div class="db-track-line"></div><div class="db-track-lbl">Publikuar</div></div>
+  </div>
+
+  <div class="db-sheet-body-3">
+
+    <div class="db-col-group">
+      <div class="db-col-group-title"><span class="db-col-group-icon">📦</span>Burimi</div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Produktet</label>
+        <div class="db-prod-row">
+          <div class="db-prod-thumb"></div>
+          <div>
+            <div class="db-prod-name">Pantallona Karrem</div>
+            <div class="db-prod-sub">Hero · 171322101 · plotesues</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Reference URL</label>
+        <input type="url" class="db-inline-input" value="https://pinterest.com/pin/12345/" data-save>
+        <div class="db-inline-hint">Hap ▸ https://pinterest.com/pin/12345/</div>
+      </div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Reference notes</label>
+        <textarea class="db-inline-textarea" data-save rows="3">Mood minimalist, sfond beige, foto full-body, model e gjate.</textarea>
+        <div class="db-inline-hint">Shtyp Enter ose dil nga fusha per ruajtje</div>
+      </div>
+    </div>
+
+    <div class="db-col-group">
+      <div class="db-col-group-title"><span class="db-col-group-icon">📅</span>Publikimi</div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Platformat</label>
+        <div class="db-seg" id="platformsSeg">
+          <div class="db-seg-opt active" data-val="instagram">Instagram</div>
+          <div class="db-seg-opt active" data-val="facebook">Facebook</div>
+          <div class="db-seg-opt" data-val="tiktok">TikTok</div>
+          <div class="db-seg-opt" data-val="web">Web</div>
+        </div>
+      </div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Data/Ora (skedulim)</label>
+        <input type="datetime-local" class="db-inline-input" value="2026-04-20T19:16" data-save>
+        <div class="db-inline-hint">E Henë, 20 Prill · 19:16</div>
+      </div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Prioriteti</label>
+        <div class="db-seg" id="prioritySeg">
+          <div class="db-seg-opt" data-val="low">Low</div>
+          <div class="db-seg-opt active" data-val="normal">Normal</div>
+          <div class="db-seg-opt" data-val="high">High</div>
+          <div class="db-seg-opt" data-val="urgent">Urgent</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="db-col-group">
+      <div class="db-col-group-title"><span class="db-col-group-icon">✍️</span>Kontenti</div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl" id="mediaLbl">📸 Foto e postimit</label>
+
+        <!-- Variant: photo -->
+        <div class="variant variant-photo active">
+          <div class="db-media-slot has-media">
+            <img class="db-media-preview" src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=400&h=400&fit=crop" alt="preview">
+            <button class="db-media-del" title="Hiq">&times;</button>
+            <div class="db-media-meta">karrem-01.jpg · 2.4 MB</div>
+          </div>
+        </div>
+
+        <!-- Variant: video -->
+        <div class="variant variant-video">
+          <div class="db-media-slot has-media">
+            <img class="db-media-preview" src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=400&fit=crop" alt="preview">
+            <div class="db-media-video-overlay">&#9654;</div>
+            <button class="db-media-del" title="Hiq">&times;</button>
+            <div class="db-media-meta">promo-karrem.mp4 · 18.3 MB · 00:24</div>
+          </div>
+        </div>
+
+        <!-- Variant: reel -->
+        <div class="variant variant-reel">
+          <div class="db-media-slot has-media" style="aspect-ratio: 9/16;">
+            <img class="db-media-preview" src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=720&fit=crop" alt="preview">
+            <div class="db-media-video-overlay">&#9654;</div>
+            <button class="db-media-del" title="Hiq">&times;</button>
+            <div class="db-media-meta">reel-karrem.mp4 · 24.1 MB · 00:15</div>
+          </div>
+        </div>
+
+        <!-- Variant: carousel -->
+        <div class="variant variant-carousel">
+          <div class="db-media-grid">
+            <div class="db-media-slot has-media">
+              <div class="db-media-order">1</div>
+              <img class="db-media-preview" src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=300" alt="">
+              <button class="db-media-del" title="Hiq">&times;</button>
+            </div>
+            <div class="db-media-slot has-media">
+              <div class="db-media-order">2</div>
+              <img class="db-media-preview" src="https://images.unsplash.com/photo-1509631179647-0177331693ae?w=300" alt="">
+              <button class="db-media-del" title="Hiq">&times;</button>
+            </div>
+            <div class="db-media-slot has-media">
+              <div class="db-media-order">3</div>
+              <img class="db-media-preview" src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=300" alt="">
+              <button class="db-media-del" title="Hiq">&times;</button>
+            </div>
+            <div class="db-media-slot has-media">
+              <div class="db-media-order">4</div>
+              <img class="db-media-preview" src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=300" alt="">
+              <button class="db-media-del" title="Hiq">&times;</button>
+            </div>
+            <div class="db-media-slot">
+              <div class="db-media-slot-icon">+</div>
+              <div class="db-media-slot-txt">Shto foto</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Variant: story -->
+        <div class="variant variant-story">
+          <div class="db-media-slot has-media" style="aspect-ratio: 9/16;">
+            <img class="db-media-preview" src="https://images.unsplash.com/photo-1509631179647-0177331693ae?w=400&h=720&fit=crop" alt="preview">
+            <button class="db-media-del" title="Hiq">&times;</button>
+            <div class="db-media-meta">story-karrem.jpg · 1.2 MB</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Caption</label>
+        <textarea class="db-inline-textarea" data-save rows="4">Super produkt — perfekt per vere.
+Disponueshem tani ne Zero Absolute.</textarea>
+      </div>
+
+      <div class="db-field-inline">
+        <label class="db-field-lbl">Hashtags</label>
+        <input type="text" class="db-inline-input" value="#zeroabsolute #drop #karrem #fashion" data-save>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="db-sheet-foot">
+    <button class="db-btn">&larr; Kthe</button>
+    <button class="db-btn db-btn-primary">Kalo te Publikuar &rarr;</button>
+  </div>
+</div>
+
+<div class="mockup-create">
+  <h2>Modali i Krijimit (i thjeshtuar)</h2>
+  <div class="mockup-create-box">
+    <div class="db-field-inline">
+      <label class="db-field-lbl">Titulli</label>
+      <input type="text" class="db-inline-input" placeholder="p.sh. Pantallona Karrem">
+    </div>
+    <div class="db-field-inline">
+      <label class="db-field-lbl">Tipi i postimit</label>
+      <div class="db-seg">
+        <div class="db-seg-opt active">Photo</div>
+        <div class="db-seg-opt">Video</div>
+        <div class="db-seg-opt">Reel</div>
+        <div class="db-seg-opt">Carousel</div>
+        <div class="db-seg-opt">Story</div>
+      </div>
+    </div>
+    <div class="db-field-inline">
+      <label class="db-field-lbl">Prioriteti</label>
+      <div class="db-seg">
+        <div class="db-seg-opt">Low</div>
+        <div class="db-seg-opt active">Normal</div>
+        <div class="db-seg-opt">High</div>
+        <div class="db-seg-opt">Urgent</div>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+      <button class="db-btn">Anulo</button>
+      <button class="db-btn db-btn-primary">Krijo post</button>
+    </div>
+    <div class="mockup-create-note">
+      Pasi krijohet, posti hapet drejtperdrejt ne panel per te plotesuar Reference, media, caption, platformat etj. &mdash; te gjitha inline.
+    </div>
+  </div>
+</div>
+
+<script>
+const LABELS = {
+  photo:    { lbl: '📸 Foto e postimit',       badge: '📸 Photo' },
+  video:    { lbl: '🎥 Video e postimit',      badge: '🎥 Video' },
+  reel:     { lbl: '🎬 Video (Reel)',          badge: '🎬 Reel' },
+  carousel: { lbl: '🖼️ Carousel (drag per te rradhitur)', badge: '🖼️ Carousel · 4 foto' },
+  story:    { lbl: '✨ Story (foto ose video)', badge: '✨ Story' },
+};
+
+document.querySelectorAll('.mockup-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    document.querySelectorAll('.mockup-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+    const target = document.querySelector('.variant-' + type);
+    if (target) target.classList.add('active');
+    document.getElementById('mediaLbl').textContent = LABELS[type].lbl;
+    document.getElementById('postTypeBadge').textContent = LABELS[type].badge;
+  });
+});
+
+document.getElementById('prioritySeg').addEventListener('click', (e) => {
+  const opt = e.target.closest('.db-seg-opt');
+  if (!opt) return;
+  opt.parentElement.querySelectorAll('.db-seg-opt').forEach(o => o.classList.remove('active'));
+  opt.classList.add('active');
+  flashSaved(opt);
+});
+document.getElementById('platformsSeg').addEventListener('click', (e) => {
+  const opt = e.target.closest('.db-seg-opt');
+  if (!opt) return;
+  opt.classList.toggle('active');
+  flashSaved(opt);
+});
+
+document.querySelectorAll('[data-save]').forEach(el => {
+  el.addEventListener('blur', () => flashSaved(el));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && el.tagName === 'INPUT') { e.preventDefault(); el.blur(); }
+  });
+});
+
+function flashSaved(el) {
+  el.classList.add('save-flash');
+  setTimeout(() => el.classList.remove('save-flash'), 1500);
+}
+</script>
+
+</body>
+</html>

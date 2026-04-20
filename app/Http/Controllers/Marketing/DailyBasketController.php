@@ -7,6 +7,7 @@ use App\Enums\DailyBasketPostType;
 use App\Http\Controllers\Controller;
 use App\Models\DailyBasket;
 use App\Models\DailyBasketPost;
+use App\Models\DailyBasketPostMedia;
 use App\Models\Content\ContentMedia;
 use App\Services\ContentPlanner\ContentPostService;
 use App\Services\DisApiClient;
@@ -223,6 +224,7 @@ class DailyBasketController extends Controller
 
         $basket->load([
             'posts' => fn ($q) => $q->orderBy('sort_order')->orderBy('id'),
+            'posts.media',
         ]);
 
         // Pull products for this collection (cached) — the single source of
@@ -258,6 +260,9 @@ class DailyBasketController extends Controller
                 'assigned_to' => $post->assigned_to,
                 'caption' => $post->caption,
                 'reference_url' => $post->reference_url,
+                'reference_notes' => $post->reference_notes,
+                'hashtags' => $post->hashtags,
+                'media' => $post->media->map(fn ($m) => $this->serializeMedia($m))->values()->all(),
                 'products' => $rows->map(function ($r) use ($productLookup) {
                     $meta = $productLookup->get($r->item_group_id);
 
@@ -678,6 +683,132 @@ class DailyBasketController extends Controller
         $post->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    // ─── Post media (inline uploader) ────────────────────────
+
+    /**
+     * Upload a media asset (photo/video) for a daily-basket post. For non-
+     * carousel posts the uploader replaces the existing asset (we delete
+     * any prior rows); for carousel it appends at the end of sort_order.
+     */
+    public function uploadMedia(Request $request, DailyBasketPost $post): JsonResponse
+    {
+        $maxSize = config('content-planner.media_max_size_mb', 50) * 1024;
+
+        $request->validate([
+            'file' => "required|file|max:{$maxSize}",
+        ]);
+
+        $file = $request->file('file');
+        $isCarousel = $post->post_type->value === 'carousel';
+
+        if (! $isCarousel) {
+            foreach ($post->media()->get() as $old) {
+                $this->deleteMediaFiles($old);
+                $old->delete();
+            }
+        }
+
+        $path = $file->store('daily-basket-media/' . $post->id, 'public');
+        [$width, $height] = $this->probeImageDimensions($file);
+
+        $nextOrder = (int) ($post->media()->max('sort_order') ?? -1) + 1;
+
+        $media = $post->media()->create([
+            'disk' => 'public',
+            'path' => $path,
+            'original_filename' => $file->getClientOriginalName(),
+            'mime_type' => $file->getMimeType(),
+            'size_bytes' => $file->getSize(),
+            'width' => $width,
+            'height' => $height,
+            'sort_order' => $nextOrder,
+        ]);
+
+        return response()->json($this->serializeMedia($media), 201);
+    }
+
+    /**
+     * Delete a single media asset. Fails (404) if the media doesn't belong
+     * to the given post — cross-post access is not allowed.
+     */
+    public function deletePostMedia(DailyBasketPost $post, int $mediaId): JsonResponse
+    {
+        $media = $post->media()->where('id', $mediaId)->firstOrFail();
+
+        $this->deleteMediaFiles($media);
+        $media->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Reorder carousel media. Accepts an array of media ids in the desired
+     * order; anything not listed is pushed to the end unchanged.
+     */
+    public function reorderPostMedia(Request $request, DailyBasketPost $post): JsonResponse
+    {
+        $validated = $request->validate([
+            'media_ids' => 'required|array',
+            'media_ids.*' => 'integer',
+        ]);
+
+        DB::transaction(function () use ($post, $validated) {
+            foreach ($validated['media_ids'] as $idx => $mediaId) {
+                $post->media()
+                    ->where('id', $mediaId)
+                    ->update(['sort_order' => $idx]);
+            }
+        });
+
+        return response()->json(['success' => true]);
+    }
+
+    private function deleteMediaFiles(DailyBasketPostMedia $media): void
+    {
+        try {
+            if ($media->path) {
+                Storage::disk($media->disk ?: 'public')->delete($media->path);
+            }
+            if ($media->thumbnail_path) {
+                Storage::disk($media->disk ?: 'public')->delete($media->thumbnail_path);
+            }
+        } catch (\Throwable $e) {
+            // Storage unlink failures shouldn't block DB cleanup; orphan
+            // files can be reaped by a separate janitor if needed.
+        }
+    }
+
+    private function probeImageDimensions($file): array
+    {
+        try {
+            $info = @getimagesize($file->getRealPath());
+            if (is_array($info)) {
+                return [$info[0] ?? null, $info[1] ?? null];
+            }
+        } catch (\Throwable $e) {
+            // Non-image files (videos) just get null dimensions.
+        }
+
+        return [null, null];
+    }
+
+    private function serializeMedia(DailyBasketPostMedia $media): array
+    {
+        return [
+            'id' => $media->id,
+            'url' => $media->url,
+            'thumbnail_url' => $media->thumbnail_url,
+            'is_video' => $media->is_video,
+            'mime_type' => $media->mime_type,
+            'size_bytes' => $media->size_bytes,
+            'original_filename' => $media->original_filename,
+            'width' => $media->width,
+            'height' => $media->height,
+            'duration_seconds' => $media->duration_seconds,
+            'sort_order' => $media->sort_order,
+        ];
     }
 
     // ─── Guards ──────────────────────────────────────────────
