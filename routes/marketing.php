@@ -34,8 +34,9 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
 
     // ─── Content Planner ────────────────────────────
     Route::prefix('planner')->as('planner.')->middleware('marketing.permission:' . P::CONTENT_PLANNER_VIEW->value)->group(function () {
-        // Page views
-        Route::get('/', [ContentPlannerController::class, 'calendar'])->name('calendar');
+        // Page views — default landing is grid (per marketing team request).
+        Route::get('/', [ContentPlannerController::class, 'grid'])->name('index');
+        Route::get('/calendar', [ContentPlannerController::class, 'calendar'])->name('calendar');
         Route::get('/list', [ContentPlannerController::class, 'list'])->name('list');
         Route::get('/grid', [ContentPlannerController::class, 'grid'])->name('grid');
         Route::get('/media', [ContentPlannerController::class, 'media'])->name('media');

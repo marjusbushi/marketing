@@ -134,7 +134,7 @@
         <span style="margin:0 4px;">›</span>
         <a href="{{ route('marketing.dashboard') }}" style="color:#9CA3AF; text-decoration:none;">Marketing</a>
         <span style="margin:0 4px;">›</span>
-        <a href="{{ route('marketing.planner.calendar') }}" style="color:#9CA3AF; text-decoration:none;">Content Planner</a>
+        <a href="{{ route('marketing.planner.index') }}" style="color:#9CA3AF; text-decoration:none;">Content Planner</a>
         <span style="margin:0 4px;">›</span>
         <span style="color:#374151; font-weight:500;">Feed</span>
     </nav>

@@ -26,7 +26,7 @@
         </a>
         @if(config('content-planner.enabled'))
         <span class="w-px h-5 bg-slate-200 mx-0.5"></span>
-        <a href="{{ route('marketing.planner.calendar') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-300 text-indigo-500 hover:bg-indigo-50 transition-colors">
+        <a href="{{ route('marketing.planner.index') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-indigo-300 text-indigo-500 hover:bg-indigo-50 transition-colors">
             <iconify-icon icon="heroicons-outline:calendar-days" width="14"></iconify-icon> Planner
         </a>
         @endif

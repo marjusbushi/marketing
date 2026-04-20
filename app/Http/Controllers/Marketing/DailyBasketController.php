@@ -503,10 +503,24 @@ class DailyBasketController extends Controller
         DB::transaction(function () use ($post, $target) {
             $post->stage = $target;
 
-            // Handoff to Content Planner the moment the post is published.
-            // Creates a content_posts row exactly once — if the basket post
-            // is reverted and re-published, we reuse the existing link.
-            if ($target === DailyBasketPostStage::PUBLISHED && $post->content_post_id === null) {
+            // Handoff to Content Planner happens at SCHEDULING — that is the
+            // moment the user has committed date + platform + caption, so the
+            // post is ready to be tracked by the planner as a "scheduled" item.
+            //
+            // PUBLISHED used to trigger handoff, but UX-wise that was confusing:
+            // users saw a post with a scheduled time and expected it in the
+            // planner, but had to do one more click. Moving handoff to SCHEDULING
+            // matches intuition — the content_post_id then survives subsequent
+            // PUBLISHED transitions (that stage now represents "live on socials").
+            //
+            // Defensive: fall through to create at PUBLISHED too, so any old
+            // basket posts that made it to PUBLISHED without a content_post_id
+            // (before this change) still get synced on re-transition.
+            $shouldHandoff = in_array($target, [
+                DailyBasketPostStage::SCHEDULING,
+                DailyBasketPostStage::PUBLISHED,
+            ], true);
+            if ($shouldHandoff && $post->content_post_id === null) {
                 $contentPostId = $this->handOffToContentPlanner($post);
                 $post->content_post_id = $contentPostId;
             }
