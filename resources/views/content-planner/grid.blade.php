@@ -284,13 +284,16 @@
             // browser's default broken-image icon.
             const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
 
+            // referrerpolicy="no-referrer" eshte kritik per Instagram/Facebook CDN:
+            // ata bllokojne serving kur Referer eshte nje domain i jashtem.
+            // Pa kete, postet e importuara nga IG shfaqen si broken-image.
             let mediaHtml = '';
             if (thumb) {
-                mediaHtml = `<img src="${thumb}" alt="" loading="lazy" onerror="feedTileOnErr(this)">`;
+                mediaHtml = `<img src="${thumb}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
             } else if (isVideo && mediaUrl) {
                 mediaHtml = `<video src="${mediaUrl}" muted preload="metadata" onerror="feedTileOnErr(this)"></video>`;
             } else if (mediaUrl) {
-                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy" onerror="feedTileOnErr(this)">`;
+                mediaHtml = `<img src="${mediaUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
             } else {
                 mediaHtml = placeholderHtml;
             }
