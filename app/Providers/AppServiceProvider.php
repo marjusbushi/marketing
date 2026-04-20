@@ -7,6 +7,7 @@ use App\Models\Content\ContentPost;
 use App\Models\DailyBasketPost;
 use App\Observers\ContentPostObserver;
 use App\Observers\DailyBasketPostObserver;
+use App\Services\Meta\MetaTokenResolver;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +26,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Load active Meta tokens from DB into config('meta.*') — the sync layer
+        // reads config(), OAuth writes DB, so without this bridge they diverge.
+        MetaTokenResolver::hydrateConfig();
+
         $this->registerMarketingGates();
         $this->registerDailyBasketSync();
     }

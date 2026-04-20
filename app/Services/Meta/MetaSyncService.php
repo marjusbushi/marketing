@@ -52,18 +52,22 @@ class MetaSyncService
 
     /**
      * Run sync for a specific data type only.
+     *
+     * $syncMode controls incremental vs full-history behaviour for posts:
+     *   - 'daily'  — 30-day window, fast; used by the hourly scheduler
+     *   - 'manual' / 'full' — entire history; used by the manual UI trigger
      */
-    public function syncType(string $type, string $dateFrom, string $dateTo): array
+    public function syncType(string $type, string $dateFrom, string $dateTo, string $syncMode = 'manual'): array
     {
         $results = [];
 
         match ($type) {
-            'ads' => $results['ads'] = $this->syncAds($dateFrom, $dateTo, 'manual'),
-            'ads-platform', 'ads_platform' => $results['ads-platform'] = $this->syncAdsPlatformBreakdown($dateFrom, $dateTo, 'manual'),
-            'page' => $results['page'] = $this->syncPageInsights($dateFrom, $dateTo, 'manual'),
-            'ig' => $results['ig'] = $this->syncIgInsights($dateFrom, $dateTo, 'manual'),
-            'posts' => $results['posts'] = $this->syncPosts('manual'),
-            'messaging' => $results['messaging'] = $this->syncMessaging($dateFrom, $dateTo, 'manual'),
+            'ads' => $results['ads'] = $this->syncAds($dateFrom, $dateTo, $syncMode),
+            'ads-platform', 'ads_platform' => $results['ads-platform'] = $this->syncAdsPlatformBreakdown($dateFrom, $dateTo, $syncMode),
+            'page' => $results['page'] = $this->syncPageInsights($dateFrom, $dateTo, $syncMode),
+            'ig' => $results['ig'] = $this->syncIgInsights($dateFrom, $dateTo, $syncMode),
+            'posts' => $results['posts'] = $this->syncPosts($syncMode),
+            'messaging' => $results['messaging'] = $this->syncMessaging($dateFrom, $dateTo, $syncMode),
             default => throw new Exception("Unknown sync type: {$type}"),
         };
 
@@ -228,15 +232,24 @@ class MetaSyncService
 
     /**
      * Sync FB + IG Posts.
+     *
+     * `manual` and `full` both pull the entire available history (no since-cutoff,
+     * up to 100 pages per source) so the planner grid can show every historic
+     * post. The hourly `daily` cron keeps the 30-day window for incremental
+     * freshness without hammering the Graph API.
      */
     private function syncPosts(string $syncType = 'daily'): array
     {
         $log = MetaSyncLog::start($syncType, 'posts');
         $this->api->resetApiCallsCount();
 
+        $fullHistory = in_array($syncType, ['manual', 'full', 'backfill'], true);
+        $sinceDays = $fullHistory ? null : 30;
+        $maxPages  = $fullHistory ? 100 : 20;
+
         try {
-            $fbCount = $this->postSyncService->syncFacebookPosts();
-            $igCount = $this->postSyncService->syncInstagramPosts();
+            $fbCount = $this->postSyncService->syncFacebookPosts($sinceDays, $maxPages);
+            $igCount = $this->postSyncService->syncInstagramPosts($sinceDays, $maxPages);
 
             $totalCount = $fbCount + $igCount;
             $log->markSuccess($totalCount, $this->api->getApiCallsCount());

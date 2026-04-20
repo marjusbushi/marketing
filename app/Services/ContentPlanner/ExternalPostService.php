@@ -49,11 +49,17 @@ class ExternalPostService
 
     /**
      * Get externally published posts (FB/IG/TikTok) formatted as FullCalendar events.
+     *
+     * $max is a safety ceiling to avoid OOM on pages with decades of history —
+     * the grid frontend paginates client-side, so serving the full recent set
+     * is intentional (was capped at 200 which made thousands of IG posts
+     * invisible to the planner grid).
      */
     public function getExternalPostsForCalendar(
         Carbon $from,
         Carbon $to,
         ?array $platforms = null,
+        int $max = 10000,
     ): array {
         $events = [];
 
@@ -73,7 +79,7 @@ class ExternalPostService
 
             $metaPosts = $query->with('mediaItems')
                 ->orderBy('created_at_meta', 'desc')
-                ->limit(200)
+                ->limit($max)
                 ->get();
 
             // Group posts with the same message that were published within 24 hours of each other
@@ -189,7 +195,7 @@ class ExternalPostService
         if ($includeTt) {
             $tiktokVideos = TiktokVideo::whereBetween('created_at_tiktok', [$from, $to])
                 ->orderBy('created_at_tiktok', 'desc')
-                ->limit(100)
+                ->limit($max)
                 ->get();
 
             foreach ($tiktokVideos as $video) {

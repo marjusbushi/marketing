@@ -265,26 +265,34 @@ class ContentPlannerApiController extends Controller
 
     // ── Meta Sync ──
 
-    public function syncFromMeta(): JsonResponse
+    public function syncFromMeta(Request $request): JsonResponse
     {
         $postSyncService = app(\App\Services\Meta\MetaPostSyncService::class);
 
+        // Manual sync button pulls the full available history by default —
+        // the grid is meant to show everything. Automated cron jobs keep the
+        // 30-day window (?full=0) for speed.
+        $fullHistory = $request->boolean('full', true);
+        $sinceDays = $fullHistory ? null : 30;
+        $maxPages  = $fullHistory ? 100 : 20;
+
         // Diagnose config up-front so a 0-count result can be explained
-        // without the user having to SSH and read logs.
+        // without the user having to SSH and read logs. Both .env AND the
+        // MetaTokenResolver DB bridge feed config, so the hint covers both.
         $issues = [];
         if (! config('meta.page_id')) {
-            $issues[] = 'META_PAGE_ID mungon (.env)';
+            $issues[] = 'META_PAGE_ID mungon (kontrollo meta_tokens DB ose .env)';
         }
         if (! config('meta.page_token')) {
-            $issues[] = 'META_PAGE_TOKEN mungon ose ka skaduar (.env)';
+            $issues[] = 'META_PAGE_TOKEN mungon ose ka skaduar (kontrollo meta_tokens DB ose .env)';
         }
         if (! config('meta.ig_account_id')) {
             $issues[] = 'META_IG_ACCOUNT_ID mungon (auto-discover do provohet)';
         }
 
         try {
-            $fbCount = $postSyncService->syncFacebookPosts();
-            $igCount = $postSyncService->syncInstagramPosts();
+            $fbCount = $postSyncService->syncFacebookPosts($sinceDays, $maxPages);
+            $igCount = $postSyncService->syncInstagramPosts($sinceDays, $maxPages);
         } catch (\Exception $e) {
             return response()->json([
                 'message'  => 'Sync failed: ' . $e->getMessage(),
@@ -313,6 +321,7 @@ class ContentPlannerApiController extends Controller
             'message'   => "Synced {$total} posts from Meta.",
             'facebook'  => $fbCount,
             'instagram' => $igCount,
+            'full'      => $fullHistory,
             'issues'    => $issues,
         ]);
     }

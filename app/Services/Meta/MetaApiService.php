@@ -213,22 +213,25 @@ class MetaApiService
      * Uses /published_posts with a since filter to avoid "reduce data" errors
      * on pages with many thousands of posts.
      */
-    public function getPagePosts(string $pageId, array $fields, int $limit = 50, ?string $since = null): array
+    public function getPagePosts(string $pageId, array $fields, int $limit = 50, ?string $since = null, int $maxPages = 20): array
     {
         $params = ['fields' => implode(',', $fields)];
         if ($since) {
             $params['since'] = $since;
         }
 
-        return $this->getPaginatedWithPageToken("{$pageId}/published_posts", $params, $limit);
+        return $this->getPaginatedWithPageToken("{$pageId}/published_posts", $params, $limit, $maxPages);
     }
 
     /**
      * Fetch IG media (uses Page Token).
+     *
+     * $maxPages bounds pagination. Default 20 pages × 50 items = 1000 posts.
+     * Full-history backfills pass a larger value to walk the whole history.
      */
-    public function getIgMedia(string $igAccountId, array $fields, int $limit = 50): array
+    public function getIgMedia(string $igAccountId, array $fields, int $limit = 50, int $maxPages = 20): array
     {
-        return $this->getPaginatedWithPageToken("{$igAccountId}/media", ['fields' => implode(',', $fields)], $limit);
+        return $this->getPaginatedWithPageToken("{$igAccountId}/media", ['fields' => implode(',', $fields)], $limit, $maxPages);
     }
 
     /**

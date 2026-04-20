@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meta\MetaToken;
+use App\Services\Meta\MetaTokenResolver;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -121,6 +122,10 @@ class MetaAuthController extends Controller
 
             // Fetch pages and page tokens
             $pageResults = $this->fetchAndStorePageTokens($longLivedData['access_token']);
+
+            // Drop the resolver cache so sync calls from this request onward
+            // see the freshly-saved tokens without waiting for the 5-min TTL.
+            MetaTokenResolver::forgetCache();
 
             $pageCount = count($pageResults);
             $igCount = collect($pageResults)->filter(fn($p) => !empty($p['ig_id']))->count();

@@ -44,8 +44,12 @@ class MetaSyncCommand extends Command
                 $from = $dateFrom ?? Carbon::now()->subDays(config('meta.daily_resync_days'))->toDateString();
                 $to = $dateTo ?? Carbon::yesterday()->toDateString();
 
-                $this->info("Syncing [{$type}] from {$from} to {$to}");
-                $results = $syncService->syncType($type, $from, $to);
+                // `--full` combined with `--type=posts` switches the posts sync
+                // from incremental (30 days) to full-history backfill. Without
+                // it the hourly scheduler stays fast and incremental.
+                $syncMode = $isFull ? 'full' : 'daily';
+                $this->info("Syncing [{$type}] ({$syncMode}) from {$from} to {$to}");
+                $results = $syncService->syncType($type, $from, $to, $syncMode);
             } elseif ($isFull) {
                 // Full initial sync
                 $this->warn('Running FULL initial sync (this may take a while)...');

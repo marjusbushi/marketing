@@ -19,8 +19,11 @@ class MetaPostSyncService
     /**
      * Sync Facebook Page posts and their insights.
      * Requires Page Token.
+     *
+     * @param int|null $sinceDays  Restrict to posts from the last N days. Null = no since filter (full history).
+     * @param int      $maxPages   Pagination ceiling. Default 20 pages × 50 = 1000 posts.
      */
-    public function syncFacebookPosts(): int
+    public function syncFacebookPosts(?int $sinceDays = 30, int $maxPages = 20): int
     {
         $pageId = config('meta.page_id');
         if (!$pageId || !config('meta.page_token')) {
@@ -33,12 +36,12 @@ class MetaPostSyncService
         try {
             // Note: 'type' and 'full_picture' were deprecated in v3.3+
             // Use 'attachments' for media info instead.
-            // Pass since filter to avoid "reduce data" errors on pages with many posts.
-            $sinceDate = Carbon::now()->subDays(30)->toDateString();
+            // Pass since filter only when bounded — full history syncs skip it.
+            $sinceDate = $sinceDays !== null ? Carbon::now()->subDays($sinceDays)->toDateString() : null;
             $posts = $this->api->getPagePosts($pageId, [
                 'id', 'message', 'created_time', 'permalink_url',
                 'attachments{type,media_type,url,media,subattachments}',
-            ], 50, $sinceDate);
+            ], 50, $sinceDate, $maxPages);
 
             foreach ($posts as $post) {
                 $postId = $post['id'] ?? null;
@@ -89,8 +92,11 @@ class MetaPostSyncService
     /**
      * Sync Instagram posts, stories, and reels.
      * Requires Page Token and IG Business Account linked to Page.
+     *
+     * @param int|null $sinceDays  Skip items older than N days. Null = full history.
+     * @param int      $maxPages   Graph API page walk ceiling (50 items per page).
      */
-    public function syncInstagramPosts(): int
+    public function syncInstagramPosts(?int $sinceDays = 30, int $maxPages = 20): int
     {
         $igAccountId = config('meta.ig_account_id');
         if (!$igAccountId || !config('meta.page_token')) {
@@ -103,20 +109,22 @@ class MetaPostSyncService
         }
 
         $count = 0;
+        $cutoff = $sinceDays !== null ? Carbon::now()->subDays($sinceDays) : null;
 
         try {
             $media = $this->api->getIgMedia($igAccountId, [
                 'id', 'caption', 'media_type', 'media_product_type', 'permalink',
                 'thumbnail_url', 'media_url', 'timestamp', 'like_count', 'comments_count',
-            ], 50);
+            ], 50, $maxPages);
 
             foreach ($media as $item) {
                 $mediaId = $item['id'] ?? null;
                 if (!$mediaId) continue;
 
-                // Only sync media from last 30 days
+                // Respect the since-days cutoff when set; full-history runs pass null
+                // so every media item is persisted regardless of age.
                 $createdTime = isset($item['timestamp']) ? Carbon::parse($item['timestamp']) : null;
-                if ($createdTime && $createdTime->lt(Carbon::now()->subDays(30))) {
+                if ($cutoff && $createdTime && $createdTime->lt($cutoff)) {
                     continue;
                 }
 

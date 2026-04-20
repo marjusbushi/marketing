@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Meta\MetaToken;
+use App\Services\Meta\MetaTokenResolver;
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -64,6 +65,9 @@ class MetaRefreshTokenCommand extends Command
 
         if ($refreshed > 0) {
             $this->info("Refreshed {$refreshed} token(s).");
+            // Force the resolver to re-read from DB on the next request so
+            // the new access_tokens propagate immediately to sync services.
+            MetaTokenResolver::forgetCache();
         } else {
             $this->line('No tokens needed refreshing.');
         }

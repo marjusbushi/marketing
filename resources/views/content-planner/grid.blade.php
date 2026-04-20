@@ -111,6 +111,19 @@
     {{-- Feed section — natural aspect ratio, no placeholders --}}
     <div>
         <div id="feedContainer" class="feed-grid"></div>
+
+        {{-- "Shfaq me shume" — Planable-style incremental reveal. The server
+             returns the entire post set; we render in pages of FEED_PAGE_SIZE
+             so tens of thousands of tiles don't hit the DOM at once. --}}
+        <div id="feedLoadMoreWrap" class="hidden flex flex-col items-center gap-2 pt-6 pb-4">
+            <div class="text-[11px] text-slate-400 font-medium" id="feedLoadMoreCount"></div>
+            <button id="feedLoadMoreBtn"
+                    class="inline-flex items-center gap-1.5 px-5 h-9 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-primary-400 hover:text-primary-600 transition-colors shadow-sm">
+                <iconify-icon icon="heroicons-outline:arrow-down-circle" width="14"></iconify-icon>
+                <span id="feedLoadMoreLabel">Shfaq me shume</span>
+            </button>
+        </div>
+
         <div id="feedEmpty" class="hidden py-10 text-center">
             <iconify-icon icon="heroicons-outline:photo" width="32" class="text-slate-200 mx-auto block mb-2"></iconify-icon>
             <p class="text-sm text-slate-400 mb-3">No posts yet</p>
@@ -145,6 +158,14 @@
     const statusLabels = { draft:'Draft', pending_review:'Review', approved:'Approved', scheduled:'Scheduled', published:'Published', failed:'Failed' };
     const platformIcons = { facebook:'logos:facebook', instagram:'skill-icons:instagram', tiktok:'logos:tiktok-icon' };
     let sortable;
+
+    // Client-side pagination state. The server returns every post in the
+    // selected window (IG history can be thousands); we render in chunks so
+    // scroll performance stays smooth. visibleCount is how many feed tiles
+    // are currently in the DOM.
+    const FEED_PAGE_SIZE = 48;
+    let feedPostsCache = [];
+    let visibleCount = 0;
 
     // Close filter on outside click
     document.addEventListener('click', function(e) {
@@ -247,6 +268,13 @@
             return !(props.content_type === 'story' || props.media_type === 'story' || props.is_story === true);
         });
 
+        // Cache the full feed set; we page through it client-side via the
+        // "Shfaq me shume" button. Reset visible count so the new filter view
+        // starts from the top (otherwise a shorter result set would still
+        // show the load-more button pointing at stale indices).
+        feedPostsCache = feedPosts;
+        visibleCount = 0;
+
         // Update counts
         document.getElementById('storiesCount').textContent = storyPosts.length ? `${storyPosts.length}` : '';
         const feedCountEl = document.getElementById('feedCount');
@@ -292,79 +320,95 @@
         // ─── FEED — natural aspect ratio, no placeholders ───
         const container = document.getElementById('feedContainer');
         const emptyEl = document.getElementById('feedEmpty');
-        const displayPosts = feedPosts.length ? feedPosts : posts;
 
-        if (!displayPosts.length) {
+        // When no feed posts exist but the broader list does (unlikely edge),
+        // fall back to showing the raw posts so the grid isn't mysteriously empty.
+        const fallbackList = feedPosts.length ? feedPosts : posts;
+        if (!fallbackList.length) {
             container.innerHTML = '';
             emptyEl.classList.remove('hidden');
+            hideLoadMore();
             return;
+        }
+        if (!feedPostsCache.length) {
+            feedPostsCache = fallbackList;
         }
         emptyEl.classList.add('hidden');
 
-        container.innerHTML = displayPosts.map(event => {
-            const p = event.extendedProps || {};
-            const isExternal = p.is_external === true || p.is_imported === true;
-            const sc = statusColors[p.status] || '#6B7280';
-            const sl = statusLabels[p.status] || '';
-            const thumb = p.thumbnail;
-            const mediaUrl = p.first_media_url;
-            const isVideo = p.is_video;
-            const permalink = p.permalink || p.url || '';
-            const dataAttr = isExternal ? 'data-external="1"' : `data-id="${event.id}"`;
+        // Reset + render first page. renderFeedPage handles the Sortable rebind
+        // so newly-appended tiles participate in drag-reorder.
+        visibleCount = 0;
+        renderFeedPage();
+    }
 
-            // Media — square crop via CSS. `feedTileOnErr` (global) swaps a
-            // broken image with the photo-placeholder so users never see the
-            // browser's default broken-image icon.
-            const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
+    // Build HTML for a single feed tile. Extracted so both initial render
+    // and "Shfaq me shume" use the exact same markup.
+    function buildFeedTileHtml(event) {
+        const p = event.extendedProps || {};
+        const isExternal = p.is_external === true || p.is_imported === true;
+        const thumb = p.thumbnail;
+        const mediaUrl = p.first_media_url;
+        const isVideo = p.is_video;
+        const permalink = p.permalink || p.url || '';
+        const dataAttr = isExternal ? 'data-external="1"' : `data-id="${event.id}"`;
 
-            // IG/FB CDN URLs routed through /marketing/meta-image (server proxy)
-            // to sidestep hotlink protection + expiring tokens.
-            // referrerpolicy stays as a belt-and-suspenders measure.
-            const proxiedThumb = proxyMetaUrl(thumb);
-            const proxiedMedia = proxyMetaUrl(mediaUrl);
+        const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
 
-            let mediaHtml = '';
-            if (proxiedThumb) {
-                mediaHtml = `<img src="${proxiedThumb}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
-            } else if (isVideo && proxiedMedia) {
-                mediaHtml = `<video src="${proxiedMedia}" muted preload="metadata" onerror="feedTileOnErr(this)"></video>`;
-            } else if (proxiedMedia) {
-                mediaHtml = `<img src="${proxiedMedia}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
-            } else {
-                mediaHtml = placeholderHtml;
-            }
+        // IG/FB CDN URLs routed through /marketing/meta-image (server proxy)
+        // to sidestep hotlink protection + expiring tokens.
+        const proxiedThumb = proxyMetaUrl(thumb);
+        const proxiedMedia = proxyMetaUrl(mediaUrl);
 
-            // Badge: carousel (+N) or video icon — shown top-right, IG-style
-            let badgeHtml = '';
-            const mediaCount = Number(p.media_count || 0);
-            if (mediaCount > 1) {
-                badgeHtml = `<span class="feed-tile-badge" title="${mediaCount} media">
-                    <iconify-icon icon="heroicons-outline:square-2-stack" width="10"></iconify-icon>${mediaCount}
-                </span>`;
-            } else if (isVideo || p.has_video) {
-                badgeHtml = `<span class="feed-tile-badge" title="Video">
-                    <iconify-icon icon="heroicons-outline:play" width="10"></iconify-icon>
-                </span>`;
-            }
-            mediaHtml += badgeHtml;
+        let mediaHtml = '';
+        if (proxiedThumb) {
+            mediaHtml = `<img src="${proxiedThumb}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
+        } else if (isVideo && proxiedMedia) {
+            mediaHtml = `<video src="${proxiedMedia}" muted preload="metadata" onerror="feedTileOnErr(this)"></video>`;
+        } else if (proxiedMedia) {
+            mediaHtml = `<img src="${proxiedMedia}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="feedTileOnErr(this)">`;
+        } else {
+            mediaHtml = placeholderHtml;
+        }
 
-            // Hover overlay — minimal
-            const hoverHtml = `<div class="feed-hover"></div>`;
+        let badgeHtml = '';
+        const mediaCount = Number(p.media_count || 0);
+        if (mediaCount > 1) {
+            badgeHtml = `<span class="feed-tile-badge" title="${mediaCount} media">
+                <iconify-icon icon="heroicons-outline:square-2-stack" width="10"></iconify-icon>${mediaCount}
+            </span>`;
+        } else if (isVideo || p.has_video) {
+            badgeHtml = `<span class="feed-tile-badge" title="Video">
+                <iconify-icon icon="heroicons-outline:play" width="10"></iconify-icon>
+            </span>`;
+        }
+        mediaHtml += badgeHtml;
 
-            const imgSrc = thumb || mediaUrl || '';
-            // For external (imported) posts we still open the permalink in a new tab;
-            // local posts open the carousel preview which fetches the full media list.
-            const clickFn = isExternal && permalink
-                ? `window.open('${permalink.replace(/'/g, "\\'")}','_blank')`
-                : `openPostPreview(${event.id})`;
+        const hoverHtml = `<div class="feed-hover"></div>`;
 
-            return `<div class="feed-tile" ${dataAttr} onclick="${clickFn}">
-                ${mediaHtml}
-                ${hoverHtml}
-            </div>`;
-        }).join('');
+        const clickFn = isExternal && permalink
+            ? `window.open('${permalink.replace(/'/g, "\\'")}','_blank')`
+            : `openPostPreview(${event.id})`;
 
-        // SortableJS on grid
+        return `<div class="feed-tile" ${dataAttr} onclick="${clickFn}">
+            ${mediaHtml}
+            ${hoverHtml}
+        </div>`;
+    }
+
+    // Render the first visibleCount+FEED_PAGE_SIZE tiles from feedPostsCache.
+    // Re-renders the whole visible prefix each call to keep Sortable + ordering
+    // logic simple (at 48-item pages this is cheap).
+    function renderFeedPage() {
+        const container = document.getElementById('feedContainer');
+        const target = Math.min(visibleCount + FEED_PAGE_SIZE, feedPostsCache.length);
+        if (target <= visibleCount) {
+            hideLoadMore();
+            return;
+        }
+
+        visibleCount = target;
+        container.innerHTML = feedPostsCache.slice(0, visibleCount).map(buildFeedTileHtml).join('');
+
         if (sortable) sortable.destroy();
         sortable = Sortable.create(container, {
             animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen', filter: '[data-external]',
@@ -373,6 +417,26 @@
                 if (orderedIds.length) showReorderConfirm(orderedIds);
             }
         });
+
+        updateLoadMore();
+    }
+
+    function updateLoadMore() {
+        const wrap = document.getElementById('feedLoadMoreWrap');
+        const countEl = document.getElementById('feedLoadMoreCount');
+        const labelEl = document.getElementById('feedLoadMoreLabel');
+        const total = feedPostsCache.length;
+        const remaining = total - visibleCount;
+        if (remaining <= 0) { hideLoadMore(); return; }
+
+        wrap.classList.remove('hidden');
+        const nextBatch = Math.min(FEED_PAGE_SIZE, remaining);
+        labelEl.textContent = `Shfaq ${nextBatch} me shume`;
+        countEl.textContent = `${visibleCount} nga ${total} poste`;
+    }
+
+    function hideLoadMore() {
+        document.getElementById('feedLoadMoreWrap').classList.add('hidden');
     }
 
     function showReorderConfirm(orderedIds) {
@@ -400,9 +464,14 @@
     async function syncFromMeta(btn) {
         const origText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<iconify-icon icon="heroicons-outline:arrow-path" width="14" class="animate-spin"></iconify-icon> Syncing...';
+        // Full-history sync can walk hundreds of Graph API pages — the
+        // "Syncing..." spinner plus explicit label manages expectations.
+        btn.innerHTML = '<iconify-icon icon="heroicons-outline:arrow-path" width="14" class="animate-spin"></iconify-icon> Syncing historik...';
         try {
-            const res = await fetch('{{ route("marketing.planner.api.posts.sync-meta") }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } });
+            // ?full=1 → walk up to ~5000 posts per source with no 30-day cutoff.
+            // The server still stops at the end of pagination, so accounts with
+            // fewer posts finish quickly.
+            const res = await fetch('{{ route("marketing.planner.api.posts.sync-meta") }}?full=1', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } });
             const ct = res.headers.get('Content-Type') || '';
             if (ct.includes('text/html')) { window.location.reload(); return; }
             const data = await res.json();
@@ -436,7 +505,14 @@
         }
     });
 
-    document.addEventListener('DOMContentLoaded', refreshGrid);
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshGrid();
+        // Planable-style "Shfaq me shume" — reveals the next FEED_PAGE_SIZE
+        // tiles from the cached post set. No extra HTTP calls; everything
+        // already loaded in feedPostsCache.
+        const btn = document.getElementById('feedLoadMoreBtn');
+        if (btn) btn.addEventListener('click', renderFeedPage);
+    });
 
     // ─── Post Preview Overlay (Planable-style) ───
     //
