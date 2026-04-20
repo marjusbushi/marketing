@@ -269,21 +269,51 @@ class ContentPlannerApiController extends Controller
     {
         $postSyncService = app(\App\Services\Meta\MetaPostSyncService::class);
 
+        // Diagnose config up-front so a 0-count result can be explained
+        // without the user having to SSH and read logs.
+        $issues = [];
+        if (! config('meta.page_id')) {
+            $issues[] = 'META_PAGE_ID mungon (.env)';
+        }
+        if (! config('meta.page_token')) {
+            $issues[] = 'META_PAGE_TOKEN mungon ose ka skaduar (.env)';
+        }
+        if (! config('meta.ig_account_id')) {
+            $issues[] = 'META_IG_ACCOUNT_ID mungon (auto-discover do provohet)';
+        }
+
         try {
             $fbCount = $postSyncService->syncFacebookPosts();
             $igCount = $postSyncService->syncInstagramPosts();
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Sync failed: ' . $e->getMessage(),
+                'message'  => 'Sync failed: ' . $e->getMessage(),
+                'facebook' => 0,
+                'instagram' => 0,
+                'issues'   => $issues,
+                'hint'     => 'Kontrollo /marketing/meta-auth per token ose .env ne server.',
             ], 500);
         }
 
         $total = $fbCount + $igCount;
 
+        // Kur total=0 dhe ka issue konfigurimi, tregoji user-it — ben debug
+        // te menjehershme ne vend te "mos del asgje".
+        if ($total === 0 && ! empty($issues)) {
+            return response()->json([
+                'message'  => 'Sync ran por 0 poste u importuan. Arsye te mundshme ↓',
+                'facebook' => 0,
+                'instagram' => 0,
+                'issues'   => $issues,
+                'hint'     => 'Rifresko token-in ne /marketing/meta-auth, ose kontrollo .env ne server.',
+            ], 200);
+        }
+
         return response()->json([
-            'message' => "Synced {$total} posts from Meta.",
-            'facebook' => $fbCount,
+            'message'   => "Synced {$total} posts from Meta.",
+            'facebook'  => $fbCount,
             'instagram' => $igCount,
+            'issues'    => $issues,
         ]);
     }
 

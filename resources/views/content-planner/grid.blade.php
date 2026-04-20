@@ -406,8 +406,18 @@
             const ct = res.headers.get('Content-Type') || '';
             if (ct.includes('text/html')) { window.location.reload(); return; }
             const data = await res.json();
-            if (res.ok) { alert(`Imported ${data.facebook??0} FB + ${data.instagram??0} IG posts`); refreshGrid(); }
-            else { alert('Sync failed: ' + (data.message || res.statusText)); }
+            const fb = data.facebook ?? 0;
+            const ig = data.instagram ?? 0;
+            const total = fb + ig;
+            if (!res.ok) {
+                alert('Sync failed: ' + (data.message || res.statusText));
+            } else if (total === 0 && Array.isArray(data.issues) && data.issues.length > 0) {
+                alert((data.message || 'Imported 0 posts.') + '\n\n• ' + data.issues.join('\n• ') +
+                    (data.hint ? '\n\n' + data.hint : ''));
+            } else {
+                alert('✓ Imported ' + fb + ' FB + ' + ig + ' IG posts');
+                if (total > 0) refreshGrid();
+            }
         } catch (e) { alert('Sync failed: ' + e.message); }
         finally { btn.disabled = false; btn.innerHTML = origText; }
     }
