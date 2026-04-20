@@ -3,6 +3,7 @@
 namespace App\Models\Meta;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Per-post/reel/story insights (Facebook + Instagram).
@@ -71,5 +72,14 @@ class MetaPostInsight extends Model
             'created_at_meta' => 'datetime',
             'synced_at'       => 'datetime',
         ];
+    }
+
+    /**
+     * All media items on this post (1 for images/videos, N for carousel).
+     * Ordered by position — first item is the thumbnail candidate.
+     */
+    public function mediaItems(): HasMany
+    {
+        return $this->hasMany(MetaPostMedia::class)->orderBy('position');
     }
 }

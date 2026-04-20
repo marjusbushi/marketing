@@ -3,6 +3,7 @@
 namespace App\Services\Meta;
 
 use App\Models\Meta\MetaPostInsight;
+use App\Models\Meta\MetaPostMedia;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -127,7 +128,7 @@ class MetaPostSyncService
                 $rawMediaUrl = $item['thumbnail_url'] ?? ($item['media_url'] ?? null);
                 $localMediaUrl = $this->downloadMedia($rawMediaUrl, 'ig_' . $mediaId);
 
-                MetaPostInsight::updateOrCreate(
+                $post = MetaPostInsight::updateOrCreate(
                     ['post_id' => $mediaId],
                     [
                         'source' => 'instagram',
@@ -153,6 +154,15 @@ class MetaPostSyncService
                         'synced_at' => now(),
                     ]
                 );
+
+                // Sync full media set (carousel children, video + cover, etc).
+                // Failures are logged but non-fatal — existing insights row stays.
+                try {
+                    $this->syncIgPostMedia($post, $item);
+                } catch (Exception $e) {
+                    Log::warning("IG media sync failed for {$mediaId}: " . $e->getMessage());
+                }
+
                 $count++;
             }
         } catch (Exception $e) {
@@ -289,6 +299,147 @@ class MetaPostSyncService
         } catch (Exception $e) {
             return null;
         }
+    }
+
+    /**
+     * Sync all media items for an Instagram post — handles:
+     *  - IMAGE posts: 1 row (position 0, IMAGE, downloaded locally)
+     *  - VIDEO posts: 1 row (position 0, VIDEO, video_url + thumbnail downloaded)
+     *  - CAROUSEL_ALBUM: fetches `/{id}/children` API and loops, N rows
+     *
+     * Idempotent: uses (meta_post_insight_id, position) unique key. Existing rows
+     * with a local_path are left alone (saves bandwidth on re-runs).
+     */
+    private function syncIgPostMedia(MetaPostInsight $post, array $item): void
+    {
+        $mediaType = strtoupper($item['media_type'] ?? '');
+        $igId = $item['id'] ?? null;
+
+        if ($mediaType === 'CAROUSEL_ALBUM' && $igId) {
+            // Fetch children list — Graph API v19+ exposes them under /children
+            $response = $this->api->getWithPageToken("{$igId}/children", [
+                'fields' => 'id,media_type,media_url,thumbnail_url',
+            ]);
+            $children = $response['data'] ?? [];
+            foreach (array_values($children) as $index => $child) {
+                $this->upsertMediaItem($post, $index, $child);
+            }
+            return;
+        }
+
+        // Single item (IMAGE or VIDEO) — use the post-level fields.
+        $this->upsertMediaItem($post, 0, [
+            'id'            => $igId,
+            'media_type'    => $mediaType ?: 'IMAGE',
+            'media_url'     => $item['media_url'] ?? null,
+            'thumbnail_url' => $item['thumbnail_url'] ?? null,
+        ]);
+    }
+
+    /**
+     * Insert or refresh one media item. Downloads the file to local storage so
+     * it survives Meta CDN token expiry (~1-2h), and updates the row fields.
+     */
+    private function upsertMediaItem(MetaPostInsight $post, int $position, array $child): void
+    {
+        $childIgId  = $child['id'] ?? null;
+        $type       = strtoupper($child['media_type'] ?? 'IMAGE');
+        $mediaUrl   = $child['media_url'] ?? null;
+        $thumbUrl   = $child['thumbnail_url'] ?? null;
+        $isVideo    = $type === 'VIDEO';
+
+        // For videos: media_url is the .mp4, thumbnail_url is the poster frame.
+        // For images: media_url is the image, no separate thumbnail needed.
+        $primaryUrl   = $mediaUrl;
+        $prefix       = 'ig_' . $post->post_id . '_' . $position;
+        $localPath    = null;
+        $localThumb   = null;
+        $mimeType     = null;
+        $sizeBytes    = null;
+
+        if ($primaryUrl) {
+            [$localPath, $mimeType, $sizeBytes] = $this->downloadToStorage($primaryUrl, $prefix);
+        }
+
+        if ($isVideo && $thumbUrl) {
+            [$localThumb] = $this->downloadToStorage($thumbUrl, $prefix . '_thumb');
+        }
+
+        MetaPostMedia::updateOrCreate(
+            [
+                'meta_post_insight_id' => $post->id,
+                'position'             => $position,
+            ],
+            [
+                'media_type'           => $isVideo ? 'VIDEO' : 'IMAGE',
+                'ig_media_id'          => $childIgId,
+                'original_url'         => $mediaUrl,
+                'video_url'            => $isVideo ? $mediaUrl : null,
+                'thumbnail_url'        => $thumbUrl,
+                'local_path'           => $localPath,
+                'local_disk'           => $localPath ? 'public' : null,
+                'local_thumbnail_path' => $localThumb,
+                'mime_type'            => $mimeType,
+                'size_bytes'           => $sizeBytes,
+                'downloaded_at'        => $localPath ? now() : null,
+            ]
+        );
+    }
+
+    /**
+     * Download a URL to public storage and return [path, mime, size].
+     * Returns [null, null, null] on failure — the caller should fall back
+     * to the original_url for display (proxy route will serve it temporarily).
+     */
+    private function downloadToStorage(?string $url, string $prefix): array
+    {
+        if (! $url) {
+            return [null, null, null];
+        }
+
+        try {
+            $response = Http::timeout(15)
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+                ])
+                ->get($url);
+
+            if (! $response->successful()) {
+                Log::debug("downloadToStorage: HTTP {$response->status()} for {$prefix}");
+                return [null, null, null];
+            }
+
+            $contentType = $response->header('Content-Type') ?: 'application/octet-stream';
+            $mime = trim(explode(';', $contentType)[0]);
+            $ext = match (strtolower($mime)) {
+                'image/jpeg', 'image/jpg' => 'jpg',
+                'image/png'              => 'png',
+                'image/webp'             => 'webp',
+                'image/gif'              => 'gif',
+                'video/mp4'              => 'mp4',
+                'video/quicktime'        => 'mov',
+                'video/webm'             => 'webm',
+                default                  => $this->extFromUrl($url) ?? 'bin',
+            };
+
+            $path = "meta_media/{$prefix}.{$ext}";
+            $body = $response->body();
+            Storage::disk('public')->put($path, $body);
+
+            return [$path, $mime, strlen($body)];
+        } catch (Exception $e) {
+            Log::debug("downloadToStorage failed [{$prefix}]: " . $e->getMessage());
+            return [null, null, null];
+        }
+    }
+
+    private function extFromUrl(string $url): ?string
+    {
+        $path = parse_url($url, PHP_URL_PATH) ?: '';
+        if (preg_match('/\.([a-zA-Z0-9]{2,5})$/', $path, $m)) {
+            return strtolower($m[1]);
+        }
+        return null;
     }
 
     /**

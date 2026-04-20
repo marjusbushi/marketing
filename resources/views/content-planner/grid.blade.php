@@ -25,6 +25,17 @@
     .feed-tile .feed-hover { position: absolute; inset: 0; background: rgba(0,0,0,0.08); opacity: 0; transition: opacity 0.15s; }
     .feed-tile:hover .feed-hover { opacity: 1; }
 
+    /* Carousel/video indicators — Instagram-style ne kend te djathtë lart */
+    .feed-tile-badge {
+        position: absolute; top: 6px; right: 6px; z-index: 2;
+        background: rgba(0,0,0,0.55); color: #fff;
+        border-radius: 4px; padding: 2px 6px;
+        font-size: 10px; font-weight: 600;
+        display: inline-flex; align-items: center; gap: 3px;
+        backdrop-filter: blur(4px);
+    }
+    .feed-tile-badge iconify-icon { width: 10px; height: 10px; }
+
     .sortable-ghost { opacity: 0.4; }
     .sortable-chosen { box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
 
@@ -322,6 +333,20 @@
             } else {
                 mediaHtml = placeholderHtml;
             }
+
+            // Badge: carousel (+N) or video icon — shown top-right, IG-style
+            let badgeHtml = '';
+            const mediaCount = Number(p.media_count || 0);
+            if (mediaCount > 1) {
+                badgeHtml = `<span class="feed-tile-badge" title="${mediaCount} media">
+                    <iconify-icon icon="heroicons-outline:square-2-stack" width="10"></iconify-icon>${mediaCount}
+                </span>`;
+            } else if (isVideo || p.has_video) {
+                badgeHtml = `<span class="feed-tile-badge" title="Video">
+                    <iconify-icon icon="heroicons-outline:play" width="10"></iconify-icon>
+                </span>`;
+            }
+            mediaHtml += badgeHtml;
 
             // Hover overlay — minimal
             const hoverHtml = `<div class="feed-hover"></div>`;

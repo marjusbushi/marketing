@@ -9,6 +9,45 @@ use Carbon\Carbon;
 class ExternalPostService
 {
     /**
+     * Shape the mediaItems relation into a lean array that the grid/list views
+     * can render. Prefer local paths (survive IG token expiry) over the
+     * original Meta CDN URL.
+     *
+     * Returns array of:
+     *   [ 'url' => ..., 'thumbnail' => ..., 'is_video' => bool, 'position' => int ]
+     *
+     * Falls back to a single synthetic item from `media_url` for posts that
+     * were synced before the media-items schema change — keeps the UI working.
+     */
+    private function buildMediaItemsFromPost(MetaPostInsight $post): array
+    {
+        $out = [];
+        $items = $post->relationLoaded('mediaItems') ? $post->mediaItems : collect();
+
+        foreach ($items as $m) {
+            $out[] = [
+                'url'       => $m->display_url,
+                'thumbnail' => $m->display_thumbnail,
+                'is_video'  => $m->isVideo(),
+                'position'  => (int) $m->position,
+            ];
+        }
+
+        // Legacy fallback — existing posts without media rows
+        if (empty($out) && $post->media_url) {
+            $out[] = [
+                'url'       => $post->media_url,
+                'thumbnail' => $post->media_url,
+                'is_video'  => false,
+                'position'  => 0,
+            ];
+        }
+
+        return $out;
+    }
+
+
+    /**
      * Get externally published posts (FB/IG/TikTok) formatted as FullCalendar events.
      */
     public function getExternalPostsForCalendar(
@@ -32,7 +71,10 @@ class ExternalPostService
                 $query->where('source', 'instagram');
             }
 
-            $metaPosts = $query->orderBy('created_at_meta', 'desc')->limit(200)->get();
+            $metaPosts = $query->with('mediaItems')
+                ->orderBy('created_at_meta', 'desc')
+                ->limit(200)
+                ->get();
 
             // Group posts with the same message that were published within 24 hours of each other
             $grouped = [];
@@ -92,6 +134,13 @@ class ExternalPostService
                         $permalinks[$p->source ?? 'facebook'] = $p->permalink_url;
                     }
 
+                    // Build full media array from mediaItems (carousel-aware).
+                    // Falls back to media_url scalar if no mediaItems synced yet
+                    // (old posts pre-dating the schema change).
+                    $mediaItems = $this->buildMediaItemsFromPost($primary);
+                    $firstMedia = $mediaItems[0] ?? null;
+                    $hasVideo   = !empty(array_filter($mediaItems, fn ($m) => $m['is_video']));
+
                     $events[] = [
                         'id' => 'ext_meta_' . implode('_', $ids),
                         'title' => Str_limit_plain($primary->message, 60),
@@ -109,14 +158,18 @@ class ExternalPostService
                             'status_bg_color' => $isMulti ? '#F0F0FF' : $this->platformBgColor($platforms[0]),
                             'platform' => $isMulti ? 'multi' : $platforms[0],
                             'platform_icons' => array_values($platforms),
-                            'thumbnail' => $primary->media_url,
+                            'thumbnail' => $firstMedia['thumbnail'] ?? $primary->media_url,
+                            'first_media_url' => $firstMedia['url'] ?? $primary->media_url,
+                            'is_video' => $firstMedia['is_video'] ?? false,
+                            'has_video' => $hasVideo,
+                            'media_items' => $mediaItems,
                             'content' => $primary->message,
                             'permalink' => $primary->permalink_url,
                             'permalinks' => $permalinks,
                             'labels' => [],
                             'user_name' => null,
-                            'media_count' => $primary->media_url ? 1 : 0,
-                            'has_media' => (bool) $primary->media_url,
+                            'media_count' => count($mediaItems) ?: ($primary->media_url ? 1 : 0),
+                            'has_media' => !empty($mediaItems) || (bool) $primary->media_url,
                             'metrics' => [
                                 'reach' => $totalReach,
                                 'impressions' => $totalImpressions,
@@ -199,7 +252,10 @@ class ExternalPostService
             if ($includeFb && !$includeIg) $query->where('source', 'facebook');
             elseif ($includeIg && !$includeFb) $query->where('source', 'instagram');
 
-            $metaPosts = $query->orderBy('created_at_meta', 'desc')->limit($limit)->get();
+            $metaPosts = $query->with('mediaItems')
+                ->orderBy('created_at_meta', 'desc')
+                ->limit($limit)
+                ->get();
 
             // Group cross-posted content
             $grouped = [];
@@ -234,13 +290,21 @@ class ExternalPostService
                     $platforms = array_unique(array_map(fn ($p) => $p->source ?? 'facebook', $group['posts']));
                     $ids = array_map(fn ($p) => $p->id, $group['posts']);
 
+                    $mediaItems = $this->buildMediaItemsFromPost($primary);
+                    $firstMedia = $mediaItems[0] ?? null;
+
                     $posts[] = [
                         'id' => 'ext_meta_' . implode('_', $ids),
                         'type' => 'external',
                         'platform' => count($platforms) > 1 ? 'multi' : $platforms[0],
                         'platform_icons' => array_values($platforms),
                         'content' => $primary->message,
-                        'thumbnail' => $primary->media_url,
+                        'thumbnail' => $firstMedia['thumbnail'] ?? $primary->media_url,
+                        'first_media_url' => $firstMedia['url'] ?? $primary->media_url,
+                        'is_video' => $firstMedia['is_video'] ?? false,
+                        'media_items' => $mediaItems,
+                        'media_count' => count($mediaItems) ?: ($primary->media_url ? 1 : 0),
+                        'has_media' => !empty($mediaItems) || (bool) $primary->media_url,
                         'permalink' => $primary->permalink_url,
                         'published_at' => $primary->created_at_meta->toIso8601String(),
                         'sort_date' => $primary->created_at_meta->toIso8601String(),
