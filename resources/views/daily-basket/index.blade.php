@@ -143,6 +143,75 @@
 
     .db-picker-empty { grid-column: 1/-1; padding: 24px; text-align: center; color: var(--db-text-3); font-size: 12px; }
 
+    /* Section header ne product picker (Produkte te caktuara / Te gjitha) */
+    .db-picker-section {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 4px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--db-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .db-picker-section.secondary { color: var(--db-text-3); }
+    .db-picker-section-count {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--db-text-3);
+        background: var(--db-accent-soft);
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+    .db-picker-section-hint {
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--db-text-3);
+        text-transform: none;
+        letter-spacing: 0;
+        margin-left: auto;
+    }
+    .db-picker-item.is-assigned {
+        background: #eef7ff;
+        border: 1px solid #bfdbfe;
+    }
+    .db-picker-item.is-assigned.selected {
+        background: #dbeafe;
+        border-color: #60a5fa;
+    }
+
+    /* Quick-post butoni ne karten e panoramen */
+    .db-pano-quick-post {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: var(--db-text);
+        color: #fff;
+        border: none;
+        border-radius: 14px;
+        padding: 4px 10px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        opacity: 0;
+        transform: translateY(-2px);
+        transition: opacity 0.15s, transform 0.15s;
+        white-space: nowrap;
+    }
+    .db-pano-card { position: relative; }
+    .db-pano-card:hover .db-pano-quick-post,
+    .db-pano-card:focus-within .db-pano-quick-post {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .db-pano-quick-post:hover { background: #27272a; }
+    /* On touch devices we can't hover — show button always */
+    @media (hover: none) {
+        .db-pano-quick-post { opacity: 1; transform: translateY(0); }
+    }
+
     /* Collection picker (dropdown in the collection row) */
     .db-coll-picker { position: relative; }
     .db-coll-trigger {
@@ -986,6 +1055,22 @@
         const card = document.createElement('div');
         card.className = 'db-pano-card';
 
+        // Quick-post button (visible on hover/touch) — ngec kartes context per
+        // te krijuar nje post me kete produkt pre-selected ne modal.
+        if (state.kanban) {
+            const quick = document.createElement('button');
+            quick.type = 'button';
+            quick.className = 'db-pano-quick-post';
+            quick.textContent = '+ Post';
+            quick.title = 'Krijo post me kete produkt';
+            quick.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closePanorama();
+                openNewPostModal(num(p.id));
+            });
+            card.appendChild(quick);
+        }
+
         if (p.image_url) {
             const img = document.createElement('img');
             img.className = 'db-pano-img';
@@ -1445,11 +1530,46 @@
         document.querySelectorAll('#dbFieldPlatforms .db-seg-opt').forEach(el => el.classList.remove('active'));
     }
 
-    function openNewPostModal() {
+    // Returns Set<int> of item_group_ids assigned for selectedDate, or empty set if none.
+    function getAssignedIdsForSelectedDay() {
+        const ids = new Set();
+        if (!state.selectedDate) return ids;
+        (state.availableProducts || []).forEach(p => {
+            const matches = (p.assigned_dates || []).some(a => a.date === state.selectedDate);
+            if (matches) ids.add(num(p.id));
+        });
+        return ids;
+    }
+
+    // preselectedProductId: when called from the "+ Post" button on a
+    // panorama card, we start with just that one product checked (and skip the
+    // bulk pre-select). When called from the header "+ Post i ri", we pre-select
+    // everything that's assigned to the selected day so the common case is 1-click.
+    function openNewPostModal(preselectedProductId = null) {
         resetModalFields();
-        document.getElementById('dbModalTitle').textContent = 'Post i ri';
+
+        const titleEl = document.getElementById('dbModalTitle');
+        let title = 'Post i ri';
+        if (state.selectedDate) {
+            const dt = new Date(state.selectedDate);
+            title += ' · ' + DAY_NAMES[dt.getDay()] + ' ' +
+                String(dt.getDate()).padStart(2, '0') + ' ' + MONTH_NAMES[dt.getMonth()];
+        }
+        titleEl.textContent = title;
         document.getElementById('dbModalSubmit').textContent = 'Krijo post';
         document.getElementById('dbEditOnly').style.display = 'none';
+
+        if (preselectedProductId != null) {
+            state.modal.selectedProductIds.add(num(preselectedProductId));
+            state.modal.heroProductId = num(preselectedProductId);
+        } else {
+            // Pre-select products assigned to the selected day (orientim nga paneli).
+            const assigned = getAssignedIdsForSelectedDay();
+            assigned.forEach(id => state.modal.selectedProductIds.add(id));
+            if (assigned.size > 0) {
+                state.modal.heroProductId = assigned.values().next().value;
+            }
+        }
 
         renderProductPicker();
         document.getElementById('dbModal').classList.add('open');
@@ -1516,9 +1636,19 @@
             return;
         }
 
+        // Partition: assigned-for-today first, everything else after. Empty
+        // assigned set falls through to a single flat list (old behavior).
+        const assignedIds = getAssignedIdsForSelectedDay();
+        const assigned = [];
+        const others = [];
         state.availableProducts.forEach(p => {
+            (assignedIds.has(num(p.id)) ? assigned : others).push(p);
+        });
+
+        const renderItem = (p, isAssigned) => {
             const item = document.createElement('div');
             item.className = 'db-picker-item';
+            if (isAssigned) item.classList.add('is-assigned');
             item.dataset.productId = p.id;
             if (state.modal.selectedProductIds.has(p.id)) {
                 item.classList.add('selected');
@@ -1558,8 +1688,49 @@
 
             item.append(info, check);
             item.addEventListener('click', () => toggleProduct(num(p.id)));
-            host.appendChild(item);
-        });
+            return item;
+        };
+
+        const makeSectionHeader = (text, count, hint, secondary = false) => {
+            const h = document.createElement('div');
+            h.className = 'db-picker-section' + (secondary ? ' secondary' : '');
+            const label = document.createElement('span');
+            label.textContent = text;
+            h.appendChild(label);
+            const badge = document.createElement('span');
+            badge.className = 'db-picker-section-count';
+            badge.textContent = String(count);
+            h.appendChild(badge);
+            if (hint) {
+                const hintEl = document.createElement('span');
+                hintEl.className = 'db-picker-section-hint';
+                hintEl.textContent = hint;
+                h.appendChild(hintEl);
+            }
+            return h;
+        };
+
+        // Section 1: day-assigned products (only if we actually have some)
+        if (assigned.length > 0) {
+            let title = 'Produkte te caktuara per kete dite';
+            if (state.selectedDate) {
+                const dt = new Date(state.selectedDate);
+                title = 'Produkte per ' + DAY_NAMES[dt.getDay()] + ' ' +
+                    String(dt.getDate()).padStart(2, '0') + ' ' + MONTH_NAMES[dt.getMonth()];
+            }
+            host.appendChild(makeSectionHeader(title, assigned.length, null, false));
+            assigned.forEach(p => host.appendChild(renderItem(p, true)));
+        }
+
+        // Section 2: all other collection products
+        if (others.length > 0) {
+            const label = assigned.length > 0
+                ? 'Te tjeret nga kolekcioni'
+                : 'Te gjitha produktet e kolekcionit';
+            const hint = assigned.length > 0 ? 'pa caktim per kete dite' : null;
+            host.appendChild(makeSectionHeader(label, others.length, hint, true));
+            others.forEach(p => host.appendChild(renderItem(p, false)));
+        }
     }
 
     function toggleProduct(id) {
