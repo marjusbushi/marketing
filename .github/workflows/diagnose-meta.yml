@@ -66,7 +66,35 @@ jobs:
             echo "count: $(ls storage/app/public/meta-downloads 2>/dev/null | wc -l)"
 
             echo ""
-            echo "=== Run sync directly (FB + IG, full history) ==="
-            php artisan tinker --no-interaction --execute='try { $svc = app(App\Services\Meta\MetaPostSyncService::class); $fb = $svc->syncFacebookPosts(null, 5); $ig = $svc->syncInstagramPosts(null, 5); echo "fb_synced=".$fb." ig_synced=".$ig.PHP_EOL; echo "total_insights=".DB::table("meta_post_insights")->count().PHP_EOL; echo "downloads_count=".count(glob("storage/app/public/meta-downloads/*") ?: []).PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; echo "trace: ".substr($e->getTraceAsString(), 0, 500).PHP_EOL; }'
+            echo "=== Direct Graph API tests (raw curl through Http) ==="
+            php artisan tinker --no-interaction --execute='
+              $token = config("meta.page_token");
+              $pageId = config("meta.page_id");
+              $igId = config("meta.ig_account_id");
+              $v = config("meta.api_version");
+              echo "--- /me ---".PHP_EOL;
+              $r = Http::get("https://graph.facebook.com/$v/me", ["access_token" => $token]);
+              echo "status=".$r->status()." body=".substr($r->body(), 0, 200).PHP_EOL;
+              echo "--- page posts ---".PHP_EOL;
+              $r = Http::get("https://graph.facebook.com/$v/$pageId/posts", ["access_token" => $token, "fields" => "id,message,created_time,permalink_url", "limit" => 3]);
+              echo "status=".$r->status()." body=".substr($r->body(), 0, 400).PHP_EOL;
+              echo "--- page feed ---".PHP_EOL;
+              $r = Http::get("https://graph.facebook.com/$v/$pageId/feed", ["access_token" => $token, "fields" => "id,message,created_time", "limit" => 3]);
+              echo "status=".$r->status()." body=".substr($r->body(), 0, 400).PHP_EOL;
+              echo "--- IG media ---".PHP_EOL;
+              $r = Http::get("https://graph.facebook.com/$v/$igId/media", ["access_token" => $token, "fields" => "id,caption,media_type,timestamp", "limit" => 3]);
+              echo "status=".$r->status()." body=".substr($r->body(), 0, 400).PHP_EOL;
+              echo "--- token permissions ---".PHP_EOL;
+              $r = Http::get("https://graph.facebook.com/$v/me/permissions", ["access_token" => $token]);
+              echo "status=".$r->status()." body=".substr($r->body(), 0, 600).PHP_EOL;
+            '
+
+            echo ""
+            echo "=== Run sync directly ==="
+            php artisan tinker --no-interaction --execute='try { $svc = app(App\Services\Meta\MetaPostSyncService::class); $fb = $svc->syncFacebookPosts(null, 5); $ig = $svc->syncInstagramPosts(null, 5); echo "fb_synced=".$fb." ig_synced=".$ig.PHP_EOL; echo "total_insights=".DB::table("meta_post_insights")->count().PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== Laravel log tail (filter for Meta) ==="
+            tail -200 storage/logs/laravel.log 2>/dev/null | grep -iE "meta|facebook|instagram|graph" | tail -10 || echo "no meta-related log lines"
 
             echo "=== DONE ==="
