@@ -10,7 +10,7 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Clear caches + verify via SSH
+      - name: Probe studio/1 500 via SSH
         uses: appleboy/ssh-action@v1
         env:
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
@@ -23,20 +23,13 @@ jobs:
           script: |
             set -e
             cd "$APP_PATH"
-            echo "=== BEFORE cache state ==="
-            php artisan tinker --no-interaction --execute='try { $k = app(App\Services\Marketing\BrandKitService::class)->get(); echo "OK: ".get_class($k).PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }' || true
+            echo "=== GIT ==="
+            git log --oneline -3
             echo ""
-            echo "=== CLEAR ==="
-            php artisan cache:clear
-            php artisan optimize:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
-            echo "done"
+            echo "=== BRIEF 1 EXISTS? ==="
+            php artisan tinker --no-interaction --execute='try { $b = App\Models\Marketing\CreativeBrief::find(1); echo $b ? ("brief 1: id=".$b->id." post_type=".$b->post_type) : "brief 1 does NOT exist"; } catch (Throwable $e) { echo "EXC: ".get_class($e).": ".$e->getMessage(); }'
             echo ""
-            echo "=== AFTER cache state ==="
-            php artisan tinker --no-interaction --execute='try { $k = app(App\Services\Marketing\BrandKitService::class)->get(); echo "OK: ".get_class($k)." id=".$k->id.PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
             echo ""
-            echo "=== LAST ERROR in log ==="
-            tail -5 storage/logs/laravel.log || echo "no log"
+            echo "=== LAST 60 log lines ==="
+            tail -60 storage/logs/laravel.log || echo "no log"
             echo "=== DONE ==="
