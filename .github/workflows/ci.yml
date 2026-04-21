@@ -44,6 +44,20 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
+      # Needed so feature tests that render Blade views with @vite(...)
+      # can find public/build/manifest.json (it is gitignored).
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.20.2'
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend (produces Vite manifest)
+        run: npm run build
+
       - name: Copy env
         run: cp .env.example .env
 
