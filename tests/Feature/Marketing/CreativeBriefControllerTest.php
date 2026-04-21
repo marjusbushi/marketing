@@ -117,6 +117,48 @@ class CreativeBriefControllerTest extends TestCase
         $this->assertSame('p1', $brief->state['pages'][0]['id']);
     }
 
+    public function test_state_round_trips_pivot_shape_with_canva_and_capcut(): void
+    {
+        // The editor hydrates itself from exactly this JSON blob on load,
+        // so we lock the shape here. Any schema change ships together
+        // with a test update — catching silent-drop bugs early.
+        $brief = CreativeBrief::query()->create(['post_type' => 'reel', 'source' => 'manual']);
+
+        $state = [
+            'canva' => [
+                'design_id'     => 'design-abc',
+                'asset_url'     => 'https://canva.example/asset.png',
+                'thumbnail_url' => 'https://canva.example/thumb.jpg',
+                'format'        => 'png',
+                'attached_at'   => '2026-04-21T10:00:00+00:00',
+            ],
+            'capcut' => [[
+                'kind'             => 'video',
+                'source'           => 'capcut',
+                'path'             => 'marketing/videos/1/foo.mp4',
+                'thumbnail_path'   => 'marketing/videos/1/thumbnails/foo.jpg',
+                'duration_seconds' => 15,
+                'width'            => 1080,
+                'height'           => 1920,
+                'mime_type'        => 'video/mp4',
+                'size_bytes'       => 2_345_678,
+                'media_id'         => null,
+                'uploaded_at'      => '2026-04-21T10:05:00+00:00',
+            ]],
+        ];
+
+        $this->putJson("/marketing/api/creative-briefs/{$brief->id}", ['state' => $state])
+            ->assertOk();
+
+        $this->getJson("/marketing/api/creative-briefs/{$brief->id}")
+            ->assertOk()
+            ->assertJsonPath('creative_brief.state.canva.design_id', 'design-abc')
+            ->assertJsonPath('creative_brief.state.canva.format', 'png')
+            ->assertJsonPath('creative_brief.state.capcut.0.kind', 'video')
+            ->assertJsonPath('creative_brief.state.capcut.0.source', 'capcut')
+            ->assertJsonPath('creative_brief.state.capcut.0.duration_seconds', 15);
+    }
+
     public function test_update_rejects_state_larger_than_5mb(): void
     {
         $brief = CreativeBrief::query()->create(['post_type' => 'reel', 'source' => 'manual']);
