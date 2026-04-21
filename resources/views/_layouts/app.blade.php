@@ -13,13 +13,41 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @yield('styles')
+
+    {{-- Studio chrome — override sidebar CSS variables so the shared
+         sidebar component renders dark when the Studio page is active,
+         without forking the markup. --}}
+    @if(request()->routeIs('marketing.studio.*'))
+        <style>
+            body { background: #09090b !important; color: #e4e4e7 !important; }
+            #sidebar {
+                --tw-bg-opacity: 1;
+                background: #18181b !important;
+                border-color: #27272a !important;
+            }
+            #sidebar, #sidebar * { color-scheme: dark; }
+            .bg-sidebar { background: #18181b !important; }
+            .bg-sidebar-active { background: rgba(139, 92, 246, 0.2) !important; }
+            .bg-sidebar-hover, .hover\:bg-sidebar-hover:hover { background: #27272a !important; }
+            .text-sidebar-text { color: #a1a1aa !important; }
+            .text-sidebar-text-active,
+            .hover\:text-sidebar-text-active:hover { color: #f4f4f5 !important; }
+            aside#sidebar a .text-slate-900 { color: #f4f4f5 !important; }
+        </style>
+    @endif
 </head>
-<body class="h-full bg-slate-50 font-sans text-slate-900 antialiased">
+    @php
+        // Studio is a creative tool (like Figma/Canva/CapCut) — dark chrome
+        // everywhere on that page so the white UI can't pull the eye away
+        // from the media being worked on.
+        $studioChrome = request()->routeIs('marketing.studio.*');
+    @endphp
+<body class="h-full font-sans antialiased {{ $studioChrome ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900' }}">
 
     {{-- Sidebar --}}
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-slate-200 overflow-y-auto flex flex-col transition-all duration-200 w-64" data-expanded="true">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 overflow-y-auto flex flex-col transition-all duration-200 w-64 {{ $studioChrome ? 'bg-zinc-900 border-r border-zinc-800' : 'bg-sidebar border-r border-slate-200' }}" data-expanded="true">
         {{-- Brand --}}
-        <div class="flex items-center gap-3 px-5 py-5 border-b border-slate-100 min-h-[68px]">
+        <div class="flex items-center gap-3 px-5 py-5 border-b min-h-[68px] {{ $studioChrome ? 'border-zinc-800' : 'border-slate-100' }}">
             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 via-rose-500 to-purple-600 flex items-center justify-center shrink-0">
                 <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" />
@@ -27,8 +55,8 @@
                 </svg>
             </div>
             <div class="sidebar-label overflow-hidden whitespace-nowrap">
-                <div class="text-sm font-bold text-slate-900 tracking-tight">Flare</div>
-                <div class="text-[10px] text-sidebar-text">by Zero Absolute</div>
+                <div class="text-sm font-bold tracking-tight {{ $studioChrome ? 'text-zinc-100' : 'text-slate-900' }}">Flare</div>
+                <div class="text-[10px] {{ $studioChrome ? 'text-zinc-500' : 'text-sidebar-text' }}">by Zero Absolute</div>
             </div>
         </div>
 
