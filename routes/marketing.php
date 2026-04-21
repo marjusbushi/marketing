@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\MarketingPermissionEnum as P;
+use App\Http\Controllers\Marketing\BrandKitController;
 use App\Http\Controllers\Marketing\ContentPlannerApiController;
 use App\Http\Controllers\Marketing\ContentPlannerController;
 use App\Http\Controllers\Marketing\DailyBasketController;
@@ -242,6 +243,24 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::delete('/api/posts/{post}/media/{mediaId}', [DailyBasketController::class, 'deletePostMedia'])
             ->name('api.posts.media.destroy');
     });
+
+    // ─── Visual Studio: Brand Kit ───────────────────
+    Route::prefix('settings/brand-kit')
+        ->as('settings.brand-kit.')
+        ->middleware('marketing.permission:' . P::CONTENT_PLANNER_MANAGE->value)
+        ->group(function () {
+            Route::get('/', [BrandKitController::class, 'index'])->name('index');
+        });
+
+    Route::prefix('api/brand-kit')
+        ->as('api.brand-kit.')
+        ->middleware('marketing.permission:' . P::CONTENT_PLANNER_MANAGE->value)
+        ->group(function () {
+            Route::get('/', [BrandKitController::class, 'show'])->name('show');
+            Route::put('/', [BrandKitController::class, 'update'])->name('update');
+            Route::post('/assets', [BrandKitController::class, 'uploadAsset'])->name('assets.store');
+            Route::delete('/assets/{asset}', [BrandKitController::class, 'deleteAsset'])->name('assets.destroy');
+        });
 
     // ─── CDN Image Proxy (bypasses hotlink protection) ──
     Route::get('/cdn-image', function (\Illuminate\Http\Request $request) {

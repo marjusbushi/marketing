@@ -116,7 +116,7 @@ return [
 
         // DIS database connection — shared identity store (users, sessions, ACL)
         'dis' => [
-            'driver' => 'mysql',
+            'driver' => env('DIS_DB_CONNECTION', 'mysql'),
             'host' => env('DIS_DB_HOST', env('DB_HOST', '127.0.0.1')),
             'port' => env('DIS_DB_PORT', env('DB_PORT', '3306')),
             'database' => env('DIS_DB_DATABASE', 'za_dis'),
@@ -129,6 +129,7 @@ return [
             'prefix_indexes' => true,
             'strict' => false,
             'engine' => 'InnoDB',
+            'foreign_key_constraints' => env('DIS_DB_FOREIGN_KEYS', true),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],

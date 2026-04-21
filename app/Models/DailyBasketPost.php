@@ -6,6 +6,7 @@ use App\Enums\DailyBasketPostStage;
 use App\Enums\DailyBasketPostType;
 use App\Models\Content\ContentPost;
 use App\Models\Dis\DisItemGroup;
+use App\Models\Marketing\CreativeBrief;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -41,6 +42,7 @@ class DailyBasketPost extends Model
         'target_platforms',
         'scheduled_for',
         'content_post_id',
+        'creative_brief_id',
         'assigned_to',
         'priority',
         'sort_order',
@@ -85,6 +87,11 @@ class DailyBasketPost extends Model
     public function contentPost(): BelongsTo
     {
         return $this->belongsTo(ContentPost::class, 'content_post_id');
+    }
+
+    public function creativeBrief(): BelongsTo
+    {
+        return $this->belongsTo(CreativeBrief::class, 'creative_brief_id');
     }
 
     public function media(): HasMany
