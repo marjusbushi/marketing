@@ -262,6 +262,24 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             Route::delete('/assets/{asset}', [BrandKitController::class, 'deleteAsset'])->name('assets.destroy');
         });
 
+    // ─── Visual Studio: Templates ───────────────────
+    Route::prefix('api/templates')
+        ->as('api.templates.')
+        ->group(function () {
+            // Read — any marketing user with content planner view.
+            Route::middleware('marketing.permission:' . P::CONTENT_PLANNER_VIEW->value)->group(function () {
+                Route::get('/', [\App\Http\Controllers\Marketing\TemplateController::class, 'index'])->name('index');
+                Route::get('/{slug}', [\App\Http\Controllers\Marketing\TemplateController::class, 'show'])->name('show');
+            });
+
+            // Write — Manager+ only.
+            Route::middleware('marketing.permission:' . P::CONTENT_PLANNER_MANAGE->value)->group(function () {
+                Route::post('/', [\App\Http\Controllers\Marketing\TemplateController::class, 'store'])->name('store');
+                Route::put('/{template}', [\App\Http\Controllers\Marketing\TemplateController::class, 'update'])->name('update');
+                Route::delete('/{template}', [\App\Http\Controllers\Marketing\TemplateController::class, 'destroy'])->name('destroy');
+            });
+        });
+
     // ─── CDN Image Proxy (bypasses hotlink protection) ──
     Route::get('/cdn-image', function (\Illuminate\Http\Request $request) {
         $url = $request->query('url');
