@@ -262,6 +262,15 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             Route::delete('/assets/{asset}', [BrandKitController::class, 'deleteAsset'])->name('assets.destroy');
         });
 
+    // ─── Visual Studio: Studio page (React SPA shell) ─
+    Route::prefix('studio')
+        ->as('studio.')
+        ->middleware('marketing.permission:' . P::CONTENT_PLANNER_VIEW->value)
+        ->group(function () {
+            Route::get('/', [\App\Http\Controllers\Marketing\StudioController::class, 'index'])->name('index');
+            Route::get('/{creativeBrief}', [\App\Http\Controllers\Marketing\StudioController::class, 'index'])->name('show');
+        });
+
     // ─── Visual Studio: AI endpoints ────────────────
     Route::prefix('api/ai')
         ->as('api.ai.')
