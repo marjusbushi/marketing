@@ -544,19 +544,32 @@
     }
     .db-plan-pop-empty { padding: 16px; text-align: center; color: var(--db-text-3); font-size: 11px; }
 
-    /* Inline media thumb — 4:5 (fashion/IG portrait) · contain = shfaq
-       foton e plote pa prere, sfond neutral ne hapesiren e mbetur. */
+    /* Inline media thumb — aspekti ndryshon sipas post_type, per t'i
+       treguar user-it formatin e materialit qe do postohet:
+         photo/video/carousel → 4:5 (IG portrait standard)
+         reel/story           → 9:16 (vertikale)
+       Sfondi eshte neutral, object-fit: contain qe foto shihet e plote.*/
     .db-plan-media {
-        position: relative; width: 100%; aspect-ratio: 4/5;
+        position: relative; width: 100%;
         border: 1.5px dashed var(--db-border-strong);
         border-radius: 6px; background: #f4f4f5;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; overflow: hidden;
     }
+    .db-plan-media.aspect-45 { aspect-ratio: 4/5; }
+    .db-plan-media.aspect-916 { aspect-ratio: 9/16; margin: 0 auto; max-width: 70%; }
+    .db-plan-media.aspect-11 { aspect-ratio: 1/1; }
     .db-plan-media:hover { border-color: var(--db-text); background: var(--db-accent-soft); }
     .db-plan-media.has-media { border-style: solid; cursor: default; background: #f4f4f5; }
     .db-plan-media.is-dragover { border-color: var(--db-text); background: #eef2ff; }
     .db-plan-media img, .db-plan-media video { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+    /* Small hint under the media showing the target aspect */
+    .db-plan-media-hint {
+        font-size: 9px; color: var(--db-text-3);
+        text-align: center; margin-top: 3px;
+        text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;
+    }
     .db-plan-media-empty { font-size: 10px; color: var(--db-text-3); text-align: center; padding: 4px 6px; }
     .db-plan-media-empty strong { font-size: 18px; display: block; color: var(--db-text-3); margin-bottom: 2px; }
     .db-plan-media-del {
@@ -1969,12 +1982,31 @@
         }, 0);
     }
 
-    // Compact media block inside a plan cell — 4:3 thumbnail. Uploading
-    // appends to post.media (replacing for non-carousel types is handled
-    // server-side, same as the detail panel).
+    // Aspect ratio + hint shown under the media — matches the platform
+    // format each post_type targets.
+    function mediaAspectFor(postType) {
+        switch (postType) {
+            case 'reel':
+            case 'story':
+                return { cls: 'aspect-916', hint: '9:16 · vertikale' };
+            case 'carousel':
+                return { cls: 'aspect-45', hint: '4:5 · carousel (disa foto)' };
+            case 'video':
+                return { cls: 'aspect-45', hint: '4:5 · video' };
+            case 'photo':
+            default:
+                return { cls: 'aspect-45', hint: '4:5 · foto' };
+        }
+    }
+
+    // Compact media block inside a plan cell. Aspect ratio follows the
+    // post_type so the user sees the publishing format before uploading.
     function buildPlanMediaBlock(post) {
+        const container = document.createElement('div');
+
         const wrap = document.createElement('div');
-        wrap.className = 'db-plan-media';
+        const aspect = mediaAspectFor(post.post_type);
+        wrap.className = 'db-plan-media ' + aspect.cls;
 
         const media = Array.isArray(post.media) ? post.media : [];
         const first = media[0];
@@ -2015,41 +2047,45 @@
                 } catch (err) { showError('Fshirja deshtoi: ' + err.message); }
             });
             wrap.appendChild(del);
-            return wrap;
+        } else {
+            // Empty state — click/drop uploads.
+            const ph = document.createElement('div');
+            ph.className = 'db-plan-media-empty';
+            const icon = document.createElement('strong');
+            icon.textContent = '⬆';
+            ph.appendChild(icon);
+            const tx = document.createElement('div');
+            tx.textContent = 'Kliko ose terhiq material';
+            ph.appendChild(tx);
+            wrap.appendChild(ph);
+
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = acceptFor(post.post_type);
+            input.style.display = 'none';
+            wrap.appendChild(input);
+
+            wrap.addEventListener('click', () => input.click());
+            wrap.addEventListener('dragover', (e) => { e.preventDefault(); wrap.classList.add('is-dragover'); });
+            wrap.addEventListener('dragleave', () => wrap.classList.remove('is-dragover'));
+            wrap.addEventListener('drop', (e) => {
+                e.preventDefault();
+                wrap.classList.remove('is-dragover');
+                if (e.dataTransfer?.files?.length) {
+                    uploadToPlanCell(post, e.dataTransfer.files[0]);
+                }
+            });
+            input.addEventListener('change', () => {
+                if (input.files?.length) uploadToPlanCell(post, input.files[0]);
+            });
         }
 
-        // Empty state — click/drop uploads.
-        const ph = document.createElement('div');
-        ph.className = 'db-plan-media-empty';
-        const icon = document.createElement('strong');
-        icon.textContent = '⬆';
-        ph.appendChild(icon);
-        const tx = document.createElement('div');
-        tx.textContent = 'Kliko ose terhiq material';
-        ph.appendChild(tx);
-        wrap.appendChild(ph);
-
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = acceptFor(post.post_type);
-        input.style.display = 'none';
-        wrap.appendChild(input);
-
-        wrap.addEventListener('click', () => input.click());
-        wrap.addEventListener('dragover', (e) => { e.preventDefault(); wrap.classList.add('is-dragover'); });
-        wrap.addEventListener('dragleave', () => wrap.classList.remove('is-dragover'));
-        wrap.addEventListener('drop', (e) => {
-            e.preventDefault();
-            wrap.classList.remove('is-dragover');
-            if (e.dataTransfer?.files?.length) {
-                uploadToPlanCell(post, e.dataTransfer.files[0]);
-            }
-        });
-        input.addEventListener('change', () => {
-            if (input.files?.length) uploadToPlanCell(post, input.files[0]);
-        });
-
-        return wrap;
+        container.appendChild(wrap);
+        const hint = document.createElement('div');
+        hint.className = 'db-plan-media-hint';
+        hint.textContent = aspect.hint;
+        container.appendChild(hint);
+        return container;
     }
 
     async function uploadToPlanCell(post, file) {
