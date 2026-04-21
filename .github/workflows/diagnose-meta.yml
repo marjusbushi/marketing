@@ -1,0 +1,51 @@
+name: Diagnose Meta Credentials
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnose-meta.yml'
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect meta_tokens + hrms_meta_credentials via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          script: |
+            set -e
+            cd "$APP_PATH"
+
+            echo "=== META_* env presence (masked) ==="
+            grep -E '^(META|HRMS)_' .env | sed 's|=.*|=***set|' || echo "NO META/HRMS env vars"
+
+            echo ""
+            echo "=== Before resolver: raw config ==="
+            php artisan config:clear
+            php artisan tinker --no-interaction --execute='echo "page_token=".(config("meta.page_token") ? "SET" : "EMPTY").PHP_EOL; echo "page_id=".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id=".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL; echo "hrms_credentials_key=".(config("meta.hrms_credentials_key") ? "SET" : "EMPTY").PHP_EOL;'
+
+            echo ""
+            echo "=== DIS connection + tables ==="
+            php artisan tinker --no-interaction --execute='try { $hasMetaTokens = DB::connection("dis")->getSchemaBuilder()->hasTable("meta_tokens"); $hasHrms = DB::connection("dis")->getSchemaBuilder()->hasTable("hrms_meta_credentials"); echo "dis.meta_tokens=".($hasMetaTokens ? "YES" : "NO").PHP_EOL; echo "dis.hrms_meta_credentials=".($hasHrms ? "YES" : "NO").PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== meta_tokens rows (DIS) ==="
+            php artisan tinker --no-interaction --execute='try { $rows = DB::connection("dis")->table("meta_tokens")->select("id","token_type","page_id","ig_account_id","is_active","expires_at","created_at")->orderByDesc("id")->limit(5)->get(); foreach ($rows as $r) { echo sprintf("id=%d type=%s page_id=%s ig=%s active=%s exp=%s", $r->id, $r->token_type ?? "-", $r->page_id ?? "-", $r->ig_account_id ?? "-", $r->is_active ? "y" : "n", $r->expires_at ?? "never").PHP_EOL; } if (count($rows) === 0) echo "EMPTY".PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== hrms_meta_credentials rows (DIS) ==="
+            php artisan tinker --no-interaction --execute='try { $rows = DB::connection("dis")->table("hrms_meta_credentials")->select("id","page_id","instagram_id","is_active","token_expires_at","created_at")->orderByDesc("id")->limit(5)->get(); foreach ($rows as $r) { echo sprintf("id=%d page_id=%s ig=%s active=%s exp=%s", $r->id, $r->page_id ?? "-", $r->instagram_id ?? "-", $r->is_active ? "y" : "n", $r->token_expires_at ?? "never").PHP_EOL; } if (count($rows) === 0) echo "EMPTY".PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== Resolver output (what the sync layer actually sees) ==="
+            php artisan tinker --no-interaction --execute='App\Services\Meta\MetaTokenResolver::forgetCache(); App\Services\Meta\MetaTokenResolver::hydrateConfig(); echo "page_token=".(config("meta.page_token") ? "RESOLVED (len ".strlen((string) config("meta.page_token")).")" : "EMPTY").PHP_EOL; echo "page_id=".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id=".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL;'
+
+            echo "=== DONE ==="
