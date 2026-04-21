@@ -109,6 +109,50 @@
     .db-btn-primary:hover:not(:disabled) { background: #27272a; color: #fff; }
     .db-btn-group { display: flex; gap: 4px; }
 
+    /* Toast notifications — floating at the top of the viewport so the
+       user doesn't need to scroll up to see feedback after clicking a
+       stage-transition button inside the detail panel. */
+    .db-toast-host {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+        max-width: 90vw;
+    }
+    .db-toast {
+        pointer-events: auto;
+        padding: 10px 16px;
+        border-radius: 7px;
+        font-size: 13px;
+        font-weight: 500;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        animation: dbToastIn 0.2s ease-out;
+    }
+    .db-toast.err {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+    }
+    .db-toast.ok {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+    }
+    .db-toast.info {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+    }
+    @keyframes dbToastIn {
+        from { opacity: 0; transform: translateY(-8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Kept for backward compat with any inline usage; shares the toast look. */
     .db-error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 14px; border-radius: 7px; font-size: 12px; margin: 12px 0; }
 
     /* Modal */
@@ -1015,15 +1059,38 @@
         return data;
     }
 
-    function showError(msg) {
-        const host = document.getElementById('dbErrors');
-        const div = document.createElement('div');
-        div.className = 'db-error';
-        div.textContent = msg; // textContent — no HTML injection
-        host.innerHTML = '';
-        host.appendChild(div);
-        setTimeout(() => { if (div.parentNode) div.remove(); }, 6000);
+    // Toast host is lazily mounted once at first use so the viewport-fixed
+    // position doesn't care where the original dbErrors anchor sits in
+    // the DOM. All message helpers funnel through `showToast`.
+    function dbToastHost() {
+        let host = document.getElementById('dbToastHost');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'dbToastHost';
+            host.className = 'db-toast-host';
+            document.body.appendChild(host);
+        }
+        return host;
     }
+
+    function showToast(kind, msg, ttlMs) {
+        const host = dbToastHost();
+        const div = document.createElement('div');
+        div.className = 'db-toast ' + (kind === 'ok' || kind === 'info' ? kind : 'err');
+        div.textContent = msg;
+        host.appendChild(div);
+        const lifetime = typeof ttlMs === 'number' ? ttlMs : (kind === 'ok' ? 3500 : 6000);
+        setTimeout(() => {
+            if (!div.parentNode) return;
+            div.style.transition = 'opacity 180ms';
+            div.style.opacity = '0';
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 200);
+        }, lifetime);
+    }
+
+    function showError(msg)   { showToast('err',  msg); }
+    function showSuccess(msg) { showToast('ok',   msg); }
+    function showInfo(msg)    { showToast('info', msg); }
 
     function getWeekIdFromUrl() {
         const params = new URLSearchParams(location.search);
@@ -2976,6 +3043,8 @@
             state.selectedPostId = post.id;
             const refreshed = findPostById(post.id);
             if (refreshed) selectPost(post.id);
+            const label = STAGE_LABELS[targetStage] || targetStage;
+            showSuccess('U zhvendos te ' + label);
         } catch (e) {
             showError(e.message);
         }
