@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Marketing;
 use App\Http\Controllers\Controller;
 use App\Models\DailyBasketPost;
 use App\Models\DailyBasketPostMedia;
+use App\Models\Dis\DisItemGroup;
 use App\Models\Marketing\CreativeBrief;
 use App\Models\Marketing\Template;
 use App\Services\Marketing\CreativeBriefService;
@@ -59,7 +60,13 @@ class CreativeBriefController extends Controller
 
     public function show(CreativeBrief $creativeBrief): JsonResponse
     {
-        $creativeBrief->load(['template', 'dailyBasketPost.itemGroups']);
+        // Deliberately NOT eager-loading `dailyBasketPost.itemGroups` —
+        // that relation joins across the `dis` connection (DisItemGroup)
+        // through a pivot table on the marketing connection, which
+        // Laravel can only do when both live on the same DB in prod
+        // (and blows up with "table not found" otherwise). We resolve
+        // the primary item group manually in serialize() instead.
+        $creativeBrief->load(['template', 'dailyBasketPost']);
 
         return response()->json([
             'creative_brief' => $this->serialize(
@@ -275,6 +282,38 @@ class CreativeBriefController extends Controller
         ], 201);
     }
 
+    /**
+     * Look up the primary (sort_order=0) item_group_id for a basket post
+     * without crossing DB connections in a single query. Returns
+     * `[null, null]` on any failure so the editor falls back gracefully.
+     *
+     * @return array{0: ?int, 1: ?string}
+     */
+    private function primaryItemGroupFor(?int $postId): array
+    {
+        if ($postId === null) {
+            return [null, null];
+        }
+
+        try {
+            $groupId = DB::table('daily_basket_post_products')
+                ->where('daily_basket_post_id', $postId)
+                ->orderBy('sort_order')
+                ->value('item_group_id');
+
+            if ($groupId === null) {
+                return [null, null];
+            }
+
+            $group = DisItemGroup::query()->find($groupId);
+
+            return [(int) $groupId, $group?->name ?? null];
+        } catch (\Throwable $e) {
+            report($e);
+            return [null, null];
+        }
+    }
+
     private function serialize(CreativeBrief $brief, bool $includeState = false, bool $includeProduct = false): array
     {
         $data = [
@@ -303,12 +342,17 @@ class CreativeBriefController extends Controller
         }
 
         if ($includeProduct) {
-            // AI caption endpoints need a product context. Expose the
-            // first item group from the linked daily-basket post so the
-            // editor's "Generate" button works out of the box.
-            $firstGroup = $brief->dailyBasketPost?->itemGroups?->first();
-            $data['primary_item_group_id'] = $firstGroup?->id;
-            $data['primary_item_group_name'] = $firstGroup?->name ?? null;
+            // AI caption endpoints need a product context. We avoid the
+            // `belongsToMany` itemGroups relation here because it joins
+            // across DBs (pivot on marketing, target on dis) — not every
+            // environment can satisfy that. Instead: pull the first
+            // pivot row from the marketing DB, then look up the item
+            // group on the dis connection by id. Both failures
+            // (no post, no products, dis unreachable) degrade silently
+            // to null — the editor handles that case.
+            [$groupId, $groupName] = $this->primaryItemGroupFor($brief->daily_basket_post_id);
+            $data['primary_item_group_id'] = $groupId;
+            $data['primary_item_group_name'] = $groupName;
         }
 
         return $data;
