@@ -122,6 +122,89 @@ class AIContentService
     }
 
     /**
+     * "Craft for publishing" — the dedicated agent that turns a creator's
+     * rough Albanian draft into a publish-ready Instagram/Facebook caption.
+     *
+     * Different from `cleanCaption`: that one is a literal copy editor,
+     * this one is a social-media copywriter. It fixes grammar AND:
+     *   • Adds 2–4 emojis that genuinely match the content (fashion,
+     *     brand, mood).
+     *   • Structures the text: opening hook → body → soft CTA.
+     *   • Appends 3–5 lowercase hashtags on a new line.
+     *   • Uses the brand's Albanian voice (voice_sq) for tone.
+     *
+     * Cached for 30 days like cleanCaption; typical cost per fresh call
+     * is ≈ $0.003 on Sonnet 4.6. Failures fall back to the raw input so
+     * the user sees no regression.
+     */
+    public function craftCaption(string $text, ?int $userId = null): string
+    {
+        $normalised = trim($text);
+        if ($normalised === '') {
+            return '';
+        }
+
+        $cacheKey = 'marketing:ai:craft:'.hash('sha256', $normalised);
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $brandKit = $this->brandKitService->get();
+        $voice = trim((string) ($brandKit->voice_sq ?? ''));
+        $defaultTags = is_array($brandKit->default_hashtags ?? null)
+            ? implode(' ', $brandKit->default_hashtags)
+            : '';
+
+        $system = <<<PROMPT
+        You are a senior social media copywriter for Zero Absolute — an
+        Albanian fashion brand with a modern, confident, direct voice.
+
+        Your job: take the creator's rough Albanian draft and return a
+        publish-ready caption for Instagram / Facebook / TikTok posts.
+
+        Rules:
+        1. Fix every spelling, diacritic (ë, ç), and punctuation error.
+        2. Write in fluent, natural Albanian — no literal translations.
+        3. Add 2–4 emojis that genuinely fit the content
+           (fashion 👚👖👗, vibes ✨💫🔥, eco 🌿, energy 💪). No random
+           emoji spam.
+        4. Structure:
+           line 1: short hook or attention grabber
+           line 2–3: key product/price/feature details
+           last line before hashtags: soft call-to-action (e.g.
+           "Gjeje te shporta ditore" / "Merre tani" / "Porosite online")
+        5. Append 3–5 lowercase hashtags on a NEW line at the very end,
+           each prefixed with #. Prefer brand hashtags when relevant.
+        6. Length: 2–4 sentences total (excluding hashtags).
+        7. Preserve product names, prices, and factual claims exactly.
+           Do NOT invent facts, colours, materials, or discounts.
+
+        Brand voice (sq): {$voice}
+        Default brand hashtags (hint — pick a subset that fits): {$defaultTags}
+
+        Return ONLY the final caption text (with hashtags on the last
+        line). No quotes, no labels, no commentary, no markdown.
+        PROMPT;
+
+        $payload = $this->call(
+            endpoint: 'craft-caption',
+            systemPrompt: $system,
+            userPrompt: $normalised,
+            userId: $userId,
+        );
+
+        $crafted = trim($payload['text'] ?? '');
+
+        if ($crafted !== '') {
+            Cache::put($cacheKey, $crafted, now()->addDays(30));
+            return $crafted;
+        }
+
+        return $normalised;
+    }
+
+    /**
      * Polish a creator-written caption and emit platform-specific variants.
      *
      * The creator (non-native writer) types a rough caption; Claude fixes

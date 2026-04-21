@@ -3378,7 +3378,8 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'db-caption-ai-btn';
-        btn.textContent = '✦ Rregullo me AI';
+        btn.textContent = '✨ Përgatit për publikim';
+        btn.title = 'AI rregullon gramatikën, shton emoji + strukturë + hashtags';
 
         const status = document.createElement('span');
         status.className = 'db-caption-ai-status';
@@ -3392,16 +3393,16 @@
             }
             btn.disabled = true;
             status.classList.remove('err');
-            status.textContent = 'Po rregullon…';
+            status.textContent = 'Po përgatit…';
             try {
                 const data = await apiPost('/marketing/api/ai/polish-caption', {
                     text: raw,
-                    mode: 'clean',
+                    mode: 'craft',
                 });
-                const cleaned = (data && data.cleaned_sq) ? data.cleaned_sq : raw;
-                ta.value = cleaned;
-                await savePostField(post, { caption: cleaned });
-                status.textContent = '✓ U rregullua';
+                const crafted = (data && data.cleaned_sq) ? data.cleaned_sq : raw;
+                ta.value = crafted;
+                await savePostField(post, { caption: crafted });
+                status.textContent = '✓ Gati për publikim';
             } catch (e) {
                 status.classList.add('err');
                 status.textContent = 'AI dështoi: ' + (e.message || '');

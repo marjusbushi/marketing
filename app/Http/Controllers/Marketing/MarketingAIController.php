@@ -57,23 +57,25 @@ class MarketingAIController extends Controller
     }
 
     /**
-     * Polish a creator-written Albanian caption. Two modes:
-     *   • `mode=clean` (default) — fix grammar/diacritics only. Cheap;
-     *     returns {cleaned_sq}. Used by the inline AI button next to the
-     *     Caption textarea in the daily-basket post detail panel.
+     * Polish a creator-written Albanian caption. Three modes:
+     *   • `mode=clean`        — fix grammar/diacritics only. Cheap, literal.
+     *   • `mode=craft`        — publish-ready: adds emojis, structure, CTA,
+     *                           and hashtags. Used by the inline AI button
+     *                           next to the Caption textarea.
      *   • `mode=per_platform` — also emit IG/FB/TikTok variants. Heavier.
-     *     Reserved for flows that need ready-to-paste per-platform text.
+     *                           Reserved for flows that need ready-to-paste
+     *                           per-platform text.
      */
     public function polishCaption(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'text'        => ['required', 'string', 'max:5000'],
-            'mode'        => ['sometimes', 'in:clean,per_platform'],
+            'mode'        => ['sometimes', 'in:clean,craft,per_platform'],
             'platforms'   => ['sometimes', 'array', 'max:3'],
             'platforms.*' => ['string', 'in:instagram,facebook,tiktok'],
         ]);
 
-        $mode = $validated['mode'] ?? 'clean';
+        $mode = $validated['mode'] ?? 'craft';
 
         if ($mode === 'clean') {
             $cleaned = $this->ai->cleanCaption(
@@ -82,6 +84,17 @@ class MarketingAIController extends Controller
             );
             return response()->json([
                 'cleaned_sq'   => $cleaned,
+                'per_platform' => null,
+            ]);
+        }
+
+        if ($mode === 'craft') {
+            $crafted = $this->ai->craftCaption(
+                text:   $validated['text'],
+                userId: $request->user()?->id,
+            );
+            return response()->json([
+                'cleaned_sq'   => $crafted,
                 'per_platform' => null,
             ]);
         }
