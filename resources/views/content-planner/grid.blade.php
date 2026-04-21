@@ -54,7 +54,9 @@
     .pd-close:hover { background: #fff; color: #dc2626; }
 
     /* LEFT: media */
-    .pd-media { background: #0a0a0a; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    /* min-height:0 + max-height:inherit let the grid item cap at the modal's
+       own max-height so the row cannot exceed the viewport constraint. */
+    .pd-media { background: #0a0a0a; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 0; max-height: inherit; }
     .pd-media-inner { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
     .pd-media-inner img, .pd-media-inner video { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
     .pd-type-chip { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,0.55); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; display: flex; align-items: center; gap: 5px; z-index: 5; }
@@ -66,8 +68,12 @@
     .pd-dot.active { background: #fff; }
 
     /* RIGHT: detail */
-    .pd-detail { display: flex; flex-direction: column; overflow: hidden; }
-    .pd-scroll { overflow-y: auto; flex: 1; padding: 22px 22px 16px; }
+    /* Detail column caps at the modal's max-height so the flex column can
+       hand a definite height to .pd-scroll; without this the scroll region
+       grows to natural content height and the footer is clipped by the
+       modal's own overflow:hidden when captions are long. */
+    .pd-detail { display: flex; flex-direction: column; overflow: hidden; min-height: 0; max-height: inherit; }
+    .pd-scroll { overflow-y: auto; flex: 1; min-height: 0; padding: 22px 22px 16px; }
     .pd-scroll::-webkit-scrollbar { width: 6px; }
     .pd-scroll::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 99px; }
 
