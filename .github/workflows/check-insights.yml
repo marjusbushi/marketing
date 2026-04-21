@@ -1,0 +1,34 @@
+name: Check Insights Count
+
+on:
+  push:
+    paths:
+      - '.github/workflows/check-insights.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quick DB probe — no sync trigger
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          script: |
+            set -e
+            cd "$APP_PATH"
+            php artisan cache:clear
+            php artisan config:cache
+
+            echo "=== insights count ==="
+            php artisan tinker --no-interaction --execute='echo "total=".DB::connection("dis")->table("meta_post_insights")->count().PHP_EOL; foreach (DB::connection("dis")->table("meta_post_insights")->selectRaw("source, COUNT(*) c")->groupBy("source")->get() as $r) echo $r->source."=".$r->c.PHP_EOL;'
+
+            echo ""
+            echo "=== last error in laravel.log ==="
+            tail -80 storage/logs/laravel.log 2>/dev/null | grep -iE "meta|sync|insight" | tail -5 || echo "no recent"
