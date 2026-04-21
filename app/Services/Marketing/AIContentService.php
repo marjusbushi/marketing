@@ -57,6 +57,90 @@ class AIContentService
     }
 
     /**
+     * Polish a creator-written caption and emit platform-specific variants.
+     *
+     * The creator (non-native writer) types a rough caption; Claude fixes
+     * spelling, punctuation, and diacritics, then re-formats the text per
+     * platform convention:
+     *   • Instagram: short, emoji-forward, hashtags inline or at end
+     *   • Facebook: longer, fuller sentences, no hashtag pressure
+     *   • TikTok: punchy hook, 1–2 trend-aware hashtags
+     *
+     * Output is returned as a strict JSON envelope so the client can show
+     * one textarea per platform without further parsing.
+     *
+     * @param array<int,string> $platforms
+     * @return array{
+     *     cleaned_sq: string,
+     *     per_platform: array<string,string>,
+     * }
+     */
+    public function polishCaption(
+        string $text,
+        array $platforms = ['instagram', 'facebook', 'tiktok'],
+        ?int $userId = null,
+    ): array {
+        $brandKit = $this->brandKitService->get();
+        $voice = trim((string) ($brandKit->voice_sq ?? ''));
+
+        $allowed = ['instagram', 'facebook', 'tiktok'];
+        $platforms = array_values(array_intersect($allowed, array_map('strtolower', $platforms)));
+        if ($platforms === []) {
+            $platforms = $allowed;
+        }
+        $platformList = implode(', ', $platforms);
+
+        $system = <<<PROMPT
+        You are a senior social-media copy editor for Zero Absolute, writing in Albanian (sq).
+        The input is a rough caption written by a non-native or hasty writer. Your job:
+          1. Correct every spelling mistake, diacritic, and punctuation error.
+          2. Use natural, fluent Albanian — avoid literal translations and English intrusions.
+          3. Preserve the author's intent and product references. Do NOT invent facts.
+          4. Re-format the final text per target platform convention.
+
+        Platform conventions:
+          • instagram: 1–2 short sentences, 1–3 emojis allowed, 3–6 lowercase hashtags at the end on a new line
+          • facebook : 2–4 sentences, warmer tone, 0 emojis, 0 hashtags unless brand-significant
+          • tiktok   : 1 punchy hook sentence, 1–2 emojis, 1–2 trending hashtags at end
+
+        Brand voice (sq): {$voice}
+
+        Output rules:
+          • Return STRICT JSON: {"cleaned_sq": string, "per_platform": {"<platform>": string, ...}}
+          • Only include the platforms requested.
+          • No markdown, no commentary, no surrounding prose.
+        PROMPT;
+
+        $user = "Requested platforms: {$platformList}\n\nROUGH CAPTION:\n{$text}";
+
+        $payload = $this->call(
+            endpoint: 'polish-caption',
+            systemPrompt: $system,
+            userPrompt: $user,
+            userId: $userId,
+        );
+
+        $decoded = json_decode((string) ($payload['text'] ?? ''), true);
+        if (! is_array($decoded)) {
+            return [
+                'cleaned_sq'   => trim($text),
+                'per_platform' => array_fill_keys($platforms, trim($text)),
+            ];
+        }
+
+        $perPlatform = [];
+        foreach ($platforms as $p) {
+            $val = $decoded['per_platform'][$p] ?? null;
+            $perPlatform[$p] = is_string($val) ? trim($val) : trim($text);
+        }
+
+        return [
+            'cleaned_sq'   => is_string($decoded['cleaned_sq'] ?? null) ? trim($decoded['cleaned_sq']) : trim($text),
+            'per_platform' => $perPlatform,
+        ];
+    }
+
+    /**
      * Rewrite a piece of text in the requested tone and language.
      */
     public function rewriteText(

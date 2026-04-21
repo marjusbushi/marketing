@@ -55,4 +55,26 @@ class MarketingAIController extends Controller
 
         return response()->json(['text' => $rewritten]);
     }
+
+    /**
+     * Polish a creator-written Albanian caption and return platform-formatted
+     * variants (Instagram / Facebook / TikTok). Called from the daily-basket
+     * Quick Edit modal when the user clicks "✦ Lusto me AI".
+     */
+    public function polishCaption(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'text'        => ['required', 'string', 'max:5000'],
+            'platforms'   => ['sometimes', 'array', 'max:3'],
+            'platforms.*' => ['string', 'in:instagram,facebook,tiktok'],
+        ]);
+
+        $result = $this->ai->polishCaption(
+            text:      $validated['text'],
+            platforms: $validated['platforms'] ?? ['instagram', 'facebook', 'tiktok'],
+            userId:    $request->user()?->id,
+        );
+
+        return response()->json($result);
+    }
 }

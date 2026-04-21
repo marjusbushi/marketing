@@ -283,6 +283,7 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         ->group(function () {
             Route::post('caption', [\App\Http\Controllers\Marketing\MarketingAIController::class, 'caption'])->name('caption');
             Route::post('rewrite', [\App\Http\Controllers\Marketing\MarketingAIController::class, 'rewrite'])->name('rewrite');
+            Route::post('polish-caption', [\App\Http\Controllers\Marketing\MarketingAIController::class, 'polishCaption'])->name('polish-caption');
         });
 
     // ─── Visual Studio: Creative Briefs ─────────────
