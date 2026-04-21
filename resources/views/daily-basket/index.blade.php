@@ -1762,17 +1762,21 @@
     }
 
     // Product detail preview popover — opens when clicking a chip (not its ×).
+    // Fashion shots are portrait 3:4 / 2:3; object-fit:contain keeps the
+    // whole frame visible. The popover auto-flips above the chip when it
+    // would overflow the bottom of the viewport so the user doesn't have
+    // to scroll to see the full photo.
     function openProductPreview(itemGroupId, anchorEl) {
         document.querySelectorAll('.db-plan-pop').forEach(p => p.remove());
         const full = (state.availableProducts || []).find(p => num(p.id) === num(itemGroupId));
 
         const pop = document.createElement('div');
         pop.className = 'db-plan-pop';
-        pop.style.width = '260px';
+        pop.style.width = '320px';
+        pop.style.maxHeight = '80vh';
+        pop.style.overflowY = 'auto';
         pop.style.padding = '12px';
-        const rect = anchorEl.getBoundingClientRect();
-        pop.style.top = (window.scrollY + rect.bottom + 6) + 'px';
-        pop.style.left = (window.scrollX + rect.left) + 'px';
+        pop.style.boxShadow = '0 20px 50px rgba(0,0,0,0.22)';
 
         if (!full) {
             const msg = document.createElement('div');
@@ -1783,7 +1787,10 @@
             if (full.image_url) {
                 const img = document.createElement('img');
                 img.src = full.image_url;
-                img.style.cssText = 'width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:6px; background:#f4f4f5; display:block;';
+                // max-height tied to viewport so the full photo + name + meta
+                // stays inside 80vh; contain preserves the actual fashion
+                // framing (no model heads/feet cut off).
+                img.style.cssText = 'width:100%; max-height:60vh; object-fit:contain; border-radius:6px; background:#f4f4f5; display:block;';
                 img.onerror = () => { img.style.display = 'none'; };
                 pop.appendChild(img);
             }
@@ -1802,7 +1809,33 @@
             pop.appendChild(meta);
         }
 
+        // Append first so we can measure the real popover size, then
+        // compute placement that stays on-screen.
         document.body.appendChild(pop);
+
+        const rect = anchorEl.getBoundingClientRect();
+        const popRect = pop.getBoundingClientRect();
+        const margin = 8;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        // Vertical: prefer below, flip above if it would overflow bottom.
+        let top = rect.bottom + 6;
+        if (top + popRect.height > vh - margin) {
+            const aboveTop = rect.top - popRect.height - 6;
+            top = aboveTop >= margin ? aboveTop : Math.max(margin, vh - popRect.height - margin);
+        }
+
+        // Horizontal: start aligned to chip left, clamp so it stays in view.
+        let left = rect.left;
+        if (left + popRect.width > vw - margin) {
+            left = Math.max(margin, vw - popRect.width - margin);
+        }
+        if (left < margin) left = margin;
+
+        pop.style.top = (top + window.scrollY) + 'px';
+        pop.style.left = (left + window.scrollX) + 'px';
+
         wirePopoverDismiss(pop, anchorEl);
     }
 
