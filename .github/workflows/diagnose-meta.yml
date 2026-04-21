@@ -52,4 +52,17 @@ jobs:
             echo "=== Search DIS for meta/facebook/instagram tables ==="
             php artisan tinker --no-interaction --execute='try { $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%meta%\""); foreach ($rows as $r) { echo "meta: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%facebook%\""); foreach ($rows as $r) { echo "facebook: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%instagram%\""); foreach ($rows as $r) { echo "instagram: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%token%\""); foreach ($rows as $r) { echo "token: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%credential%\""); foreach ($rows as $r) { echo "cred: ".array_values((array) $r)[0].PHP_EOL; } } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
 
+            echo ""
+            echo "=== Imported posts summary (meta_post_insights) ==="
+            php artisan tinker --no-interaction --execute='try { $total = DB::table("meta_post_insights")->count(); $bySource = DB::table("meta_post_insights")->selectRaw("source, COUNT(*) c")->groupBy("source")->get(); echo "total=".$total.PHP_EOL; foreach ($bySource as $r) echo "  ".$r->source."=".$r->c.PHP_EOL; $withMedia = DB::table("meta_post_insights")->whereNotNull("media_url")->count(); $withoutMedia = $total - $withMedia; echo "with_media_url=".$withMedia." without=".$withoutMedia.PHP_EOL; $localMedia = DB::table("meta_post_insights")->where("media_url","LIKE","/storage/%")->orWhere("media_url","LIKE","storage/%")->count(); $remoteMedia = DB::table("meta_post_insights")->where(function($q){$q->where("media_url","LIKE","http://%")->orWhere("media_url","LIKE","https://%");})->count(); echo "local_path=".$localMedia." remote_url=".$remoteMedia.PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== 5 most recent insights (sample) ==="
+            php artisan tinker --no-interaction --execute='try { $rows = DB::table("meta_post_insights")->orderByDesc("id")->limit(5)->get(["id","source","post_id","media_url","permalink_url","created_at_meta"]); foreach ($rows as $r) echo sprintf("id=%d src=%s pid=%s media=%s perma=%s", $r->id, $r->source, substr($r->post_id ?? "", 0, 18), $r->media_url ? substr($r->media_url, 0, 60) : "NULL", $r->permalink_url ? substr($r->permalink_url, 0, 50) : "NULL").PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== meta-downloads dir on disk ==="
+            ls -la storage/app/public/meta-downloads 2>/dev/null | head -10 || echo "dir missing"
+            echo "count: $(ls storage/app/public/meta-downloads 2>/dev/null | wc -l)"
+
             echo "=== DONE ==="
