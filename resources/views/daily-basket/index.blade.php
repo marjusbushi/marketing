@@ -1525,7 +1525,7 @@
         tx.textContent = 'Post ' + slotNumber;
         cell.append(ic, tx);
 
-        const trigger = () => createPostForSlot(slotNumber);
+        const trigger = () => openPostTypePicker(cell, (pt) => createPostForSlot(slotNumber, pt));
         cell.addEventListener('click', trigger);
         cell.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); }
@@ -1533,13 +1533,13 @@
         return cell;
     }
 
-    async function createPostForSlot(slotNumber) {
+    async function createPostForSlot(slotNumber, postType) {
         const basketId = state.kanban?.basket?.id;
         if (!basketId) return;
         try {
             await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
                 title: 'Post ' + slotNumber,
-                post_type: 'photo',
+                post_type: postType || 'photo',
                 priority: 'normal',
             });
             await selectDay(state.selectedDate);
@@ -1548,13 +1548,116 @@
         }
     }
 
+    // Popover dismiss helper — close on outside click or Escape.
+    function wirePopoverDismiss(pop, anchorEl) {
+        const cleanup = () => {
+            pop.remove();
+            document.removeEventListener('click', onDoc);
+            document.removeEventListener('keydown', onKey);
+        };
+        const onDoc = (ev) => {
+            if (!pop.contains(ev.target) && ev.target !== anchorEl && !anchorEl.contains(ev.target)) {
+                cleanup();
+            }
+        };
+        const onKey = (ev) => { if (ev.key === 'Escape') cleanup(); };
+        setTimeout(() => {
+            document.addEventListener('click', onDoc);
+            document.addEventListener('keydown', onKey);
+        }, 0);
+    }
+
+    // Small 5-item picker for post_type — shown before creating a post.
+    function openPostTypePicker(anchorEl, onPick) {
+        document.querySelectorAll('.db-plan-pop').forEach(p => p.remove());
+        const pop = document.createElement('div');
+        pop.className = 'db-plan-pop';
+        pop.style.width = '180px';
+        pop.style.padding = '6px';
+        const rect = anchorEl.getBoundingClientRect();
+        pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+        pop.style.left = (window.scrollX + rect.left) + 'px';
+
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'font-size:10px; font-weight:600; color:var(--db-text-3); text-transform:uppercase; letter-spacing:0.05em; padding:4px 6px 6px;';
+        hdr.textContent = 'Lloji i postit';
+        pop.appendChild(hdr);
+
+        const types = [
+            { value: 'photo',    label: '📸 Photo' },
+            { value: 'video',    label: '🎥 Video' },
+            { value: 'reel',     label: '🎬 Reel' },
+            { value: 'carousel', label: '🖼️ Carousel' },
+            { value: 'story',    label: '✨ Story' },
+        ];
+        types.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'db-plan-pop-item';
+            item.style.cssText = 'padding:7px 8px; font-size:12px; font-weight:500;';
+            item.textContent = t.label;
+            item.addEventListener('click', () => {
+                pop.remove();
+                onPick(t.value);
+            });
+            pop.appendChild(item);
+        });
+
+        document.body.appendChild(pop);
+        wirePopoverDismiss(pop, anchorEl);
+    }
+
+    // Product detail preview popover — opens when clicking a chip (not its ×).
+    function openProductPreview(itemGroupId, anchorEl) {
+        document.querySelectorAll('.db-plan-pop').forEach(p => p.remove());
+        const full = (state.availableProducts || []).find(p => num(p.id) === num(itemGroupId));
+
+        const pop = document.createElement('div');
+        pop.className = 'db-plan-pop';
+        pop.style.width = '260px';
+        pop.style.padding = '12px';
+        const rect = anchorEl.getBoundingClientRect();
+        pop.style.top = (window.scrollY + rect.bottom + 6) + 'px';
+        pop.style.left = (window.scrollX + rect.left) + 'px';
+
+        if (!full) {
+            const msg = document.createElement('div');
+            msg.style.cssText = 'font-size:11px; color:var(--db-text-3); text-align:center; padding:8px;';
+            msg.textContent = 'Te dhenat e produktit nuk u gjeten ne kolekcionin aktiv.';
+            pop.appendChild(msg);
+        } else {
+            if (full.image_url) {
+                const img = document.createElement('img');
+                img.src = full.image_url;
+                img.style.cssText = 'width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:6px; background:#f4f4f5; display:block;';
+                img.onerror = () => { img.style.display = 'none'; };
+                pop.appendChild(img);
+            }
+            const name = document.createElement('div');
+            name.style.cssText = 'font-size:13px; font-weight:600; margin-top:10px; color:var(--db-text);';
+            name.textContent = full.name || '';
+            pop.appendChild(name);
+
+            const meta = document.createElement('div');
+            meta.style.cssText = 'font-size:11px; color:var(--db-text-3); margin-top:4px; line-height:1.5;';
+            const bits = [];
+            if (full.code) bits.push(full.code);
+            if (full.classification) bits.push(full.classification);
+            if (full.avg_price != null) bits.push(Math.round(+full.avg_price).toLocaleString('sq-AL') + ' L');
+            meta.textContent = bits.join(' · ');
+            pop.appendChild(meta);
+        }
+
+        document.body.appendChild(pop);
+        wirePopoverDismiss(pop, anchorEl);
+    }
+
     function buildPlanCellFilled(post, slotNumber) {
         const cell = document.createElement('div');
         cell.className = 'db-plan-cell';
         if (post.id === state.selectedPostId) cell.classList.add('selected');
         cell.addEventListener('click', (e) => {
-            // Clicks inside inputs / buttons shouldn't re-select.
-            if (e.target.closest('input, textarea, button, a, .db-plan-pop')) return;
+            // Clicks inside inputs / buttons / chips shouldn't re-select.
+            if (e.target.closest('input, textarea, button, a, .db-plan-pop, .db-plan-chip')) return;
             selectPost(num(post.id));
         });
 
@@ -1714,7 +1817,15 @@
     function buildProductChip(post, p) {
         const chip = document.createElement('span');
         chip.className = 'db-plan-chip';
-        chip.title = p.name || '';
+        chip.style.cursor = 'pointer';
+        chip.title = 'Klik per preview · ' + (p.name || '');
+
+        // Click on the chip (not its ×) opens a preview popover.
+        chip.addEventListener('click', (e) => {
+            if (e.target.closest('.db-plan-chip-del')) return;
+            e.stopPropagation();
+            openProductPreview(p.item_group_id, chip);
+        });
 
         if (p.image_url) {
             const img = document.createElement('img');
@@ -2994,12 +3105,13 @@
             btn.addEventListener('click', () => setViewMode(btn.dataset.mode));
         });
 
-        // "+ Shto post" in plan view — always appends a new post at the end.
-        document.getElementById('dbPlanAddBtn').addEventListener('click', () => {
+        // "+ Shto post" in plan view — picks post_type first, then creates.
+        const addBtn = document.getElementById('dbPlanAddBtn');
+        addBtn.addEventListener('click', () => {
             const nextIndex = state.kanban
                 ? allPostsOrderedForPlan(state.kanban).length + 1
                 : 1;
-            createPostForSlot(nextIndex);
+            openPostTypePicker(addBtn, (pt) => createPostForSlot(nextIndex, pt));
         });
 
         // (The legacy #dbFieldPlatforms wiring lived in the edit modal; that
