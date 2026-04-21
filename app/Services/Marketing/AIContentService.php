@@ -57,6 +57,42 @@ class AIContentService
     }
 
     /**
+     * Clean a creator-written Albanian caption — fix spelling, diacritics,
+     * punctuation. No platform-formatting, no tone change, no content
+     * additions. This is the cheap path used by the Quick AI button in
+     * the daily-basket post detail panel (the creator writes rough, AI
+     * polishes, user copies the same text to IG / FB / TikTok).
+     */
+    public function cleanCaption(string $text, ?int $userId = null): string
+    {
+        $brandKit = $this->brandKitService->get();
+        $voice = trim((string) ($brandKit->voice_sq ?? ''));
+
+        $system = <<<PROMPT
+        You are an Albanian copy editor. Fix the user's caption:
+        - Correct every spelling, diacritic (ë, ç), and punctuation error.
+        - Use natural fluent Albanian — no literal translations.
+        - Preserve meaning, product names, and the writer's tone.
+        - Do NOT add emojis or hashtags that weren't already there.
+        - Do NOT add facts, claims, or fillers.
+
+        Brand voice hint (sq): {$voice}
+
+        Return ONLY the cleaned Albanian text — no quotes, no labels,
+        no prose, no markdown.
+        PROMPT;
+
+        $payload = $this->call(
+            endpoint: 'clean-caption',
+            systemPrompt: $system,
+            userPrompt: $text,
+            userId: $userId,
+        );
+
+        return trim($payload['text'] ?? $text);
+    }
+
+    /**
      * Polish a creator-written caption and emit platform-specific variants.
      *
      * The creator (non-native writer) types a rough caption; Claude fixes

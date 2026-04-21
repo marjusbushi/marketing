@@ -646,40 +646,24 @@
     .db-studio-modal-close:hover { color: #fff; }
     .db-studio-modal-iframe { flex: 1; border: 0; width: 100%; height: 100%; background: #09090b; }
 
-    /* Quick Edit modal — lightweight inline editor that replaces the Studio
-       iframe for day-to-day caption+media work. Narrower and scrollable so
-       it reads like a form, not an app. */
-    .db-quick-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9996; display: none; align-items: center; justify-content: center; padding: 24px; }
-    .db-quick-modal-backdrop.open { display: flex; }
-    .db-quick-modal { background: #0b0b0d; border: 1px solid #27272a; border-radius: 10px; width: min(640px, 100%); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); color: #e4e4e7; }
-    .db-quick-modal-head { padding: 12px 16px; border-bottom: 1px solid #27272a; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #18181b; }
-    .db-quick-modal-title { font-size: 13px; font-weight: 600; }
-    .db-quick-modal-close { background: none; border: none; cursor: pointer; color: #a1a1aa; font-size: 20px; padding: 2px 8px; }
-    .db-quick-modal-close:hover { color: #fff; }
-    .db-quick-modal-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-    .db-quick-section { border: 1px solid #27272a; border-radius: 8px; padding: 10px 12px; background: #0f0f10; }
-    .db-quick-section-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #71717a; margin-bottom: 6px; }
-    .db-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .db-quick-btn { border: 1px solid #3f3f46; background: #18181b; color: #e4e4e7; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-    .db-quick-btn:hover:not(:disabled) { border-color: #a78bfa; color: #fff; }
-    .db-quick-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .db-quick-btn-primary { background: rgba(109, 40, 217, 0.35); border-color: #6d28d9; color: #ddd6fe; }
-    .db-quick-btn-primary:hover:not(:disabled) { background: rgba(109, 40, 217, 0.55); }
-    .db-quick-textarea { width: 100%; background: #09090b; border: 1px solid #27272a; color: #e4e4e7; border-radius: 6px; padding: 8px 10px; font-size: 13px; line-height: 1.45; resize: vertical; min-height: 70px; font-family: inherit; }
-    .db-quick-textarea:focus { outline: none; border-color: #6d28d9; }
-    .db-quick-media-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .db-quick-media-thumb { width: 72px; height: 72px; border-radius: 6px; overflow: hidden; background: #000; border: 1px solid #27272a; }
-    .db-quick-media-thumb img, .db-quick-media-thumb video { width: 100%; height: 100%; object-fit: cover; }
-    .db-quick-platform { display: flex; flex-direction: column; gap: 4px; }
-    .db-quick-platform-head { display: flex; justify-content: space-between; align-items: center; }
-    .db-quick-platform-name { font-size: 11px; font-weight: 600; color: #a1a1aa; }
-    .db-quick-platform-copy { background: none; border: 1px solid #3f3f46; color: #a1a1aa; padding: 2px 8px; font-size: 10px; border-radius: 4px; cursor: pointer; }
-    .db-quick-platform-copy:hover { border-color: #a78bfa; color: #fff; }
-    .db-quick-progress { height: 3px; background: #27272a; border-radius: 2px; overflow: hidden; margin-top: 6px; }
-    .db-quick-progress-bar { height: 100%; background: #a78bfa; transition: width 120ms linear; }
-    .db-quick-status { font-size: 11px; color: #71717a; }
-    .db-quick-status.err { color: #fda4af; }
-    .db-quick-foot { padding: 10px 16px; border-top: 1px solid #27272a; display: flex; justify-content: flex-end; gap: 8px; background: #18181b; }
+    /* Caption + AI polish styling — lives next to the caption textarea in
+       the post detail panel. Single button, single status row. */
+    .db-caption-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .db-caption-ai-row { display: flex; align-items: center; gap: 10px; }
+    .db-caption-ai-btn {
+        border: 1px solid #6d28d9;
+        background: rgba(109, 40, 217, 0.18);
+        color: #6d28d9;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .db-caption-ai-btn:hover:not(:disabled) { background: rgba(109, 40, 217, 0.3); }
+    .db-caption-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .db-caption-ai-status { font-size: 11px; color: var(--db-text-2); }
+    .db-caption-ai-status.err { color: #dc2626; }
 
     /* "+ Shto post" button under the plan grid */
     .db-plan-add-row { margin-top: 14px; display: flex; justify-content: center; }
@@ -819,75 +803,6 @@
                 src="about:blank"
                 allow="clipboard-read; clipboard-write; fullscreen"
             ></iframe>
-        </div>
-    </div>
-
-    <!-- Quick Edit modal (inline editor, replaces Studio iframe for
-         day-to-day caption+media work). Materialet dizajnohen jashtë
-         (Canva/CapCut); ky modal mbledh vetëm upload + caption + AI polish. -->
-    <div class="db-quick-modal-backdrop" id="dbQuickModal" role="dialog" aria-modal="true" aria-hidden="true">
-        <div class="db-quick-modal">
-            <div class="db-quick-modal-head">
-                <div class="db-quick-modal-title" id="dbQuickModalTitle">Edito post</div>
-                <button class="db-quick-modal-close" id="dbQuickModalClose" type="button" aria-label="Mbyll">×</button>
-            </div>
-            <div class="db-quick-modal-body">
-                <div class="db-quick-section">
-                    <div class="db-quick-section-label">Media</div>
-                    <div class="db-quick-actions">
-                        <input type="file" id="dbQuickPhotoInput" accept="image/jpeg,image/png,image/webp" style="display:none" />
-                        <input type="file" id="dbQuickVideoInput" accept="video/mp4,video/quicktime,video/x-m4v,video/webm" style="display:none" />
-                        <button type="button" class="db-quick-btn" id="dbQuickUploadPhoto">⇪ Upload foto</button>
-                        <button type="button" class="db-quick-btn" id="dbQuickUploadVideo">⇪ Upload video</button>
-                        <span class="db-quick-status" id="dbQuickMediaStatus"></span>
-                    </div>
-                    <div class="db-quick-progress" id="dbQuickProgressWrap" style="display:none">
-                        <div class="db-quick-progress-bar" id="dbQuickProgressBar" style="width:0%"></div>
-                    </div>
-                    <div class="db-quick-media-list" id="dbQuickMediaList"></div>
-                </div>
-
-                <div class="db-quick-section">
-                    <div class="db-quick-section-label">Caption (i kreatorit)</div>
-                    <textarea class="db-quick-textarea" id="dbQuickRawCaption"
-                        rows="3"
-                        placeholder="Shkruaj caption-in siç të vjen ndërmend. AI e lusto gramatikën + formaton për IG/FB/TikTok."></textarea>
-                    <div class="db-quick-actions" style="margin-top:8px">
-                        <button type="button" class="db-quick-btn db-quick-btn-primary" id="dbQuickPolish">✦ Lusto me AI (IG / FB / TikTok)</button>
-                        <span class="db-quick-status" id="dbQuickPolishStatus"></span>
-                    </div>
-                </div>
-
-                <div class="db-quick-section" id="dbQuickPolishedBox" style="display:none">
-                    <div class="db-quick-section-label">Versionet e lustuara</div>
-                    <div class="db-quick-platform">
-                        <div class="db-quick-platform-head">
-                            <span class="db-quick-platform-name">📸 Instagram</span>
-                            <button type="button" class="db-quick-platform-copy" data-copy="instagram">Kopjo</button>
-                        </div>
-                        <textarea class="db-quick-textarea" id="dbQuickInstagram" rows="3"></textarea>
-                    </div>
-                    <div class="db-quick-platform" style="margin-top:10px">
-                        <div class="db-quick-platform-head">
-                            <span class="db-quick-platform-name">📘 Facebook</span>
-                            <button type="button" class="db-quick-platform-copy" data-copy="facebook">Kopjo</button>
-                        </div>
-                        <textarea class="db-quick-textarea" id="dbQuickFacebook" rows="4"></textarea>
-                    </div>
-                    <div class="db-quick-platform" style="margin-top:10px">
-                        <div class="db-quick-platform-head">
-                            <span class="db-quick-platform-name">🎵 TikTok</span>
-                            <button type="button" class="db-quick-platform-copy" data-copy="tiktok">Kopjo</button>
-                        </div>
-                        <textarea class="db-quick-textarea" id="dbQuickTiktok" rows="2"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="db-quick-foot">
-                <span class="db-quick-status" id="dbQuickSaveStatus"></span>
-                <button type="button" class="db-quick-btn" id="dbQuickCancel">Mbyll</button>
-                <button type="button" class="db-quick-btn db-quick-btn-primary" id="dbQuickSave">Ruaj</button>
-            </div>
         </div>
     </div>
 
@@ -1849,17 +1764,18 @@
         dot.title = post.stage_label || post.stage;
         right.appendChild(dot);
 
-        // "Edito shpejt" — inline modal for caption + upload. Replaces the
-        // old Studio iframe route now that materials are designed in
-        // Canva/CapCut externally.
+        // Pencil: direct upload based on the post's format. Photo/carousel/
+        // story open the image picker; reel/video open the video picker.
+        // No modal — just native file picker → POST to the brief.
+        const isVideoPost = ['video', 'reel'].includes(post.post_type);
         const edit = document.createElement('button');
         edit.type = 'button';
         edit.className = 'db-plan-cell-edit';
-        edit.title = 'Edito post (caption + media)';
+        edit.title = isVideoPost ? 'Ngarko video' : 'Ngarko foto';
         edit.textContent = '✎';
         edit.addEventListener('click', (e) => {
             e.stopPropagation();
-            openQuickEditModal(post).catch((err) => showError('Hapja dështoi: ' + err.message));
+            triggerDirectUpload(post).catch((err) => showError('Upload dështoi: ' + err.message));
         });
         right.appendChild(edit);
 
@@ -2463,12 +2379,7 @@
 
         col3.appendChild(labeledField(mediaLabelFor(post.post_type), buildMediaWidget(post)));
 
-        col3.appendChild(labeledField('Caption', inlineTextarea({
-            value: post.caption,
-            rows: 4,
-            placeholder: 'Shkruaj tekstin e postit…',
-            save: (v) => savePostField(post, { caption: v }),
-        })));
+        col3.appendChild(labeledField('Caption', captionWithPolish(post)));
 
         col3.appendChild(labeledField('Hashtags', inlineInput({
             value: post.hashtags,
@@ -3308,16 +3219,6 @@
 
     const studioModalState = { open: false, postId: null };
 
-    const quickModalState = {
-        open: false,
-        postId: null,
-        briefId: null,
-        postType: null,
-        uploadInFlight: false,
-        photoCount: 0,
-        videoCount: 0,
-    };
-
     async function openStudioModal(post) {
         if (studioModalState.open) return;
         studioModalState.open = true;
@@ -3391,303 +3292,131 @@
     }
 
     // ────────────────────────────────────────────────────────────────
-    // Quick Edit modal — lightweight inline replacement for Studio.
-    // Materials are designed externally (Canva / CapCut); this modal
-    // just collects upload + caption, then polishes the caption via
-    // /marketing/api/ai/polish-caption for IG / FB / TikTok.
+    // Direct upload from the pencil button — no modal. Creates a brief
+    // if one doesn't exist yet, then pops the native file picker for
+    // either image or video depending on post.post_type.
     // ────────────────────────────────────────────────────────────────
 
-    function dbQuickClearEl(el) {
-        while (el && el.firstChild) el.removeChild(el.firstChild);
-    }
-
-    async function openQuickEditModal(post) {
-        if (quickModalState.open) return;
-        quickModalState.open = true;
-        quickModalState.postId = num(post.id);
-        quickModalState.postType = post.post_type || 'photo';
-
-        document.getElementById('dbQuickModalTitle').textContent =
-            (post.title || 'Post ' + quickModalState.postId) + ' · ' + (post.post_type_label || post.post_type);
-        document.getElementById('dbQuickRawCaption').value = '';
-        document.getElementById('dbQuickInstagram').value = '';
-        document.getElementById('dbQuickFacebook').value = '';
-        document.getElementById('dbQuickTiktok').value = '';
-        document.getElementById('dbQuickPolishedBox').style.display = 'none';
-        document.getElementById('dbQuickPolishStatus').textContent = '';
-        document.getElementById('dbQuickPolishStatus').classList.remove('err');
-        document.getElementById('dbQuickMediaStatus').textContent = '';
-        document.getElementById('dbQuickMediaStatus').classList.remove('err');
-        document.getElementById('dbQuickSaveStatus').textContent = '';
-        document.getElementById('dbQuickSaveStatus').classList.remove('err');
-        dbQuickClearEl(document.getElementById('dbQuickMediaList'));
-        document.getElementById('dbQuickProgressWrap').style.display = 'none';
-        quickModalState.photoCount = 0;
-        quickModalState.videoCount = 0;
+    async function triggerDirectUpload(post) {
+        const isVideo = ['video', 'reel'].includes(post.post_type);
 
         let briefId = num(post.creative_brief_id || 0);
         if (!briefId) {
-            try {
-                const created = await apiPost('/marketing/api/creative-briefs', {
-                    daily_basket_post_id: quickModalState.postId,
-                    post_type: quickModalState.postType,
-                });
-                briefId = num(created && created.creative_brief && created.creative_brief.id);
-            } catch (e) {
-                quickModalState.open = false;
-                throw e;
-            }
-        }
-        if (!briefId) {
-            quickModalState.open = false;
-            throw new Error('Brief id mungon pas krijimit.');
-        }
-        quickModalState.briefId = briefId;
-
-        try {
-            const briefResp = await apiGet('/marketing/api/creative-briefs/' + briefId);
-            const brief = briefResp && briefResp.creative_brief;
-            if (brief) {
-                document.getElementById('dbQuickRawCaption').value = brief.caption_sq || '';
-                const perPlatform = (brief.state && brief.state.per_platform_captions) || null;
-                if (perPlatform) {
-                    document.getElementById('dbQuickInstagram').value = perPlatform.instagram || '';
-                    document.getElementById('dbQuickFacebook').value  = perPlatform.facebook  || '';
-                    document.getElementById('dbQuickTiktok').value    = perPlatform.tiktok    || '';
-                    document.getElementById('dbQuickPolishedBox').style.display = 'block';
-                }
-                const photos = (brief.state && brief.state.photos) || [];
-                const capcut = (brief.state && brief.state.capcut) || [];
-                quickModalState.photoCount = photos.length;
-                quickModalState.videoCount = capcut.length;
-                renderQuickMediaList(photos, capcut);
-            }
-        } catch (_) { /* non-fatal — user can still upload fresh. */ }
-
-        const backdrop = document.getElementById('dbQuickModal');
-        backdrop.classList.add('open');
-        backdrop.setAttribute('aria-hidden', 'false');
-    }
-
-    function closeQuickEditModal() {
-        if (!quickModalState.open) return;
-        quickModalState.open = false;
-        const backdrop = document.getElementById('dbQuickModal');
-        backdrop.classList.remove('open');
-        backdrop.setAttribute('aria-hidden', 'true');
-        selectDay(state.selectedDate).catch(() => { /* non-fatal */ });
-    }
-
-    function renderQuickMediaList(photos, videos) {
-        const host = document.getElementById('dbQuickMediaList');
-        dbQuickClearEl(host);
-        photos.forEach((slot) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'db-quick-media-thumb';
-            const img = document.createElement('img');
-            img.src = slot.path && slot.path.startsWith('http') ? slot.path : '/storage/' + (slot.path || '').replace(/^\/+/, '');
-            wrap.appendChild(img);
-            host.appendChild(wrap);
-        });
-        videos.forEach((slot) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'db-quick-media-thumb';
-            if (slot.thumbnail_path) {
-                const img = document.createElement('img');
-                img.src = '/storage/' + slot.thumbnail_path.replace(/^\/+/, '');
-                wrap.appendChild(img);
-            } else {
-                wrap.textContent = '🎬';
-                wrap.style.cssText += 'display:flex; align-items:center; justify-content:center; color:#a1a1aa; font-size:22px;';
-            }
-            host.appendChild(wrap);
-        });
-    }
-
-    async function quickUpload(kind, file) {
-        if (quickModalState.uploadInFlight || !quickModalState.briefId) return;
-        quickModalState.uploadInFlight = true;
-
-        const statusEl = document.getElementById('dbQuickMediaStatus');
-        statusEl.classList.remove('err');
-        statusEl.textContent = 'Duke ngarkuar 0%…';
-
-        const progressWrap = document.getElementById('dbQuickProgressWrap');
-        const progressBar  = document.getElementById('dbQuickProgressBar');
-        progressWrap.style.display = 'block';
-        progressBar.style.width = '0%';
-
-        const form = new FormData();
-        form.append('file', file);
-
-        const endpoint = kind === 'photo'
-            ? '/marketing/api/creative-briefs/' + quickModalState.briefId + '/upload-photo'
-            : '/marketing/api/creative-briefs/' + quickModalState.briefId + '/upload-video';
-
-        try {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', endpoint);
-            xhr.setRequestHeader('Accept', 'application/json');
-            xhr.setRequestHeader('X-CSRF-TOKEN', CSRF);
-            xhr.upload.onprogress = (ev) => {
-                if (!ev.lengthComputable) return;
-                const pct = Math.round((ev.loaded / ev.total) * 100);
-                progressBar.style.width = pct + '%';
-                statusEl.textContent = 'Duke ngarkuar ' + pct + '%…';
-            };
-
-            const response = await new Promise((resolve, reject) => {
-                xhr.onload = () => {
-                    try {
-                        const data = JSON.parse(xhr.responseText || '{}');
-                        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-                        else reject(new Error(data.message || ('HTTP ' + xhr.status)));
-                    } catch (e) { reject(e); }
-                };
-                xhr.onerror = () => reject(new Error('network'));
-                xhr.send(form);
+            const created = await apiPost('/marketing/api/creative-briefs', {
+                daily_basket_post_id: num(post.id),
+                post_type: post.post_type,
             });
-
-            const brief = response.creative_brief;
-            const photos = (brief && brief.state && brief.state.photos) || [];
-            const capcut = (brief && brief.state && brief.state.capcut) || [];
-            quickModalState.photoCount = photos.length;
-            quickModalState.videoCount = capcut.length;
-            renderQuickMediaList(photos, capcut);
-
-            statusEl.textContent = '✓ Ngarkuar';
-            progressWrap.style.display = 'none';
-        } catch (e) {
-            statusEl.classList.add('err');
-            statusEl.textContent = 'Upload dështoi: ' + e.message;
-            progressWrap.style.display = 'none';
-        } finally {
-            quickModalState.uploadInFlight = false;
+            briefId = num(created && created.creative_brief && created.creative_brief.id);
         }
-    }
+        if (!briefId) throw new Error('Brief id mungon pas krijimit.');
 
-    async function quickPolishCaption() {
-        const raw = document.getElementById('dbQuickRawCaption').value.trim();
-        const btn = document.getElementById('dbQuickPolish');
-        const statusEl = document.getElementById('dbQuickPolishStatus');
-        statusEl.classList.remove('err');
+        await new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = isVideo
+                ? 'video/mp4,video/quicktime,video/x-m4v,video/webm'
+                : 'image/jpeg,image/png,image/webp';
+            input.style.display = 'none';
+            input.addEventListener('change', async () => {
+                const file = input.files && input.files[0];
+                if (!file) { resolve(); return; }
 
-        if (!raw) {
-            statusEl.classList.add('err');
-            statusEl.textContent = 'Shkruaj fillimisht caption-in.';
-            return;
-        }
+                const endpoint = isVideo
+                    ? '/marketing/api/creative-briefs/' + briefId + '/upload-video'
+                    : '/marketing/api/creative-briefs/' + briefId + '/upload-photo';
 
-        btn.disabled = true;
-        statusEl.textContent = 'Po mendon…';
+                const form = new FormData();
+                form.append('file', file);
 
-        try {
-            const data = await apiPost('/marketing/api/ai/polish-caption', {
-                text: raw,
-                platforms: ['instagram', 'facebook', 'tiktok'],
-            });
-            const pp = (data && data.per_platform) || {};
-            document.getElementById('dbQuickInstagram').value = pp.instagram || '';
-            document.getElementById('dbQuickFacebook').value  = pp.facebook  || '';
-            document.getElementById('dbQuickTiktok').value    = pp.tiktok    || '';
-            if (data && data.cleaned_sq) {
-                document.getElementById('dbQuickRawCaption').value = data.cleaned_sq;
-            }
-            document.getElementById('dbQuickPolishedBox').style.display = 'block';
-            statusEl.textContent = '✓ Gati';
-        } catch (e) {
-            statusEl.classList.add('err');
-            statusEl.textContent = 'AI dështoi: ' + e.message;
-        } finally {
-            btn.disabled = false;
-        }
-    }
-
-    async function quickSaveCaption() {
-        if (!quickModalState.briefId) return;
-        const statusEl = document.getElementById('dbQuickSaveStatus');
-        statusEl.classList.remove('err');
-        statusEl.textContent = 'Po ruan…';
-
-        const raw = document.getElementById('dbQuickRawCaption').value;
-        const instagram = document.getElementById('dbQuickInstagram').value;
-        const facebook  = document.getElementById('dbQuickFacebook').value;
-        const tiktok    = document.getElementById('dbQuickTiktok').value;
-
-        try {
-            const briefResp = await apiGet('/marketing/api/creative-briefs/' + quickModalState.briefId);
-            const existingState = (briefResp && briefResp.creative_brief && briefResp.creative_brief.state) || {};
-
-            const nextState = Object.assign({}, existingState, {
-                per_platform_captions: {
-                    instagram: instagram || null,
-                    facebook:  facebook  || null,
-                    tiktok:    tiktok    || null,
-                },
-            });
-
-            await apiPutJson('/marketing/api/creative-briefs/' + quickModalState.briefId, {
-                caption_sq: raw || null,
-                state: nextState,
-            });
-            statusEl.textContent = '✓ U ruajt';
-            try {
-                await apiPutJson('/marketing/daily-basket/api/posts/' + quickModalState.postId, {
-                    caption: raw || null,
-                });
-            } catch (_) { /* non-fatal — brief is the canonical source. */ }
-        } catch (e) {
-            statusEl.classList.add('err');
-            statusEl.textContent = 'Ruajtja dështoi: ' + e.message;
-        }
-    }
-
-    function wireQuickEditModal() {
-        document.getElementById('dbQuickModalClose').addEventListener('click', closeQuickEditModal);
-        document.getElementById('dbQuickCancel').addEventListener('click', closeQuickEditModal);
-        document.getElementById('dbQuickModal').addEventListener('click', (e) => {
-            if (e.target.id === 'dbQuickModal') closeQuickEditModal();
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && quickModalState.open) closeQuickEditModal();
-        });
-
-        const photoInput = document.getElementById('dbQuickPhotoInput');
-        const videoInput = document.getElementById('dbQuickVideoInput');
-        document.getElementById('dbQuickUploadPhoto').addEventListener('click', () => photoInput.click());
-        document.getElementById('dbQuickUploadVideo').addEventListener('click', () => videoInput.click());
-        photoInput.addEventListener('change', (e) => {
-            const f = e.target.files && e.target.files[0];
-            if (f) quickUpload('photo', f);
-            e.target.value = '';
-        });
-        videoInput.addEventListener('change', (e) => {
-            const f = e.target.files && e.target.files[0];
-            if (f) quickUpload('video', f);
-            e.target.value = '';
-        });
-
-        document.getElementById('dbQuickPolish').addEventListener('click', quickPolishCaption);
-        document.getElementById('dbQuickSave').addEventListener('click', quickSaveCaption);
-
-        document.querySelectorAll('.db-quick-platform-copy').forEach((btn) => {
-            btn.addEventListener('click', async () => {
-                const which = btn.dataset.copy;
-                const map = { instagram: 'dbQuickInstagram', facebook: 'dbQuickFacebook', tiktok: 'dbQuickTiktok' };
-                const el = document.getElementById(map[which]);
-                if (!el) return;
                 try {
-                    await navigator.clipboard.writeText(el.value || '');
-                    const old = btn.textContent;
-                    btn.textContent = '✓';
-                    setTimeout(() => { btn.textContent = old; }, 1000);
-                } catch (_) {
-                    el.select();
-                    document.execCommand('copy');
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                        body: form,
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        showError('Upload dështoi: ' + (data.message || ('HTTP ' + res.status)));
+                    } else {
+                        await selectDay(state.selectedDate);
+                    }
+                } catch (e) {
+                    showError('Upload dështoi: ' + (e.message || 'rrjeti'));
+                } finally {
+                    if (input.parentNode) input.parentNode.removeChild(input);
+                    resolve();
                 }
             });
+            document.body.appendChild(input);
+            input.click();
         });
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // Caption helper — inline textarea + single "Rregullo me AI" button.
+    // Sends the creator's rough Albanian text to Sonnet 4.6 which
+    // returns a cleaned, grammatically correct version. We only use
+    // the cleaned_sq field; per-platform formatting is skipped because
+    // staff copies the same cleaned text into IG/FB/TikTok themselves.
+    // ────────────────────────────────────────────────────────────────
+
+    function captionWithPolish(post) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-caption-wrap';
+
+        const ta = inlineTextarea({
+            value: post.caption,
+            rows: 4,
+            placeholder: 'Shkruaj tekstin e postit…',
+            save: (v) => savePostField(post, { caption: v }),
+        });
+        wrap.appendChild(ta);
+
+        const row = document.createElement('div');
+        row.className = 'db-caption-ai-row';
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'db-caption-ai-btn';
+        btn.textContent = '✦ Rregullo me AI';
+
+        const status = document.createElement('span');
+        status.className = 'db-caption-ai-status';
+
+        btn.addEventListener('click', async () => {
+            const raw = (ta.value || '').trim();
+            if (!raw) {
+                status.classList.add('err');
+                status.textContent = 'Shkruaj fillimisht tekstin.';
+                return;
+            }
+            btn.disabled = true;
+            status.classList.remove('err');
+            status.textContent = 'Po rregullon…';
+            try {
+                const data = await apiPost('/marketing/api/ai/polish-caption', {
+                    text: raw,
+                    mode: 'clean',
+                });
+                const cleaned = (data && data.cleaned_sq) ? data.cleaned_sq : raw;
+                ta.value = cleaned;
+                await savePostField(post, { caption: cleaned });
+                status.textContent = '✓ U rregullua';
+            } catch (e) {
+                status.classList.add('err');
+                status.textContent = 'AI dështoi: ' + (e.message || '');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        row.appendChild(btn);
+        row.appendChild(status);
+        wrap.appendChild(row);
+
+        return wrap;
+    }
+
 
     function wireModalOnce() {
         document.getElementById('dbBtnNewPost').addEventListener('click', openNewPostModal);
@@ -3695,7 +3424,6 @@
         document.getElementById('dbModalCancel').addEventListener('click', closeNewPostModal);
         document.getElementById('dbModalSubmit').addEventListener('click', submitModal);
         wireStudioModal();
-        wireQuickEditModal();
 
         // Panorama
         document.getElementById('dbBtnPano').addEventListener('click', openPanorama);
