@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8" />
+<title>Post Detail — Mockup</title>
+<style>
+  :root {
+    --bg: #f4f4f5;
+    --surface: #ffffff;
+    --border: #e4e4e7;
+    --text: #18181b;
+    --text-2: #52525b;
+    --text-3: #a1a1aa;
+    --accent: #6d28d9;
+    --accent-soft: rgba(109, 40, 217, 0.1);
+    --ok: #16a34a;
+    --danger: #dc2626;
+    --ig: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%);
+    --fb: #1877f2;
+    --tt: #000;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  .page-head {
+    max-width: 1200px;
+    margin: 0 auto 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .page-head h1 { font-size: 18px; font-weight: 600; margin: 0; }
+  .page-head .sub { font-size: 12px; color: var(--text-2); margin: 4px 0 0; }
+  .scenario-picker {
+    display: flex; gap: 6px; background: #fff; padding: 4px;
+    border-radius: 8px; border: 1px solid var(--border);
+  }
+  .scenario-picker button {
+    border: none; background: transparent; color: var(--text-2);
+    font-size: 12px; padding: 6px 12px; border-radius: 5px;
+    cursor: pointer; font-weight: 500;
+  }
+  .scenario-picker button.active { background: var(--accent); color: #fff; }
+
+  .fake-grid {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+    background: #fff; border-radius: 6px; overflow: hidden;
+    aspect-ratio: 3 / 4; opacity: 0.35; filter: blur(1px);
+  }
+  .fake-grid > div { background: linear-gradient(135deg, #ddd6fe, #fce7f3); }
+
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55);
+    z-index: 100; display: flex; align-items: center; justify-content: center;
+    padding: 20px; backdrop-filter: blur(4px);
+  }
+  .modal {
+    background: var(--surface); border-radius: 12px; overflow: hidden;
+    max-width: 1100px; width: 100%; max-height: 92vh;
+    display: grid; grid-template-columns: 1.15fr 0.85fr;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.35); position: relative;
+  }
+
+  .nav-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.95); border: 1px solid var(--border);
+    width: 36px; height: 36px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px; color: var(--text);
+    z-index: 10; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  .nav-btn:hover { background: #fff; border-color: var(--accent); color: var(--accent); }
+  .nav-btn.prev { left: -48px; }
+  .nav-btn.next { right: -48px; }
+  .close-btn {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(255, 255, 255, 0.9); border: 1px solid var(--border);
+    width: 32px; height: 32px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 16px; z-index: 20;
+  }
+  .close-btn:hover { background: #fff; color: var(--danger); }
+
+  .media-pane {
+    background: #0a0a0a; position: relative;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .media-pane .bg {
+    width: 100%; height: 100%;
+    background-position: center; background-size: cover;
+  }
+  .carousel-dots {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px;
+  }
+  .carousel-dot { width: 7px; height: 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.5); }
+  .carousel-dot.active { background: #fff; }
+  .carousel-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.4); border: none;
+    width: 34px; height: 34px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px; cursor: pointer;
+  }
+  .carousel-arrow.left { left: 12px; }
+  .carousel-arrow.right { right: 12px; }
+  .media-type-chip {
+    position: absolute; top: 14px; left: 14px;
+    background: rgba(0, 0, 0, 0.55); color: #fff;
+    font-size: 11px; font-weight: 600; padding: 4px 10px;
+    border-radius: 999px; display: flex; align-items: center;
+    gap: 5px; letter-spacing: 0.02em;
+  }
+  .video-play-indicator {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px; height: 60px; border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 24px; pointer-events: none;
+  }
+
+  .detail-pane {
+    padding: 22px 22px 0; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .detail-pane .scroll { overflow-y: auto; flex: 1; padding-bottom: 16px; }
+  .platform-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap;
+  }
+  .platform-badge {
+    font-size: 11px; font-weight: 600; padding: 4px 9px;
+    border-radius: 5px; color: #fff;
+  }
+  .platform-badge.ig { background: var(--ig); }
+  .platform-badge.fb { background: var(--fb); }
+  .platform-badge.tt { background: var(--tt); }
+  .post-meta { font-size: 12px; color: var(--text-3); }
+  .status-tag {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 3px 8px; border-radius: 999px; margin-left: 0;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .status-tag.draft { background: #f4f4f5; color: #71717a; }
+  .status-tag.scheduled { background: #eef2ff; color: #4338ca; }
+  .status-tag.published { background: #f0fdf4; color: var(--ok); }
+
+  .section { margin-top: 18px; }
+  .section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+    color: var(--text-3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .caption-box {
+    font-size: 13px; line-height: 1.55; color: var(--text);
+    white-space: pre-wrap; background: #fafafa;
+    padding: 10px 12px; border-radius: 7px; border: 1px solid var(--border);
+  }
+  .hashtags-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .hashtag {
+    background: var(--accent-soft); color: var(--accent);
+    padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500;
+  }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .metric {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px; text-align: center;
+  }
+  .metric .val { font-size: 16px; font-weight: 700; color: var(--text); }
+  .metric .lbl {
+    font-size: 10px; color: var(--text-2); margin-top: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .products-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .product-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px 3px 3px;
+    font-size: 11px; cursor: pointer;
+  }
+  .product-chip:hover { border-color: var(--accent); }
+  .product-chip img {
+    width: 22px; height: 22px; border-radius: 999px;
+    object-fit: cover; background: #f4f4f5;
+  }
+  .product-chip .name { font-weight: 500; color: var(--text); }
+  .product-chip .price { color: var(--text-3); font-size: 10px; }
+
+  .kv-list { display: flex; flex-direction: column; gap: 6px; }
+  .kv {
+    display: flex; justify-content: space-between;
+    font-size: 12px; padding: 6px 0; border-bottom: 1px dashed var(--border);
+  }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--text-3); }
+  .kv .v { color: var(--text); font-weight: 500; }
+
+  .foot {
+    border-top: 1px solid var(--border); padding: 12px 22px;
+    background: #fafafa; display: flex; gap: 8px;
+    justify-content: flex-end; flex-wrap: wrap;
+  }
+  .btn {
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    font-size: 12px; padding: 7px 14px; border-radius: 6px;
+    cursor: pointer; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #5b21b6; color: #fff; }
+  .btn-ghost { background: transparent; border-color: transparent; }
+
+  .scroll::-webkit-scrollbar { width: 6px; }
+  .scroll::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 99px; }
+
+  @media (max-width: 900px) {
+    .modal { grid-template-columns: 1fr; max-height: 98vh; }
+    .media-pane { aspect-ratio: 4/5; }
+    .nav-btn.prev { left: 8px; }
+    .nav-btn.next { right: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div>
+    <h1>Post Detail Modal — Mockup</h1>
+    <p class="sub">Si do të dukej kur kliko një post në Content Planner grid. Klik butonat djathtas për të parë skenarët.</p>
+  </div>
+  <div class="scenario-picker">
+    <button data-scenario="reel" class="active">Reel (imported)</button>
+    <button data-scenario="carousel">Carousel (imported)</button>
+    <button data-scenario="planned">Planned draft</button>
+  </div>
+</div>
+
+<div class="fake-grid">
+  <div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+</div>
+
+<div class="backdrop" id="backdrop">
+  <button class="nav-btn prev" title="Post më parë">‹</button>
+  <button class="nav-btn next" title="Post tjetër">›</button>
+
+  <div class="modal">
+    <button class="close-btn" title="Mbyll">×</button>
+
+    <div class="media-pane" id="mediaPane"></div>
+
+    <div class="detail-pane">
+      <div class="scroll">
+        <div class="platform-row">
+          <span class="platform-badge ig" id="platformBadge">Instagram</span>
+          <span class="post-meta" id="postTypeDate">—</span>
+          <span class="status-tag published" id="statusTag">—</span>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Caption</div>
+          <div class="caption-box" id="captionBox">—</div>
+          <div class="hashtags-row" id="hashtagsRow"></div>
+        </div>
+
+        <div class="section" id="metricsSection">
+          <div class="section-label">Performance</div>
+          <div class="metrics" id="metricsGrid"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Produktet e lidhura</div>
+          <div class="products-row" id="productsRow"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Detaje</div>
+          <div class="kv-list" id="kvList"></div>
+        </div>
+      </div>
+
+      <div class="foot" id="footer"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const scenarios = {
+    reel: {
+      mediaType: 'video',
+      mediaLabel: 'Reel',
+      platform: 'ig',
+      platformName: 'Instagram',
+      dateLine: 'Reel · 21 prill 2026, 18:00',
+      status: 'published',
+      statusLabel: 'Publikuar',
+      caption: 'Besoj se nuk jam e vetmja që kam një motër të tillë\nBëje tag që të mos ketë ndërmend ta bëj',
+      hashtags: ['#zeroabsolute', '#reels', '#motra', '#humor'],
+      metrics: [
+        { val: '13.991', lbl: 'Reach' },
+        { val: '83', lbl: 'Likes' },
+        { val: '1', lbl: 'Comments' },
+        { val: '2', lbl: 'Shares' },
+      ],
+      products: [
+        { name: 'Bluze e shkurter', price: '1.990 L', img: 'https://picsum.photos/seed/p1/120' },
+        { name: 'Pantallona', price: '2.490 L', img: 'https://picsum.photos/seed/p2/120' },
+      ],
+      meta: [
+        ['Post ID', '18092301124920034'],
+        ['Publikuar nga', 'Zero Absolute (auto)'],
+        ['Engagement rate', '0.62%'],
+        ['Saves', '9'],
+      ],
+      actions: [
+        { kind: 'ghost', label: 'Kopjo link' },
+        { kind: 'secondary', label: 'Hap ne Instagram' },
+      ],
+    },
+    carousel: {
+      mediaType: 'carousel',
+      mediaLabel: 'Carousel · 4',
+      platform: 'ig',
+      platformName: 'Instagram',
+      dateLine: 'Carousel · 18 prill 2026, 20:00',
+      status: 'published',
+      statusLabel: 'Publikuar',
+      caption: '4 ngjyrat me te shitura kete muaj\nCili eshte favoriti juaj?',
+      hashtags: ['#zeroabsolute', '#newdrop', '#spring26'],
+      metrics: [
+        { val: '8.742', lbl: 'Reach' },
+        { val: '245', lbl: 'Likes' },
+        { val: '18', lbl: 'Comments' },
+        { val: '12', lbl: 'Saves' },
+      ],
+      products: [
+        { name: 'Set elegant', price: '3.290 L', img: 'https://picsum.photos/seed/p3/120' },
+        { name: 'Blazer + pantallona', price: '4.490 L', img: 'https://picsum.photos/seed/p4/120' },
+        { name: 'Fustan formal', price: '2.890 L', img: 'https://picsum.photos/seed/p5/120' },
+      ],
+      meta: [
+        ['Post ID', '18101564671784868'],
+        ['Slides', '4 foto'],
+        ['Engagement rate', '3.15%'],
+      ],
+      actions: [
+        { kind: 'ghost', label: 'Kopjo link' },
+        { kind: 'secondary', label: 'Hap ne Instagram' },
+      ],
+    },
+    planned: {
+      mediaType: 'photo',
+      mediaLabel: 'Foto',
+      platform: 'ig',
+      platformName: 'Instagram',
+      dateLine: 'Photo · Skedulim: 23 prill 2026, 18:00',
+      status: 'scheduled',
+      statusLabel: 'Skeduluar',
+      caption: 'Pantallonat e reja nga Kalk Tektum jane ketu!\nSuper te rehatshme, te qendrueshme, per cdo rast.\nGjeje te Shporta Ditore.',
+      hashtags: ['#zeroabsolute', '#pantallona', '#newdrop', '#stilimodern'],
+      metrics: null,
+      products: [
+        { name: 'Pantallona Kalk Tektum', price: '1.990 L', img: 'https://picsum.photos/seed/p6/120' },
+      ],
+      meta: [
+        ['Brief', '#9'],
+        ['Krijoi', 'Marjus Bushi'],
+        ['Platforma', 'IG + FB + TikTok'],
+        ['Prioritet', 'Normal'],
+      ],
+      actions: [
+        { kind: 'danger', label: 'Hiq' },
+        { kind: 'ghost', label: 'Duplikato' },
+        { kind: 'primary', label: 'Edito brief' },
+      ],
+    },
+  };
+
+  function clearEl(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
+  function render(key) {
+    const s = scenarios[key];
+
+    const media = document.getElementById('mediaPane');
+    clearEl(media);
+
+    const typeChip = document.createElement('div');
+    typeChip.className = 'media-type-chip';
+    typeChip.textContent = s.mediaLabel;
+    media.appendChild(typeChip);
+
+    const bg = document.createElement('div');
+    bg.className = 'bg';
+    const seed = key + '-hero';
+    bg.style.backgroundImage = `url('https://picsum.photos/seed/${seed}/800/1000')`;
+    media.appendChild(bg);
+
+    if (s.mediaType === 'video') {
+      const play = document.createElement('div');
+      play.className = 'video-play-indicator';
+      play.textContent = '▶';
+      media.appendChild(play);
+    }
+    if (s.mediaType === 'carousel') {
+      const left = document.createElement('button');
+      left.className = 'carousel-arrow left';
+      left.textContent = '‹';
+      const right = document.createElement('button');
+      right.className = 'carousel-arrow right';
+      right.textContent = '›';
+      const dots = document.createElement('div');
+      dots.className = 'carousel-dots';
+      for (let i = 0; i < 4; i++) {
+        const d = document.createElement('div');
+        d.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+        dots.appendChild(d);
+      }
+      media.appendChild(left);
+      media.appendChild(right);
+      media.appendChild(dots);
+    }
+
+    const badge = document.getElementById('platformBadge');
+    badge.className = 'platform-badge ' + s.platform;
+    badge.textContent = s.platformName;
+    document.getElementById('postTypeDate').textContent = s.dateLine;
+    const statusEl = document.getElementById('statusTag');
+    statusEl.className = 'status-tag ' + s.status;
+    statusEl.textContent = s.statusLabel;
+
+    document.getElementById('captionBox').textContent = s.caption;
+    const tagsEl = document.getElementById('hashtagsRow');
+    clearEl(tagsEl);
+    s.hashtags.forEach(t => {
+      const el = document.createElement('span');
+      el.className = 'hashtag';
+      el.textContent = t;
+      tagsEl.appendChild(el);
+    });
+
+    const metricsSec = document.getElementById('metricsSection');
+    const grid = document.getElementById('metricsGrid');
+    clearEl(grid);
+    if (s.metrics) {
+      metricsSec.style.display = '';
+      s.metrics.forEach(m => {
+        const cell = document.createElement('div');
+        cell.className = 'metric';
+        const val = document.createElement('div');
+        val.className = 'val';
+        val.textContent = m.val;
+        const lbl = document.createElement('div');
+        lbl.className = 'lbl';
+        lbl.textContent = m.lbl;
+        cell.appendChild(val);
+        cell.appendChild(lbl);
+        grid.appendChild(cell);
+      });
+    } else {
+      metricsSec.style.display = 'none';
+    }
+
+    const prodRow = document.getElementById('productsRow');
+    clearEl(prodRow);
+    s.products.forEach(p => {
+      const chip = document.createElement('div');
+      chip.className = 'product-chip';
+      const img = document.createElement('img');
+      img.src = p.img;
+      img.alt = '';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = p.name;
+      const price = document.createElement('span');
+      price.className = 'price';
+      price.textContent = p.price;
+      chip.appendChild(img);
+      chip.appendChild(name);
+      chip.appendChild(price);
+      prodRow.appendChild(chip);
+    });
+
+    const kv = document.getElementById('kvList');
+    clearEl(kv);
+    s.meta.forEach(pair => {
+      const row = document.createElement('div');
+      row.className = 'kv';
+      const k = document.createElement('span');
+      k.className = 'k';
+      k.textContent = pair[0];
+      const v = document.createElement('span');
+      v.className = 'v';
+      v.textContent = pair[1];
+      row.appendChild(k);
+      row.appendChild(v);
+      kv.appendChild(row);
+    });
+
+    const foot = document.getElementById('footer');
+    clearEl(foot);
+    s.actions.forEach(a => {
+      const btn = document.createElement('button');
+      let cls = 'btn';
+      if (a.kind === 'primary') cls += ' btn-primary';
+      if (a.kind === 'ghost' || a.kind === 'danger') cls += ' btn-ghost';
+      btn.className = cls;
+      if (a.kind === 'danger') btn.style.color = 'var(--danger)';
+      btn.textContent = a.label;
+      foot.appendChild(btn);
+    });
+  }
+
+  document.querySelectorAll('.scenario-picker button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.scenario-picker button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      render(b.dataset.scenario);
+    });
+  });
+
+  render('reel');
+</script>
+
+</body>
+</html>

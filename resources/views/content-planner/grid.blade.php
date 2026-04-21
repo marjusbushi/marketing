@@ -43,6 +43,75 @@
     .section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; }
     .section-title { font-size: 15px; font-weight: 600; color: #1e293b; letter-spacing: -0.01em; }
     .section-count { font-size: 12px; color: #94a3b8; font-weight: 500; margin-left: 8px; }
+
+    /* Post Detail modal — 60/40 layout (mockup parity).
+       Light theme inside a dark backdrop so metrics + caption read on white
+       like the rest of Content Planner, not on the old black/fullscreen. */
+    .pd-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9980; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+    .pd-backdrop.open { display: flex; }
+    .pd-modal { background: #fff; border-radius: 12px; overflow: hidden; max-width: 1100px; width: 100%; max-height: 92vh; display: grid; grid-template-columns: 1.15fr 0.85fr; box-shadow: 0 40px 100px rgba(0,0,0,0.35); position: relative; }
+    .pd-close { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.92); border: 1px solid #e4e4e7; width: 32px; height: 32px; border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; z-index: 20; color: #18181b; }
+    .pd-close:hover { background: #fff; color: #dc2626; }
+
+    /* LEFT: media */
+    .pd-media { background: #0a0a0a; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .pd-media-inner { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative; }
+    .pd-media-inner img, .pd-media-inner video { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    .pd-type-chip { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,0.55); color: #fff; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; display: flex; align-items: center; gap: 5px; z-index: 5; }
+    .pd-carousel-arrow { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.4); border: none; width: 34px; height: 34px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; cursor: pointer; z-index: 5; }
+    .pd-carousel-arrow.left { left: 12px; }
+    .pd-carousel-arrow.right { right: 12px; }
+    .pd-carousel-dots { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; z-index: 5; }
+    .pd-dot { width: 7px; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.5); }
+    .pd-dot.active { background: #fff; }
+
+    /* RIGHT: detail */
+    .pd-detail { display: flex; flex-direction: column; overflow: hidden; }
+    .pd-scroll { overflow-y: auto; flex: 1; padding: 22px 22px 16px; }
+    .pd-scroll::-webkit-scrollbar { width: 6px; }
+    .pd-scroll::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 99px; }
+
+    .pd-head-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+    .pd-platform-badge { font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 5px; color: #fff; white-space: nowrap; }
+    .pd-platform-badge.ig { background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%); }
+    .pd-platform-badge.fb { background: #1877f2; }
+    .pd-platform-badge.tt { background: #000; }
+    .pd-platform-badge.multi { background: #6366f1; }
+    .pd-meta-line { font-size: 12px; color: #a1a1aa; }
+    .pd-status-tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .pd-status-tag.draft { background: #f4f4f5; color: #71717a; }
+    .pd-status-tag.scheduled { background: #eef2ff; color: #4338ca; }
+    .pd-status-tag.published { background: #f0fdf4; color: #16a34a; }
+
+    .pd-section { margin-top: 18px; }
+    .pd-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: #a1a1aa; text-transform: uppercase; margin-bottom: 8px; }
+    .pd-caption-box { font-size: 13px; line-height: 1.55; color: #18181b; white-space: pre-wrap; background: #fafafa; padding: 10px 12px; border-radius: 7px; border: 1px solid #e4e4e7; }
+    .pd-hashtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .pd-hashtag { background: rgba(109,40,217,0.1); color: #6d28d9; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+    .pd-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .pd-metric { background: #fafafa; border: 1px solid #e4e4e7; border-radius: 7px; padding: 10px; text-align: center; }
+    .pd-metric .v { font-size: 16px; font-weight: 700; color: #18181b; }
+    .pd-metric .l { font-size: 10px; color: #52525b; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .pd-kv-list { display: flex; flex-direction: column; gap: 6px; }
+    .pd-kv { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #e4e4e7; }
+    .pd-kv:last-child { border-bottom: none; }
+    .pd-kv .k { color: #a1a1aa; }
+    .pd-kv .v { color: #18181b; font-weight: 500; }
+
+    .pd-foot { border-top: 1px solid #e4e4e7; padding: 12px 22px; background: #fafafa; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+    .pd-btn { border: 1px solid #e4e4e7; background: #fff; color: #18181b; font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+    .pd-btn:hover { border-color: #6d28d9; color: #6d28d9; }
+    .pd-btn-primary { background: #6d28d9; color: #fff; border-color: #6d28d9; }
+    .pd-btn-primary:hover { background: #5b21b6; color: #fff; }
+    .pd-btn-ghost { background: transparent; border-color: transparent; }
+    .pd-btn-ghost:hover { background: #f4f4f5; border-color: transparent; }
+    .pd-btn-danger { color: #dc2626; }
+    .pd-btn-danger:hover { border-color: #dc2626; color: #dc2626; }
+
+    @media (max-width: 900px) {
+      .pd-modal { grid-template-columns: 1fr; max-height: 98vh; }
+      .pd-media { aspect-ratio: 4/5; }
+    }
 </style>
 @endsection
 
@@ -385,9 +454,10 @@
 
         const hoverHtml = `<div class="feed-hover"></div>`;
 
-        const clickFn = isExternal && permalink
-            ? `window.open('${permalink.replace(/'/g, "\\'")}','_blank')`
-            : `openPostPreview(${event.id})`;
+        // Unified click — external + planned both open the in-app detail
+        // modal. The "Hap në Instagram" action lives inside the modal as a
+        // secondary button, never as an automatic redirect.
+        const clickFn = `openPostPreview('${String(event.id).replace(/'/g, "\\'")}')`;
 
         return `<div class="feed-tile" ${dataAttr} onclick="${clickFn}">
             ${mediaHtml}
@@ -539,28 +609,36 @@
         const mediaHost = document.getElementById('postPreviewMedia');
         const captionEl = document.getElementById('postPreviewCaption');
 
-        // Open overlay with loading state before the fetch so clicks feel instant.
-        overlay.style.display = 'flex';
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
+
+        // Reset all the right-panel surfaces so a reopen never shows stale data.
         while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
         captionEl.textContent = '';
-        captionEl.style.display = 'none';
-
         const loader = document.createElement('div');
-        loader.style.cssText = 'color:rgba(255,255,255,0.6);font-size:13px;';
+        loader.style.cssText = 'color:rgba(255,255,255,0.55);font-size:12px;';
         loader.textContent = 'Loading…';
         mediaHost.appendChild(loader);
 
+        // External posts (synced from Meta / TikTok) already have everything
+        // we need cached from /feedPosts — no second fetch required. Planned
+        // posts still go through the old detail endpoint because it returns
+        // ordered media_items + scheduled_at + labels.
+        const cached = Array.isArray(feedPostsCache)
+            ? feedPostsCache.find(e => String(e.id) === String(postId))
+            : null;
+
         try {
-            const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
-            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
-            preview.media = Array.isArray(data.media) ? data.media : [];
-            captionEl.textContent = data.content || '';
-            captionEl.style.display = data.content ? '' : 'none';
-            renderPreviewCarousel();
-            ensurePreviewWired();
+            if (cached && cached.extendedProps && cached.extendedProps.is_external) {
+                renderPreviewDetail(cached, true);
+            } else {
+                const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                renderPreviewDetail(normalisePlanned(data, cached), false);
+            }
         } catch (e) {
             while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
             const err = document.createElement('div');
@@ -568,6 +646,256 @@
             err.textContent = 'Nuk u ngarkua posti: ' + (e.message || 'unknown error');
             mediaHost.appendChild(err);
         }
+    }
+
+    // Converts the planned-post /api/posts/{id} response + the cached feed
+    // event into the same shape that renderPreviewDetail consumes, so the
+    // modal code below doesn't care whether a post is external or planned.
+    function normalisePlanned(data, cached) {
+        const p = (cached && cached.extendedProps) || {};
+        const scheduled = data.scheduled_at || p.scheduled_at || null;
+        return {
+            id: (cached && cached.id) || data.id,
+            extendedProps: {
+                is_external: false,
+                platform: p.platform || data.platform || 'multi',
+                status: p.status || data.status || 'draft',
+                status_label: p.status_label || data.status_label || 'Draft',
+                content: data.content || p.content || '',
+                media_items: (data.media || []).map(m => ({
+                    url: m.url || m.thumbnail_url || '',
+                    thumbnail: m.thumbnail_url || m.url || '',
+                    is_video: (m.mime_type || '').startsWith('video/'),
+                })),
+                metrics: null,
+                permalink: null,
+                scheduled_at: scheduled,
+            },
+        };
+    }
+
+    // Single render path for both external and planned posts. All data comes
+    // from `event.extendedProps`; layout is the 60/40 modal defined in the
+    // template below.
+    function renderPreviewDetail(event, isExternal) {
+        const p = event.extendedProps || {};
+
+        // Media
+        preview.media = (p.media_items || []).map(m => ({
+            url: proxyMetaUrl(m.url || m.thumbnail || ''),
+            thumbnail_url: proxyMetaUrl(m.thumbnail || m.url || ''),
+            mime_type: m.is_video ? 'video/mp4' : 'image/jpeg',
+        }));
+        preview.index = 0;
+        renderPreviewCarousel();
+        ensurePreviewWired();
+
+        // Type chip (top-left of the media pane)
+        const typeChip = document.getElementById('pdTypeChip');
+        typeChip.textContent = formatMediaTypeLabel(p, preview.media.length);
+
+        // Platform badge
+        const badge = document.getElementById('pdPlatformBadge');
+        const plat = (p.platform || 'multi').toLowerCase();
+        badge.className = 'pd-platform-badge ' + (plat === 'instagram' ? 'ig' : plat === 'facebook' ? 'fb' : plat === 'tiktok' ? 'tt' : 'multi');
+        badge.textContent = prettyPlatform(plat);
+
+        // Meta line (date + post type)
+        const metaLine = document.getElementById('pdMetaLine');
+        const typeLabel = p.post_type_label || postTypeFromMedia(p);
+        const when = formatWhen(event, p, isExternal);
+        metaLine.textContent = typeLabel + (when ? ' · ' + when : '');
+
+        // Status tag
+        const statusEl = document.getElementById('pdStatusTag');
+        const statusKey = isExternal ? 'published' : (p.status === 'scheduled' ? 'scheduled' : p.status === 'published' ? 'published' : 'draft');
+        statusEl.className = 'pd-status-tag ' + statusKey;
+        statusEl.textContent = isExternal ? 'Publikuar' : (p.status_label || 'Draft');
+
+        // Caption (split out hashtags for the chip row)
+        const rawCaption = p.content || '';
+        const { body, hashtags } = splitCaptionHashtags(rawCaption);
+        const captionEl = document.getElementById('postPreviewCaption');
+        captionEl.textContent = body || '—';
+        const tagsEl = document.getElementById('pdHashtagRow');
+        while (tagsEl.firstChild) tagsEl.removeChild(tagsEl.firstChild);
+        hashtags.forEach(t => {
+            const el = document.createElement('span');
+            el.className = 'pd-hashtag';
+            el.textContent = t;
+            tagsEl.appendChild(el);
+        });
+
+        // Metrics — external only
+        const metricsSec = document.getElementById('pdMetricsSection');
+        const metricsGrid = document.getElementById('pdMetricsGrid');
+        while (metricsGrid.firstChild) metricsGrid.removeChild(metricsGrid.firstChild);
+        if (isExternal && p.metrics) {
+            metricsSec.style.display = '';
+            const m = p.metrics;
+            const cells = [
+                { v: fmtNum(m.reach),    l: 'Reach' },
+                { v: fmtNum(m.likes),    l: 'Likes' },
+                { v: fmtNum(m.comments), l: 'Comments' },
+                { v: fmtNum(m.shares || m.saves), l: (m.shares ? 'Shares' : 'Saves') },
+            ];
+            cells.forEach(c => {
+                const cell = document.createElement('div');
+                cell.className = 'pd-metric';
+                const v = document.createElement('div'); v.className = 'v'; v.textContent = c.v;
+                const l = document.createElement('div'); l.className = 'l'; l.textContent = c.l;
+                cell.appendChild(v); cell.appendChild(l);
+                metricsGrid.appendChild(cell);
+            });
+        } else {
+            metricsSec.style.display = 'none';
+        }
+
+        // Details kv list
+        const kvList = document.getElementById('pdKvList');
+        while (kvList.firstChild) kvList.removeChild(kvList.firstChild);
+        const details = buildDetailsKv(event, p, isExternal);
+        if (details.length > 0) {
+            document.getElementById('pdDetailsSection').style.display = '';
+            details.forEach(pair => {
+                const row = document.createElement('div');
+                row.className = 'pd-kv';
+                const k = document.createElement('span'); k.className = 'k'; k.textContent = pair[0];
+                const v = document.createElement('span'); v.className = 'v'; v.textContent = pair[1];
+                row.appendChild(k); row.appendChild(v);
+                kvList.appendChild(row);
+            });
+        } else {
+            document.getElementById('pdDetailsSection').style.display = 'none';
+        }
+
+        // Footer actions
+        const foot = document.getElementById('pdFooter');
+        while (foot.firstChild) foot.removeChild(foot.firstChild);
+        buildFooterActions(event, p, isExternal).forEach(a => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pd-btn' + (a.kind === 'primary' ? ' pd-btn-primary' : a.kind === 'ghost' ? ' pd-btn-ghost' : a.kind === 'danger' ? ' pd-btn-ghost pd-btn-danger' : '');
+            btn.textContent = a.label;
+            if (a.onClick) btn.addEventListener('click', a.onClick);
+            foot.appendChild(btn);
+        });
+    }
+
+    function splitCaptionHashtags(text) {
+        if (!text) return { body: '', hashtags: [] };
+        const lines = text.split(/\n+/);
+        const tags = [];
+        const bodyLines = [];
+        lines.forEach(line => {
+            const matches = line.match(/(^|\s)(#\w+)/g);
+            if (matches && matches.join('').replace(/\s/g, '').length >= line.trim().length * 0.5) {
+                // Line is mostly hashtags — extract them.
+                (line.match(/#\w+/g) || []).forEach(t => tags.push(t));
+            } else {
+                bodyLines.push(line);
+            }
+        });
+        return { body: bodyLines.join('\n').trim(), hashtags: Array.from(new Set(tags)) };
+    }
+
+    function prettyPlatform(plat) {
+        return plat === 'instagram' ? 'Instagram'
+            : plat === 'facebook' ? 'Facebook'
+            : plat === 'tiktok' ? 'TikTok'
+            : 'Multi';
+    }
+
+    function postTypeFromMedia(p) {
+        if (p.is_video || p.has_video) return 'Reel';
+        const count = Number(p.media_count || (p.media_items ? p.media_items.length : 0));
+        if (count > 1) return 'Carousel';
+        return 'Foto';
+    }
+
+    function formatMediaTypeLabel(p, count) {
+        if (p.is_video || p.has_video) return 'Reel';
+        if (count > 1) return 'Carousel · ' + count;
+        return 'Foto';
+    }
+
+    function formatWhen(event, p, isExternal) {
+        try {
+            if (isExternal && event.start) {
+                return new Date(event.start).toLocaleString('sq-AL', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
+            if (p.scheduled_at) {
+                return 'Skedulim: ' + new Date(p.scheduled_at).toLocaleString('sq-AL', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' });
+            }
+        } catch (_) {}
+        return '';
+    }
+
+    function fmtNum(n) {
+        if (n === null || n === undefined) return '—';
+        const num = Number(n) || 0;
+        return num.toLocaleString('sq-AL');
+    }
+
+    function buildDetailsKv(event, p, isExternal) {
+        const out = [];
+        if (isExternal) {
+            if (p.metrics && typeof p.metrics.engagement_rate === 'number') {
+                out.push(['Engagement rate', p.metrics.engagement_rate.toFixed(2) + '%']);
+            }
+            if (p.metrics && (p.metrics.impressions || p.metrics.impressions === 0)) {
+                out.push(['Impressions', fmtNum(p.metrics.impressions)]);
+            }
+            if (p.metrics && (p.metrics.saves || p.metrics.saves === 0) && p.metrics.shares) {
+                // If Shares is in the grid, still show Saves here.
+                out.push(['Saves', fmtNum(p.metrics.saves)]);
+            }
+        } else {
+            if (p.user_name) out.push(['Krijoi', p.user_name]);
+            if (p.platform_icons && p.platform_icons.length) {
+                out.push(['Platforma', p.platform_icons.join(' + ')]);
+            }
+            if (p.priority) out.push(['Prioritet', p.priority]);
+        }
+        return out;
+    }
+
+    function buildFooterActions(event, p, isExternal) {
+        if (isExternal) {
+            const actions = [];
+            if (p.permalink) {
+                actions.push({
+                    kind: 'ghost',
+                    label: 'Kopjo link',
+                    onClick: async () => {
+                        try {
+                            await navigator.clipboard.writeText(p.permalink);
+                            toast('Link u kopjua');
+                        } catch (_) {}
+                    },
+                });
+                actions.push({
+                    kind: 'secondary',
+                    label: 'Hap në ' + prettyPlatform((p.platform || '').toLowerCase()),
+                    onClick: () => window.open(p.permalink, '_blank', 'noopener'),
+                });
+            }
+            return actions;
+        }
+        // Planned-post actions
+        return [
+            { kind: 'primary', label: 'Edito brief', onClick: () => editFromPreview() },
+        ];
+    }
+
+    function toast(msg) {
+        // Minimal inline toast — the planner already has rich status bars,
+        // this is just for the modal's copy-link confirm so users get feedback.
+        const el = document.createElement('div');
+        el.textContent = msg;
+        el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#18181b;color:#fff;padding:8px 14px;border-radius:6px;font-size:12px;z-index:10010;box-shadow:0 10px 30px rgba(0,0,0,0.25);';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2000);
     }
 
     function renderPreviewCarousel() {
@@ -703,7 +1031,9 @@
     }
 
     function closePostPreview() {
-        document.getElementById('postPreviewOverlay').style.display = 'none';
+        const overlay = document.getElementById('postPreviewOverlay');
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
         const vid = document.querySelector('#postPreviewMedia video');
         if (vid) vid.pause();
@@ -713,12 +1043,18 @@
     }
 
     // ESC closes the preview, and in the preview ← → navigate the carousel.
+    // Also: clicking the backdrop (but not the modal itself) closes.
     document.addEventListener('keydown', (e) => {
         const overlay = document.getElementById('postPreviewOverlay');
-        if (!overlay || overlay.style.display !== 'flex') return;
+        if (!overlay || !overlay.classList.contains('open')) return;
         if (e.key === 'Escape') closePostPreview();
         if (e.key === 'ArrowLeft')  previewPrev();
         if (e.key === 'ArrowRight') previewNext();
+    });
+    document.addEventListener('click', (e) => {
+        const overlay = document.getElementById('postPreviewOverlay');
+        if (!overlay || !overlay.classList.contains('open')) return;
+        if (e.target === overlay) closePostPreview();
     });
 
     function editFromPreview() {
@@ -734,44 +1070,50 @@
     }
 </script>
 
-{{-- Post Preview Overlay --}}
-<div id="postPreviewOverlay" style="position:fixed;inset:0;z-index:9980;background:rgba(0,0,0,0.75);display:none;flex-direction:column;">
-    {{-- Toolbar --}}
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;flex-shrink:0;">
-        <div style="display:flex;align-items:center;gap:6px;">
-            <button onclick="editFromPreview()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'" title="Edit post">
-                <iconify-icon icon="heroicons-outline:pencil-square" width="18" style="color:#fff;"></iconify-icon>
-            </button>
-            <button onclick="downloadFromPreview()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'" title="Download">
-                <iconify-icon icon="heroicons-outline:arrow-down-tray" width="18" style="color:#fff;"></iconify-icon>
-            </button>
+{{-- Post Detail Modal (60/40 — mockup parity). Replaces the fullscreen
+     black overlay with a light, sectioned panel so the caption + metrics
+     read naturally and external vs planned posts share the same shell. --}}
+<div id="postPreviewOverlay" class="pd-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="pd-modal">
+        <button type="button" class="pd-close" onclick="closePostPreview()" aria-label="Mbyll">×</button>
+
+        <div class="pd-media">
+            <div class="pd-type-chip" id="pdTypeChip"></div>
+            <div class="pd-media-inner" id="postPreviewMedia"></div>
+
+            <button type="button" class="pd-carousel-arrow left" id="postPreviewPrev" onclick="event.stopPropagation(); previewPrev();" aria-label="Previous" style="display:none;">‹</button>
+            <button type="button" class="pd-carousel-arrow right" id="postPreviewNext" onclick="event.stopPropagation(); previewNext();" aria-label="Next" style="display:none;">›</button>
+            <div class="pd-carousel-dots" id="postPreviewDots" style="display:none;"></div>
+            <div id="postPreviewCounter" style="display:none;"></div>
         </div>
-        <button onclick="closePostPreview()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'" title="Close">
-            <iconify-icon icon="heroicons-outline:x-mark" width="20" style="color:#fff;"></iconify-icon>
-        </button>
-    </div>
-    {{-- Media (with carousel controls) --}}
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 60px 20px;min-height:0;position:relative;" onclick="closePostPreview()">
-        <div id="postPreviewMedia" onclick="event.stopPropagation()" style="display:flex;align-items:center;justify-content:center;position:relative;"></div>
 
-        {{-- Carousel arrows (stopPropagation so they don't close the overlay) --}}
-        <button type="button" id="postPreviewPrev" onclick="event.stopPropagation(); previewPrev();" aria-label="Previous"
-            style="display:none; position:absolute; left:12px; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); border:none; cursor:pointer; align-items:center; justify-content:center;">
-            <iconify-icon icon="heroicons-outline:chevron-left" width="22" style="color:#fff;"></iconify-icon>
-        </button>
-        <button type="button" id="postPreviewNext" onclick="event.stopPropagation(); previewNext();" aria-label="Next"
-            style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%); width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,0.15); border:none; cursor:pointer; align-items:center; justify-content:center;">
-            <iconify-icon icon="heroicons-outline:chevron-right" width="22" style="color:#fff;"></iconify-icon>
-        </button>
+        <div class="pd-detail">
+            <div class="pd-scroll">
+                <div class="pd-head-row">
+                    <span class="pd-platform-badge ig" id="pdPlatformBadge">—</span>
+                    <span class="pd-meta-line" id="pdMetaLine">—</span>
+                    <span class="pd-status-tag" id="pdStatusTag">—</span>
+                </div>
 
-        {{-- Counter badge top-right of the media --}}
-        <div id="postPreviewCounter" onclick="event.stopPropagation()" style="display:none; position:absolute; top:8px; right:70px; background:rgba(0,0,0,0.55); color:#fff; font-size:12px; font-weight:500; padding:4px 10px; border-radius:12px;"></div>
-    </div>
+                <div class="pd-section">
+                    <div class="pd-section-label">Caption</div>
+                    <div class="pd-caption-box" id="postPreviewCaption">—</div>
+                    <div class="pd-hashtag-row" id="pdHashtagRow"></div>
+                </div>
 
-    {{-- Dots indicator + Caption --}}
-    <div style="padding:0 40px 20px;text-align:center;">
-        <div id="postPreviewDots" onclick="event.stopPropagation()" style="display:none; justify-content:center; gap:6px; margin-bottom:10px;"></div>
-        <p id="postPreviewCaption" style="color:rgba(255,255,255,0.7);font-size:13px;margin:0;max-width:500px;display:inline-block;"></p>
+                <div class="pd-section" id="pdMetricsSection" style="display:none;">
+                    <div class="pd-section-label">Performance</div>
+                    <div class="pd-metrics" id="pdMetricsGrid"></div>
+                </div>
+
+                <div class="pd-section" id="pdDetailsSection" style="display:none;">
+                    <div class="pd-section-label">Detaje</div>
+                    <div class="pd-kv-list" id="pdKvList"></div>
+                </div>
+            </div>
+
+            <div class="pd-foot" id="pdFooter"></div>
+        </div>
     </div>
 </div>
 @endsection
