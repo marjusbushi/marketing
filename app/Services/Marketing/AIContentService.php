@@ -5,6 +5,7 @@ namespace App\Services\Marketing;
 use App\Models\Dis\DisItemGroup;
 use App\Models\Marketing\BrandKit;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -62,9 +63,28 @@ class AIContentService
      * additions. This is the cheap path used by the Quick AI button in
      * the daily-basket post detail panel (the creator writes rough, AI
      * polishes, user copies the same text to IG / FB / TikTok).
+     *
+     * Results are cached by sha256 of the input text for 30 days — the
+     * creator's rough drafts are highly repetitive (same typos, same
+     * product names) so the hit rate is high and we stop paying Anthropic
+     * for work we've already done.
      */
     public function cleanCaption(string $text, ?int $userId = null): string
     {
+        $normalised = trim($text);
+        if ($normalised === '') {
+            return '';
+        }
+
+        // Cache by sha256 of the input — creators repeat the same typos
+        // and product names, so hit rate is high and we stop paying
+        // Anthropic for work we've already done.
+        $cacheKey = 'marketing:ai:clean:'.hash('sha256', $normalised);
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
         $brandKit = $this->brandKitService->get();
         $voice = trim((string) ($brandKit->voice_sq ?? ''));
 
@@ -85,11 +105,20 @@ class AIContentService
         $payload = $this->call(
             endpoint: 'clean-caption',
             systemPrompt: $system,
-            userPrompt: $text,
+            userPrompt: $normalised,
             userId: $userId,
         );
 
-        return trim($payload['text'] ?? $text);
+        $cleaned = trim($payload['text'] ?? '');
+
+        // Only cache successful results — an Anthropic outage shouldn't
+        // bake "no cleanup" into the cache for 30 days.
+        if ($cleaned !== '') {
+            Cache::put($cacheKey, $cleaned, now()->addDays(30));
+            return $cleaned;
+        }
+
+        return $normalised;
     }
 
     /**

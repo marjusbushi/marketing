@@ -1,0 +1,56 @@
+name: Setup Anthropic API Key
+
+on:
+  push:
+    paths:
+      - '.github/workflows/setup-anthropic.yml'
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inject ANTHROPIC_API_KEY into server .env via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH,ANTHROPIC_API_KEY
+          script: |
+            set -e
+            cd "$APP_PATH"
+
+            upsert() {
+              local key="$1"
+              local value="$2"
+              if grep -q "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${value}|" .env
+                echo "updated ${key}"
+              else
+                echo "${key}=${value}" >> .env
+                echo "appended ${key}"
+              fi
+            }
+
+            upsert ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"
+
+            echo ""
+            echo "=== Masked grep ==="
+            grep '^ANTHROPIC_' .env | sed 's|=.*|=***|'
+
+            echo ""
+            echo "=== Rebuild config cache ==="
+            php artisan config:clear
+            php artisan config:cache
+
+            echo ""
+            echo "=== Live test: cleanCaption('pershendetje si je') ==="
+            php artisan tinker --no-interaction --execute='try { $out = app(App\Services\Marketing\AIContentService::class)->cleanCaption("pershendetje si je"); echo "CLEANED: [".$out."]".PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            sudo -n systemctl reload php8.4-fpm 2>/dev/null || sudo -n systemctl reload php-fpm 2>/dev/null || echo "php-fpm reload skipped"
+            echo "=== DONE ==="
