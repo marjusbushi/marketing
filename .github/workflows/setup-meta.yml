@@ -1,0 +1,76 @@
+name: Setup Meta Credentials
+
+on:
+  push:
+    paths:
+      - '.github/workflows/setup-meta.yml'
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inject META_* into server .env via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+          META_SYSTEM_USER_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
+          META_PAGE_TOKEN: ${{ secrets.META_PAGE_TOKEN }}
+          META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          META_IG_ACCOUNT_ID: ${{ secrets.META_IG_ACCOUNT_ID }}
+          META_BUSINESS_ID: ${{ secrets.META_BUSINESS_ID }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH,META_SYSTEM_USER_TOKEN,META_PAGE_TOKEN,META_AD_ACCOUNT_ID,META_PAGE_ID,META_IG_ACCOUNT_ID,META_BUSINESS_ID,META_APP_ID,META_APP_SECRET
+          script: |
+            set -e
+            cd "$APP_PATH"
+
+            upsert() {
+              local key="$1"
+              local value="$2"
+              if grep -q "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${value}|" .env
+                echo "updated ${key}"
+              else
+                echo "${key}=${value}" >> .env
+                echo "appended ${key}"
+              fi
+            }
+
+            upsert META_SYSTEM_USER_TOKEN      "$META_SYSTEM_USER_TOKEN"
+            upsert META_PAGE_TOKEN             "$META_PAGE_TOKEN"
+            upsert META_AD_ACCOUNT_ID          "$META_AD_ACCOUNT_ID"
+            upsert META_PAGE_ID                "$META_PAGE_ID"
+            upsert META_IG_ACCOUNT_ID          "$META_IG_ACCOUNT_ID"
+            upsert META_BUSINESS_ID            "$META_BUSINESS_ID"
+            upsert META_APP_ID                 "$META_APP_ID"
+            upsert META_APP_SECRET             "$META_APP_SECRET"
+            upsert META_API_VERSION            "v24.0"
+            upsert META_FEATURE_FACEBOOK_MODULE "true"
+
+            echo ""
+            echo "=== Masked grep ==="
+            grep '^META_' .env | sed 's|=.*|=***|'
+
+            echo ""
+            echo "=== Rebuild config cache ==="
+            php artisan config:clear
+            php artisan config:cache
+
+            echo ""
+            echo "=== Verify config loaded ==="
+            php artisan tinker --no-interaction --execute='echo "page_token=".(config("meta.page_token") ? "SET (len ".strlen((string) config("meta.page_token")).")" : "EMPTY").PHP_EOL; echo "page_id=".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id=".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL; echo "ad_account_id=".(config("meta.ad_account_id") ?: "EMPTY").PHP_EOL; echo "app_id=".(config("meta.app_id") ?: "EMPTY").PHP_EOL; echo "api_version=".(config("meta.api_version") ?: "EMPTY").PHP_EOL;'
+
+            echo ""
+            echo "=== Live test: Graph API ping (validates token) ==="
+            php artisan tinker --no-interaction --execute='try { $res = Http::get("https://graph.facebook.com/".config("meta.api_version")."/me", ["access_token" => config("meta.page_token"), "fields" => "id,name"]); echo "status=".$res->status().PHP_EOL; echo "body=".$res->body().PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            sudo -n systemctl reload php8.4-fpm 2>/dev/null || sudo -n systemctl reload php-fpm 2>/dev/null || echo "php-fpm reload skipped"
+            echo "=== DONE ==="
