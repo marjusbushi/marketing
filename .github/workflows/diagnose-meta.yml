@@ -48,4 +48,8 @@ jobs:
             echo "=== Resolver output (what the sync layer actually sees) ==="
             php artisan tinker --no-interaction --execute='App\Services\Meta\MetaTokenResolver::forgetCache(); App\Services\Meta\MetaTokenResolver::hydrateConfig(); echo "page_token=".(config("meta.page_token") ? "RESOLVED (len ".strlen((string) config("meta.page_token")).")" : "EMPTY").PHP_EOL; echo "page_id=".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id=".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL;'
 
+            echo ""
+            echo "=== Search DIS for meta/facebook/instagram tables ==="
+            php artisan tinker --no-interaction --execute='try { $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%meta%\""); foreach ($rows as $r) { echo "meta: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%facebook%\""); foreach ($rows as $r) { echo "facebook: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%instagram%\""); foreach ($rows as $r) { echo "instagram: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%token%\""); foreach ($rows as $r) { echo "token: ".array_values((array) $r)[0].PHP_EOL; } $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%credential%\""); foreach ($rows as $r) { echo "cred: ".array_values((array) $r)[0].PHP_EOL; } } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
             echo "=== DONE ==="
