@@ -86,6 +86,17 @@
     .pd-section { margin-top: 18px; }
     .pd-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; color: #a1a1aa; text-transform: uppercase; margin-bottom: 8px; }
     .pd-caption-box { font-size: 13px; line-height: 1.55; color: #18181b; white-space: pre-wrap; background: #fafafa; padding: 10px 12px; border-radius: 7px; border: 1px solid #e4e4e7; }
+    /* Long captions (15+ rreshta) would push Performance/Detaje beneath the
+       viewport. Cap height + internal scroll keeps metrics above the fold. */
+    .pd-caption-wrap { position: relative; }
+    .pd-caption-box.capped { max-height: 220px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d4d4d8 transparent; }
+    .pd-caption-box.capped::-webkit-scrollbar { width: 5px; }
+    .pd-caption-box.capped::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 99px; }
+    .pd-caption-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 28px; background: linear-gradient(to bottom, rgba(250,250,250,0), #fafafa); pointer-events: none; border-bottom-left-radius: 7px; border-bottom-right-radius: 7px; display: none; }
+    .pd-caption-wrap.is-capped .pd-caption-fade { display: block; }
+    .pd-caption-hint { display: none; align-items: center; gap: 4px; font-size: 10px; color: #a1a1aa; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+    .pd-caption-hint::before { content: "\2193"; font-size: 11px; }
+    .pd-caption-wrap.is-capped + .pd-caption-hint { display: inline-flex; }
     .pd-hashtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
     .pd-hashtag { background: rgba(109,40,217,0.1); color: #6d28d9; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
     .pd-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -725,6 +736,7 @@
             el.textContent = t;
             tagsEl.appendChild(el);
         });
+        applyCaptionCap();
 
         // Metrics — external only
         const metricsSec = document.getElementById('pdMetricsSection');
@@ -779,6 +791,23 @@
             btn.textContent = a.label;
             if (a.onClick) btn.addEventListener('click', a.onClick);
             foot.appendChild(btn);
+        });
+    }
+
+    // Cap caption box height + show fade/hint only when content actually
+    // overflows, so short captions keep the compact layout and long ones
+    // stop pushing Performance/Detaje beneath the fold.
+    function applyCaptionCap() {
+        const wrap = document.getElementById('pdCaptionWrap');
+        const box = document.getElementById('postPreviewCaption');
+        if (!wrap || !box) return;
+        wrap.classList.remove('is-capped');
+        box.classList.remove('capped');
+        requestAnimationFrame(() => {
+            if (box.scrollHeight > 220) {
+                box.classList.add('capped');
+                wrap.classList.add('is-capped');
+            }
         });
     }
 
@@ -1097,7 +1126,11 @@
 
                 <div class="pd-section">
                     <div class="pd-section-label">Caption</div>
-                    <div class="pd-caption-box" id="postPreviewCaption">—</div>
+                    <div class="pd-caption-wrap" id="pdCaptionWrap">
+                        <div class="pd-caption-box" id="postPreviewCaption">—</div>
+                        <div class="pd-caption-fade" aria-hidden="true"></div>
+                    </div>
+                    <div class="pd-caption-hint">scroll per me shume</div>
                     <div class="pd-hashtag-row" id="pdHashtagRow"></div>
                 </div>
 
