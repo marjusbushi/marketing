@@ -46,6 +46,22 @@ class StudioController extends Controller
                     'creative_briefs' => route('marketing.api.creative-briefs.index'),
                     'ai_caption'      => route('marketing.api.ai.caption'),
                     'ai_rewrite'      => route('marketing.api.ai.rewrite'),
+                    'canva_authorize'     => route('marketing.canva.authorize'),
+                    'canva_disconnect'    => route('marketing.canva.disconnect'),
+                    'canva_status'        => route('marketing.api.canva.status'),
+                    'canva_designs'       => route('marketing.api.canva.designs.create'),
+                    'canva_design_show'   => route('marketing.api.canva.designs.show', ['designId' => '__ID__']),
+                    'canva_design_export' => route('marketing.api.canva.designs.export', ['designId' => '__ID__']),
+                    'canva_export_status' => route('marketing.api.canva.exports.show', ['jobId' => '__ID__']),
+                    'canva_brand_sync'    => route('marketing.api.canva.brand-kit.sync'),
+                    'canva_attach_brief'  => route('marketing.api.creative-briefs.attach-canva', ['creativeBrief' => '__ID__']),
+                    'upload_video_brief'  => route('marketing.api.creative-briefs.upload-video', ['creativeBrief' => '__ID__']),
+                ],
+                'features' => [
+                    'canva_connect' => (bool) config('canva.features.canva_connect', false),
+                ],
+                'limits' => [
+                    'video_max_size_mb' => (int) config('content-planner.video_max_size_mb', 500),
                 ],
             ],
         ]);

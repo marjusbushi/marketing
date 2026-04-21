@@ -294,6 +294,13 @@
         <iconify-icon icon="heroicons-outline:arrow-path" width="15"></iconify-icon>
         Refresh
     </button>
+    @if(config('canva.features.canva_connect'))
+        <button type="button" class="brand-kit-button" id="syncCanvaBrandKitBtn"
+                title="Shtyn ngjyrat dhe logot te brand kit-i yt në Canva (njëkahesh)">
+            <iconify-icon icon="heroicons-outline:cloud-arrow-up" width="15"></iconify-icon>
+            Sinkronizo me Canva
+        </button>
+    @endif
     <button type="button" class="brand-kit-button brand-kit-button-primary" id="saveBrandKitBtn">
         <iconify-icon icon="heroicons-outline:check" width="15"></iconify-icon>
         Save
@@ -812,6 +819,44 @@
     $('[data-action="save"]')?.addEventListener('click', saveBrandKit);
     $('[data-action="refresh"]')?.addEventListener('click', refreshBrandKit);
     $('#assetUploadForm').addEventListener('submit', uploadAsset);
+
+    // One-way push of the saved brand kit into the user's Canva account.
+    // Canva is the consumer; the marketing app stays the source of truth.
+    const syncBtn = $('#syncCanvaBrandKitBtn');
+    if (syncBtn) {
+        const idleLabel = syncBtn.textContent?.trim() ?? 'Sinkronizo me Canva';
+        syncBtn.addEventListener('click', async () => {
+            syncBtn.disabled = true;
+            syncBtn.textContent = 'Duke sinkronizuar…';
+            try {
+                const res = await fetch('{{ route('marketing.api.canva.brand-kit.sync') }}', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                        'Accept': 'application/json',
+                    },
+                });
+                if (res.status === 428) {
+                    window.location.href = '{{ route('marketing.canva.authorize') }}';
+                    return;
+                }
+                const data = await res.json();
+                if (!res.ok) {
+                    alert('Sinkronizimi dështoi: ' + (data.message || res.status));
+                    return;
+                }
+                const errs = (data.errors || []).join('\n');
+                alert(`U sinkronizuan ${data.colors} ngjyra dhe ${data.logos} logo me Canva.` + (errs ? `\n\nGabime:\n${errs}` : ''));
+            } catch (e) {
+                alert('Sinkronizimi dështoi: ' + e.message);
+            } finally {
+                syncBtn.disabled = false;
+                syncBtn.textContent = idleLabel;
+            }
+        });
+    }
 
     fillForm();
     renderAssets();

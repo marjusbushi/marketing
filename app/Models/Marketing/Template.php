@@ -26,6 +26,7 @@ class Template extends Model
         'kind',
         'engine',
         'source',
+        'canva_brand_template_id',
         'metadata',
         'thumbnail_path',
         'is_system',

@@ -2,6 +2,8 @@
 
 use App\Enums\MarketingPermissionEnum as P;
 use App\Http\Controllers\Marketing\BrandKitController;
+use App\Http\Controllers\Marketing\CanvaAuthController;
+use App\Http\Controllers\Marketing\CanvaDesignController;
 use App\Http\Controllers\Marketing\ContentPlannerApiController;
 use App\Http\Controllers\Marketing\ContentPlannerController;
 use App\Http\Controllers\Marketing\DailyBasketController;
@@ -446,6 +448,50 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/callback', [TiktokAuthController::class, 'callback'])->name('callback');
         Route::delete('/tokens/{token}', [TiktokAuthController::class, 'deleteToken'])->name('delete-token');
     });
+
+    // ─── Visual Studio: Canva Connect ───────────────
+    // Per-user OAuth + design flow for the "Open in Canva" button. Gated by
+    // CONTENT_PLANNER_EDIT because it's part of the content-creation workflow
+    // (not analytics). Feature flag (canva.features.canva_connect) returns
+    // 404 until creds + redirect URI are wired in each environment.
+    Route::prefix('canva')
+        ->as('canva.')
+        ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value)
+        ->group(function () {
+            Route::get('/authorize', [CanvaAuthController::class, 'authorize'])->name('authorize');
+            Route::get('/callback',  [CanvaAuthController::class, 'callback'])->name('callback');
+            Route::post('/disconnect', [CanvaAuthController::class, 'disconnect'])->name('disconnect');
+        });
+
+    Route::prefix('api/canva')
+        ->as('api.canva.')
+        ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value)
+        ->group(function () {
+            Route::get('/status', [CanvaAuthController::class, 'status'])->name('status');
+
+            Route::post('/designs',                  [CanvaDesignController::class, 'create'])->name('designs.create');
+            Route::get('/designs/{designId}',        [CanvaDesignController::class, 'show'])->name('designs.show');
+            Route::post('/designs/{designId}/export', [CanvaDesignController::class, 'startExport'])->name('designs.export');
+            Route::get('/exports/{jobId}',           [CanvaDesignController::class, 'exportStatus'])->name('exports.show');
+
+            Route::post('/brand-kit/sync', [CanvaDesignController::class, 'syncBrandKit'])->name('brand-kit.sync');
+        });
+
+    // Creative-brief attach lives under its own resource group so it picks
+    // up the same permission gate as the rest of the brief API.
+    Route::prefix('api/creative-briefs')
+        ->as('api.creative-briefs.')
+        ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value)
+        ->group(function () {
+            Route::post('/{creativeBrief}/attach-canva-design',
+                [CanvaDesignController::class, 'attachToBrief']
+            )->name('attach-canva');
+
+            // CapCut-exported video upload (post-pivot video path).
+            Route::post('/{creativeBrief}/upload-video',
+                [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'uploadVideo']
+            )->name('upload-video');
+        });
 
     // ─── Influencers ────────────────────────────────
     Route::prefix('influencers')->as('influencers.')->group(function () {

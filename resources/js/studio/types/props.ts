@@ -10,6 +10,29 @@ export interface StudioEndpoints {
     creative_briefs: string;
     ai_caption: string;
     ai_rewrite: string;
+    canva_authorize: string;
+    canva_disconnect: string;
+    canva_status: string;
+    canva_designs: string;
+    /** URL template with `__ID__` placeholder for the design id. */
+    canva_design_show: string;
+    /** URL template with `__ID__` placeholder for the design id. */
+    canva_design_export: string;
+    /** URL template with `__ID__` placeholder for the export job id. */
+    canva_export_status: string;
+    canva_brand_sync: string;
+    /** URL template with `__ID__` placeholder for the creative brief id. */
+    canva_attach_brief: string;
+    /** URL template with `__ID__` placeholder for the creative brief id. */
+    upload_video_brief: string;
+}
+
+export interface StudioFeatures {
+    canva_connect: boolean;
+}
+
+export interface StudioLimits {
+    video_max_size_mb: number;
 }
 
 export interface StudioUser {
@@ -54,4 +77,6 @@ export interface StudioProps {
     permissions: StudioPermissions;
     csrf_token: string;
     endpoints: StudioEndpoints;
+    features: StudioFeatures;
+    limits: StudioLimits;
 }

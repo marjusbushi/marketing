@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { StudioLayout } from '@studio/components/Layout';
 import { QuickTrimModal } from '@studio/components/QuickTrimModal';
+import { OpenInCanvaButton } from '@studio/components/OpenInCanvaButton';
+import { VideoUploadButton } from '@studio/components/VideoUploadButton';
+import { createApiClient } from '@studio/services/api';
 import { StudioProps } from '@studio/types/props';
 
 interface BriefEditorProps {
@@ -9,17 +12,48 @@ interface BriefEditorProps {
 }
 
 /**
- * Placeholder route that will mount Polotno (photo/carousel/story) or
- * Remotion + RVE (reel/video) in tasks #1243/#1244. For now it renders
- * the shell so the full-screen layout, routing, and prop propagation
- * are testable end-to-end.
+ * Visual Studio brief editor.
+ *
+ * Post-pivot (Decision #14): we do not embed Polotno/Remotion. Photo/
+ * carousel/story work happens in Canva via the "Open in Canva" button,
+ * and video work happens in CapCut via the upload + Quick Trim path
+ * (task #1244 wires the upload control into this same shell).
  */
 export function BriefEditor({ studio }: BriefEditorProps) {
     const { id } = useParams<{ id: string }>();
     const briefId = id ?? studio.creative_brief_id;
 
+    const http = useMemo(() => createApiClient(studio.csrf_token), [studio.csrf_token]);
+
     const [quickTrimOpen, setQuickTrimOpen] = useState(false);
     const [lastTrim, setLastTrim] = useState<{ url: string; name: string } | null>(null);
+    const [brandTemplateId, setBrandTemplateId] = useState<string>('');
+    const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([]);
+
+    useEffect(() => {
+        // Pull the set of Canva brand templates available to the user.
+        // Templates without a `canva_brand_template_id` are skipped — they
+        // belong to the old Polotno path and are being phased out.
+        http.get(studio.endpoints.templates)
+            .then((res) => {
+                const list = (res.data?.templates ?? res.data ?? []) as Array<{
+                    id: string | number;
+                    name: string;
+                    canva_brand_template_id?: string | null;
+                }>;
+                const canvaOnly = list
+                    .filter((t) => Boolean(t.canva_brand_template_id))
+                    .map((t) => ({ id: String(t.canva_brand_template_id), name: t.name }));
+                setTemplates(canvaOnly);
+                if (canvaOnly.length > 0 && !brandTemplateId) {
+                    setBrandTemplateId(canvaOnly[0].id);
+                }
+            })
+            .catch(() => {
+                /* ignore — feature flag gates the button anyway. */
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [http, studio.endpoints.templates]);
 
     return (
         <StudioLayout
@@ -33,6 +67,38 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                     >
                         ✂︎ Quick Trim
                     </button>
+                    {studio.features.canva_connect && templates.length > 0 ? (
+                        <select
+                            value={brandTemplateId}
+                            onChange={(e) => setBrandTemplateId(e.target.value)}
+                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-200"
+                            title="Zgjidh Canva brand template"
+                        >
+                            {templates.map((t) => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                    ) : null}
+                    {brandTemplateId && (
+                        <OpenInCanvaButton
+                            http={http}
+                            endpoints={studio.endpoints}
+                            featureEnabled={studio.features.canva_connect}
+                            brandTemplateId={brandTemplateId}
+                            creativeBriefId={briefId ?? null}
+                        />
+                    )}
+                    <VideoUploadButton
+                        http={http}
+                        endpoints={studio.endpoints}
+                        limits={studio.limits}
+                        creativeBriefId={briefId ?? null}
+                        onQuickTrimRequested={(blob, name) => {
+                            if (lastTrim?.url) URL.revokeObjectURL(lastTrim.url);
+                            setLastTrim({ url: URL.createObjectURL(blob), name });
+                            setQuickTrimOpen(true);
+                        }}
+                    />
                     <span className="text-xs text-zinc-500">AI</span>
                     <button
                         type="button"
@@ -54,7 +120,7 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                         Shtresat
                     </div>
                     <p className="text-zinc-600">
-                        Editor i foto-s (Polotno) ose videos (Remotion) mount-ohet në tasks #1243/#1244.
+                        Foto/carousel → Canva Connect (butoni "Hap në Canva"). Video → CapCut (butoni "Upload video").
                     </p>
                 </div>
             }
@@ -71,6 +137,10 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                                 label="Permissions"
                                 value={studio.permissions['content_planner.edit'] ? 'edit' : 'view'}
                             />
+                            <Row
+                                label="Canva"
+                                value={studio.features.canva_connect ? 'on' : 'off'}
+                            />
                         </div>
                     </section>
                     {lastTrim ? (
@@ -82,25 +152,18 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                             <div className="mt-1 truncate text-[11px] text-zinc-400">{lastTrim.name}</div>
                         </section>
                     ) : null}
-                    <section>
-                        <div className="mb-1 text-[10px] uppercase tracking-widest text-zinc-500">
-                            API endpoints
-                        </div>
-                        <ul className="space-y-1 text-[11px] text-zinc-500">
-                            <li>POST {new URL(studio.endpoints.ai_caption, window.location.origin).pathname}</li>
-                            <li>PUT {new URL(studio.endpoints.creative_briefs, window.location.origin).pathname}/{briefId ?? '{id}'}</li>
-                        </ul>
-                    </section>
                 </div>
             }
             timeline={
                 <div className="flex h-full items-center justify-center text-xs text-zinc-500">
-                    Timeline për reel/video do të mount-ohet në #1244
+                    Timeline për video/reel mount-ohet në #1244 kur aktivizohet CapCut upload.
                 </div>
             }
         >
             <div className="flex h-full items-center justify-center text-sm text-zinc-500">
-                Canvas për Polotno (#1243) / Remotion Player (#1244) vjen këtu.
+                {studio.features.canva_connect
+                    ? 'Kliko "Hap në Canva" për të filluar një dizajn. Pas publikimit, ai vjen automatikisht këtu.'
+                    : 'Pas integrimit me Canva Connect, dizajnet do të hapen këtu.'}
             </div>
 
             <QuickTrimModal

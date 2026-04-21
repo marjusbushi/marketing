@@ -8,16 +8,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Creative Brief — the record that bridges AI, editor, and post.
  *
- * See the migration class docblock for the L1 vs L2 fill strategy. The
- * model enforces the relationship to RenderJob manually because the FK
- * lives the "wrong" direction (creative_briefs.render_job_id exists
- * without a DB constraint to avoid a circular FK with marketing_render_jobs).
+ * Post Decision #14: the render-job relationship is gone. Video work
+ * happens in CapCut (manual upload into `media_slots`) and photo work
+ * in Canva (the Canva design id + exported asset URL land in `state`
+ * under the `canva` key). Neither path needs an internal render queue.
  */
 class CreativeBrief extends Model
 {
@@ -41,7 +40,6 @@ class CreativeBrief extends Model
         'source',
         'ai_prompt_version',
         'state',
-        'render_job_id',
         'created_by',
     ];
 
@@ -66,17 +64,6 @@ class CreativeBrief extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function renderJobs(): HasMany
-    {
-        return $this->hasMany(RenderJob::class, 'creative_brief_id');
-    }
-
-    public function latestRenderJob(): BelongsTo
-    {
-        // Pseudo-belongsTo via the unconstrained FK column; resolves at query time.
-        return $this->belongsTo(RenderJob::class, 'render_job_id');
     }
 
     public function scopeBySource(Builder $q, string $source): Builder

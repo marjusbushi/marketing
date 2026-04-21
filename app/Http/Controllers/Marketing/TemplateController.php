@@ -59,13 +59,14 @@ class TemplateController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name'           => ['required', 'string', 'max:120'],
-            'slug'           => ['nullable', 'string', 'max:120', 'unique:marketing_templates,slug'],
-            'kind'           => ['required', 'in:photo,carousel,reel,video,story'],
-            'engine'         => ['required', 'in:polotno,remotion'],
-            'source'         => ['required', 'array'],
-            'metadata'       => ['nullable', 'array'],
-            'thumbnail_path' => ['nullable', 'string', 'max:500'],
+            'name'                    => ['required', 'string', 'max:120'],
+            'slug'                    => ['nullable', 'string', 'max:120', 'unique:marketing_templates,slug'],
+            'kind'                    => ['required', 'in:photo,carousel,reel,video,story'],
+            'engine'                  => ['required', 'in:polotno,remotion,canva,capcut'],
+            'source'                  => ['required', 'array'],
+            'canva_brand_template_id' => ['nullable', 'string', 'max:120'],
+            'metadata'                => ['nullable', 'array'],
+            'thumbnail_path'          => ['nullable', 'string', 'max:500'],
         ]);
 
         $validated['slug'] = $validated['slug'] ?? Str::slug($validated['name']) . '-' . Str::random(6);
@@ -85,13 +86,14 @@ class TemplateController extends Controller
         }
 
         $validated = $request->validate([
-            'name'           => ['sometimes', 'string', 'max:120'],
-            'kind'           => ['sometimes', 'in:photo,carousel,reel,video,story'],
-            'engine'         => ['sometimes', 'in:polotno,remotion'],
-            'source'         => ['sometimes', 'array'],
-            'metadata'       => ['sometimes', 'array'],
-            'thumbnail_path' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'is_active'      => ['sometimes', 'boolean'],
+            'name'                    => ['sometimes', 'string', 'max:120'],
+            'kind'                    => ['sometimes', 'in:photo,carousel,reel,video,story'],
+            'engine'                  => ['sometimes', 'in:polotno,remotion,canva,capcut'],
+            'source'                  => ['sometimes', 'array'],
+            'canva_brand_template_id' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'metadata'                => ['sometimes', 'array'],
+            'thumbnail_path'          => ['sometimes', 'nullable', 'string', 'max:500'],
+            'is_active'               => ['sometimes', 'boolean'],
         ]);
 
         $this->templates->update($template, $validated);
@@ -113,15 +115,16 @@ class TemplateController extends Controller
     private function serialize(Template $template, bool $includeSource = false): array
     {
         $data = [
-            'id'             => $template->id,
-            'name'           => $template->name,
-            'slug'           => $template->slug,
-            'kind'           => $template->kind,
-            'engine'         => $template->engine,
-            'metadata'       => $template->metadata ?? [],
-            'thumbnail_path' => $template->thumbnail_path,
-            'is_system'      => $template->is_system,
-            'is_active'      => $template->is_active,
+            'id'                      => $template->id,
+            'name'                    => $template->name,
+            'slug'                    => $template->slug,
+            'kind'                    => $template->kind,
+            'engine'                  => $template->engine,
+            'canva_brand_template_id' => $template->canva_brand_template_id,
+            'metadata'                => $template->metadata ?? [],
+            'thumbnail_path'          => $template->thumbnail_path,
+            'is_system'               => $template->is_system,
+            'is_active'               => $template->is_active,
         ];
 
         if ($includeSource) {
