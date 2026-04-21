@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { StudioLayout } from '@studio/components/Layout';
+import { QuickTrimModal } from '@studio/components/QuickTrimModal';
 import { StudioProps } from '@studio/types/props';
 
 interface BriefEditorProps {
@@ -16,11 +18,21 @@ export function BriefEditor({ studio }: BriefEditorProps) {
     const { id } = useParams<{ id: string }>();
     const briefId = id ?? studio.creative_brief_id;
 
+    const [quickTrimOpen, setQuickTrimOpen] = useState(false);
+    const [lastTrim, setLastTrim] = useState<{ url: string; name: string } | null>(null);
+
     return (
         <StudioLayout
             title={briefId ? `Brief #${briefId}` : 'Brief i ri'}
             actions={
                 <>
+                    <button
+                        type="button"
+                        onClick={() => setQuickTrimOpen(true)}
+                        className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:border-violet-500"
+                    >
+                        ✂︎ Quick Trim
+                    </button>
                     <span className="text-xs text-zinc-500">AI</span>
                     <button
                         type="button"
@@ -61,6 +73,15 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                             />
                         </div>
                     </section>
+                    {lastTrim ? (
+                        <section>
+                            <div className="mb-1 text-[10px] uppercase tracking-widest text-zinc-500">
+                                Trim i fundit
+                            </div>
+                            <video src={lastTrim.url} controls className="w-full rounded bg-black" />
+                            <div className="mt-1 truncate text-[11px] text-zinc-400">{lastTrim.name}</div>
+                        </section>
+                    ) : null}
                     <section>
                         <div className="mb-1 text-[10px] uppercase tracking-widest text-zinc-500">
                             API endpoints
@@ -81,6 +102,15 @@ export function BriefEditor({ studio }: BriefEditorProps) {
             <div className="flex h-full items-center justify-center text-sm text-zinc-500">
                 Canvas për Polotno (#1243) / Remotion Player (#1244) vjen këtu.
             </div>
+
+            <QuickTrimModal
+                open={quickTrimOpen}
+                onClose={() => setQuickTrimOpen(false)}
+                onTrimmed={(blob, name) => {
+                    if (lastTrim?.url) URL.revokeObjectURL(lastTrim.url);
+                    setLastTrim({ url: URL.createObjectURL(blob), name });
+                }}
+            />
         </StudioLayout>
     );
 }
