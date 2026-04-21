@@ -10,7 +10,7 @@ jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Run diagnostic via SSH
+      - name: Clear caches + verify via SSH
         uses: appleboy/ssh-action@v1
         env:
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
@@ -23,25 +23,20 @@ jobs:
           script: |
             set -e
             cd "$APP_PATH"
-            echo "=== GIT ==="
-            git log --oneline -3
+            echo "=== BEFORE cache state ==="
+            php artisan tinker --no-interaction --execute='try { $k = app(App\Services\Marketing\BrandKitService::class)->get(); echo "OK: ".get_class($k).PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }' || true
             echo ""
-            echo "=== LARAVEL LOG (last 120 lines) ==="
-            tail -120 storage/logs/laravel.log || echo "no log"
+            echo "=== CLEAR ==="
+            php artisan cache:clear
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            echo "done"
             echo ""
-            echo "=== ROUTES canva ==="
-            php artisan route:list --name=canva 2>&1 | head -20 || echo "route list failed"
+            echo "=== AFTER cache state ==="
+            php artisan tinker --no-interaction --execute='try { $k = app(App\Services\Marketing\BrandKitService::class)->get(); echo "OK: ".get_class($k)." id=".$k->id.PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
             echo ""
-            echo "=== CANVA ROUTE sync exists? ==="
-            php artisan tinker --no-interaction --execute='try { echo route("marketing.api.canva.brand-kit.sync").PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
-            echo ""
-            echo "=== VIEW CACHE dir ==="
-            ls -la storage/framework/views/ | head -10 || true
-            echo ""
-            echo "=== curl brand-kit HEAD ==="
-            curl -sI "http://127.0.0.1/marketing/settings/brand-kit" | head -5 || echo "curl failed"
-            echo ""
-            echo "=== curl daily-basket HEAD ==="
-            curl -sI "http://127.0.0.1/marketing/daily-basket?week=12" | head -5 || echo "curl failed"
-            echo ""
+            echo "=== LAST ERROR in log ==="
+            tail -5 storage/logs/laravel.log || echo "no log"
             echo "=== DONE ==="
