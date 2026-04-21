@@ -35,6 +35,18 @@ export interface CapcutStateEntry {
     uploaded_at: string;
 }
 
+export interface PhotoStateEntry {
+    kind: 'photo';
+    source: 'upload';
+    path: string;
+    width: number | null;
+    height: number | null;
+    mime_type: string;
+    size_bytes: number;
+    media_id: number | null;
+    uploaded_at: string;
+}
+
 export interface MediaSlot {
     kind: string;
     [key: string]: unknown;
@@ -68,6 +80,7 @@ export interface CreativeBriefPayload {
 export interface BriefState {
     canva?: CanvaStateEntry | null;
     capcut?: CapcutStateEntry[];
+    photos?: PhotoStateEntry[];
     editor?: Record<string, unknown>;
     [key: string]: unknown;
 }

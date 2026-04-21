@@ -491,6 +491,13 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             Route::post('/{creativeBrief}/upload-video',
                 [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'uploadVideo']
             )->name('upload-video');
+
+            // Direct photo upload (Rruga C fallback — works without Canva
+            // brand template subscription). Staff designs anywhere, exports
+            // PNG/JPG, drops it here.
+            Route::post('/{creativeBrief}/upload-photo',
+                [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'uploadPhoto']
+            )->name('upload-photo');
         });
 
     // ─── Influencers ────────────────────────────────

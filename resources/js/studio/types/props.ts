@@ -25,6 +25,8 @@ export interface StudioEndpoints {
     canva_attach_brief: string;
     /** URL template with `__ID__` placeholder for the creative brief id. */
     upload_video_brief: string;
+    /** URL template with `__ID__` placeholder for the creative brief id. */
+    upload_photo_brief: string;
 }
 
 export interface StudioFeatures {
@@ -33,6 +35,7 @@ export interface StudioFeatures {
 
 export interface StudioLimits {
     video_max_size_mb: number;
+    photo_max_size_mb: number;
 }
 
 export interface StudioUser {

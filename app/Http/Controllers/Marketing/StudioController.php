@@ -63,12 +63,14 @@ class StudioController extends Controller
                     'canva_brand_sync'    => route('marketing.api.canva.brand-kit.sync'),
                     'canva_attach_brief'  => route('marketing.api.creative-briefs.attach-canva', ['creativeBrief' => '__ID__']),
                     'upload_video_brief'  => route('marketing.api.creative-briefs.upload-video', ['creativeBrief' => '__ID__']),
+                    'upload_photo_brief'  => route('marketing.api.creative-briefs.upload-photo', ['creativeBrief' => '__ID__']),
                 ],
                 'features' => [
                     'canva_connect' => (bool) config('canva.features.canva_connect', false),
                 ],
                 'limits' => [
                     'video_max_size_mb' => (int) config('content-planner.video_max_size_mb', 500),
+                    'photo_max_size_mb' => (int) config('content-planner.photo_max_size_mb', 25),
                 ],
                 'embedded' => $embedded,
             ],

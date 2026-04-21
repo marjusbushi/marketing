@@ -4,10 +4,11 @@ import { StudioLayout } from '@studio/components/Layout';
 import { QuickTrimModal } from '@studio/components/QuickTrimModal';
 import { OpenInCanvaButton } from '@studio/components/OpenInCanvaButton';
 import { VideoUploadButton } from '@studio/components/VideoUploadButton';
+import { PhotoUploadButton } from '@studio/components/PhotoUploadButton';
 import { AiCaptionButtons } from '@studio/components/AiCaptionButtons';
 import { useToast } from '@studio/components/ToastHost';
 import { createApiClient } from '@studio/services/api';
-import { CreativeBriefClient, type CapcutStateEntry, type CanvaStateEntry } from '@studio/services/creativeBriefClient';
+import { CreativeBriefClient, type CapcutStateEntry, type CanvaStateEntry, type PhotoStateEntry } from '@studio/services/creativeBriefClient';
 import { useAutoSaveBrief, type SaveStatus } from '@studio/hooks/useAutoSaveBrief';
 import { StudioProps } from '@studio/types/props';
 
@@ -85,6 +86,7 @@ export function BriefEditor({ studio }: BriefEditorProps) {
 
     const canvaAttached: CanvaStateEntry | null = brief?.state?.canva ?? null;
     const capcutAttached: CapcutStateEntry[] = brief?.state?.capcut ?? [];
+    const photosAttached: PhotoStateEntry[] = brief?.state?.photos ?? [];
 
     return (
         <StudioLayout
@@ -121,6 +123,13 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                             onAttached={() => { void reload(); }}
                         />
                     )}
+                    <PhotoUploadButton
+                        http={http}
+                        endpoints={studio.endpoints}
+                        limits={studio.limits}
+                        creativeBriefId={briefId ?? null}
+                        onUploaded={() => { void reload(); }}
+                    />
                     <VideoUploadButton
                         http={http}
                         endpoints={studio.endpoints}
@@ -141,7 +150,7 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                         Media e lidhura
                     </div>
                     {!brief && !loading && !loadError ? (
-                        <p className="text-zinc-600">Brief i ri — ngarko një video ose hap në Canva.</p>
+                        <p className="text-zinc-600">Brief i ri — ngarko foto ose video për të filluar.</p>
                     ) : null}
                     {loading ? <p className="text-zinc-500">Duke ngarkuar…</p> : null}
                     {loadError ? <p className="text-rose-400">{loadError}</p> : null}
@@ -167,6 +176,29 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                             <div className="mt-1 text-[10px] text-zinc-500">
                                 {new Date(canvaAttached.attached_at).toLocaleString()}
                             </div>
+                        </section>
+                    ) : null}
+
+                    {photosAttached.length > 0 ? (
+                        <section className="mb-3">
+                            <div className="mb-1 text-[10px] uppercase tracking-widest text-sky-400">
+                                Foto ({photosAttached.length})
+                            </div>
+                            <ul className="space-y-2">
+                                {photosAttached.map((slot, idx) => (
+                                    <li key={idx} className="rounded-md border border-zinc-800 bg-zinc-900/50 p-2">
+                                        <img
+                                            src={toPublicUrl(slot.path)}
+                                            alt=""
+                                            className="mb-1 h-20 w-full rounded object-cover"
+                                        />
+                                        <div className="text-[11px] text-zinc-300">
+                                            {slot.width ?? '—'}×{slot.height ?? '—'}
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500">{formatBytes(slot.size_bytes)}</div>
+                                    </li>
+                                ))}
+                            </ul>
                         </section>
                     ) : null}
 
@@ -274,10 +306,16 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                 </div>
             }
             timeline={
-                <div className="flex h-full items-center justify-center text-xs text-zinc-500">
-                    {capcutAttached.length > 0
-                        ? `${capcutAttached.length} video e lidhur${capcutAttached.length > 1 ? 'a' : 'e'}`
-                        : 'Asnjë video e ngarkuar ende.'}
+                <div className="flex h-full items-center justify-center gap-4 text-xs text-zinc-500">
+                    {photosAttached.length > 0 ? (
+                        <span>{photosAttached.length} foto</span>
+                    ) : null}
+                    {capcutAttached.length > 0 ? (
+                        <span>{capcutAttached.length} video</span>
+                    ) : null}
+                    {photosAttached.length === 0 && capcutAttached.length === 0 ? (
+                        <span>Asnjë media e ngarkuar ende.</span>
+                    ) : null}
                 </div>
             }
         >
@@ -291,6 +329,19 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                         />
                         <p className="text-zinc-400">Dizajni i ngarkuar nga Canva. Kliko "Hap në Canva" për ta përditësuar.</p>
                     </>
+                ) : photosAttached.length > 0 ? (
+                    <>
+                        <img
+                            src={toPublicUrl(photosAttached[0].path)}
+                            alt=""
+                            className="max-h-[70%] max-w-[70%] rounded shadow-lg"
+                        />
+                        <p className="text-zinc-400">
+                            {photosAttached.length === 1
+                                ? 'Foto e ngarkuar.'
+                                : `${photosAttached.length} foto të ngarkuara (carousel).`}
+                        </p>
+                    </>
                 ) : capcutAttached.length > 0 && capcutAttached[0].thumbnail_path ? (
                     <>
                         <img
@@ -300,10 +351,8 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                         />
                         <p className="text-zinc-400">{capcutAttached.length} video e ngarkuar nga CapCut.</p>
                     </>
-                ) : studio.features.canva_connect ? (
-                    <p>Kliko "Hap në Canva" për foto/carousel ose "Upload video" për video.</p>
                 ) : (
-                    <p>Ngarko një video CapCut për të filluar.</p>
+                    <p>Ngarko foto (PNG/JPG) ose video (MP4 nga CapCut) për të filluar.</p>
                 )}
             </div>
 

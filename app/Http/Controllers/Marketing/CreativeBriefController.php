@@ -283,6 +283,94 @@ class CreativeBriefController extends Controller
     }
 
     /**
+     * Direct photo upload for the Rruga C fallback — staff designs in any
+     * tool (Canva Free, Figma, Photoshop, phone) and drops the finished
+     * PNG/JPG here. Works without Canva brand templates, which are a
+     * Canva Pro+ feature we don't yet subscribe to.
+     *
+     * Mirrors `uploadVideo()`'s shape so the handoff code in DailyBasket
+     * can pick either kind from the same `state` snapshot.
+     */
+    public function uploadPhoto(Request $request, CreativeBrief $creativeBrief): JsonResponse
+    {
+        $maxKb = (int) config('content-planner.photo_max_size_mb', 25) * 1024;
+
+        $validated = $request->validate([
+            'file'   => ["required", "file", "max:{$maxKb}", "mimetypes:image/jpeg,image/png,image/webp"],
+            'width'  => ['nullable', 'integer', 'min:1', 'max:16384'],
+            'height' => ['nullable', 'integer', 'min:1', 'max:16384'],
+        ]);
+
+        $file = $request->file('file');
+        $dir  = "marketing/photos/{$creativeBrief->id}";
+        $path = $file->store($dir, 'public');
+
+        // Parallel DailyBasketPostMedia row so the planner grid shows it.
+        $media = null;
+        if ($creativeBrief->daily_basket_post_id !== null) {
+            $media = DB::transaction(function () use ($creativeBrief, $file, $path, $validated) {
+                $nextOrder = (int) DailyBasketPostMedia::query()
+                    ->where('daily_basket_post_id', $creativeBrief->daily_basket_post_id)
+                    ->max('sort_order') + 1;
+
+                return DailyBasketPostMedia::query()->create([
+                    'daily_basket_post_id' => $creativeBrief->daily_basket_post_id,
+                    'disk'                 => 'public',
+                    'path'                 => $path,
+                    'original_filename'    => $file->getClientOriginalName(),
+                    'mime_type'            => $file->getMimeType(),
+                    'size_bytes'           => $file->getSize(),
+                    'width'                => $validated['width'] ?? null,
+                    'height'               => $validated['height'] ?? null,
+                    'duration_seconds'     => null,
+                    'thumbnail_path'       => $path,
+                    'sort_order'           => $nextOrder,
+                ]);
+            });
+        }
+
+        $slotEntry = [
+            'kind'        => 'photo',
+            'source'      => 'upload',
+            'disk'        => 'public',
+            'path'        => $path,
+            'width'       => $validated['width'] ?? null,
+            'height'      => $validated['height'] ?? null,
+            'mime_type'   => $file->getMimeType(),
+            'size_bytes'  => $file->getSize(),
+            'media_id'    => $media?->id,
+            'uploaded_at' => now()->toIso8601String(),
+        ];
+
+        $slots = $creativeBrief->media_slots ?? [];
+        $slots[] = $slotEntry;
+
+        $state = $creativeBrief->state ?? [];
+        $state['photos'] = array_values(array_filter(
+            array_merge($state['photos'] ?? [], [$slotEntry]),
+            fn ($v) => is_array($v),
+        ));
+
+        $creativeBrief->forceFill([
+            'media_slots' => $slots,
+            'state'       => $state,
+        ])->save();
+
+        return response()->json([
+            'creative_brief' => $this->serialize($creativeBrief->refresh(), includeState: true),
+            'media'          => $media ? [
+                'id'            => $media->id,
+                'url'           => $media->url,
+                'thumbnail_url' => $media->thumbnail_url,
+                'width'         => $media->width,
+                'height'        => $media->height,
+                'size_bytes'    => $media->size_bytes,
+            ] : null,
+            'slot' => $slotEntry,
+        ], 201);
+    }
+
+    /**
      * Look up the primary (sort_order=0) item_group_id for a basket post
      * without crossing DB connections in a single query. Returns
      * `[null, null]` on any failure so the editor falls back gracefully.

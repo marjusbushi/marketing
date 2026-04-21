@@ -26,6 +26,9 @@ return [
     // enforce at the Laravel layer; PHP `upload_max_filesize` / `post_max_size`
     // and nginx `client_max_body_size` must match or exceed it.
     'video_max_size_mb' => (int) env('MARKETING_VIDEO_MAX_SIZE_MB', 500),
+    // Direct photo upload ceiling (Rruga C). Social-first exports are
+    // typically 1-5 MB; 25 MB gives head-room for Retina/PDF export prints.
+    'photo_max_size_mb' => (int) env('MARKETING_PHOTO_MAX_SIZE_MB', 25),
     'allowed_image_types' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
     'allowed_video_types' => ['mp4', 'mov', 'avi'],
     'thumbnail_width' => 400,

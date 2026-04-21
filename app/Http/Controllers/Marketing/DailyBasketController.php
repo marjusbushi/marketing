@@ -652,6 +652,24 @@ class DailyBasketController extends Controller
                         'alt_text'          => 'Brief #'.$brief->id.' video',
                     ]);
                     $ids[] = $media->id;
+                } elseif ($kind === 'photo' && ($slot['source'] ?? null) === 'upload') {
+                    // Rruga C fallback: direct photo uploads live on the
+                    // public disk already, so just clone the row into
+                    // ContentMedia without re-downloading.
+                    $path = (string) ($slot['path'] ?? '');
+                    if ($path === '' || ! Storage::disk('public')->exists($path)) continue;
+                    $media = ContentMedia::create([
+                        'uuid'              => (string) Str::uuid(),
+                        'user_id'           => $this->currentUserId() ?? 1,
+                        'filename'          => basename($path),
+                        'original_filename' => basename($path),
+                        'disk'              => 'public',
+                        'path'              => $path,
+                        'mime_type'         => (string) ($slot['mime_type'] ?? 'image/jpeg'),
+                        'size_bytes'        => (int) ($slot['size_bytes'] ?? Storage::disk('public')->size($path)),
+                        'alt_text'          => 'Brief #'.$brief->id.' photo',
+                    ]);
+                    $ids[] = $media->id;
                 }
             } catch (\Throwable $e) {
                 report($e);
