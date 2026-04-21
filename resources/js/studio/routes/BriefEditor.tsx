@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { StudioLayout } from '@studio/components/Layout';
 import { QuickTrimModal } from '@studio/components/QuickTrimModal';
 import { OpenInCanvaButton } from '@studio/components/OpenInCanvaButton';
 import { VideoUploadButton } from '@studio/components/VideoUploadButton';
 import { AiCaptionButtons } from '@studio/components/AiCaptionButtons';
+import { useToast } from '@studio/components/ToastHost';
 import { createApiClient } from '@studio/services/api';
 import { CreativeBriefClient, type CapcutStateEntry, type CanvaStateEntry } from '@studio/services/creativeBriefClient';
 import { useAutoSaveBrief, type SaveStatus } from '@studio/hooks/useAutoSaveBrief';
@@ -43,6 +44,17 @@ export function BriefEditor({ studio }: BriefEditorProps) {
         patch,
         reload,
     } = useAutoSaveBrief(briefClient, briefId);
+
+    // Toast once on each transition into the error state. Without the
+    // ref guard the pill and the toast would double-fire on every render.
+    const toast = useToast();
+    const lastSaveStatusRef = useRef<SaveStatus>('idle');
+    useEffect(() => {
+        if (saveStatus === 'error' && lastSaveStatusRef.current !== 'error' && saveError) {
+            toast.error('Ruajtja dështoi: ' + saveError);
+        }
+        lastSaveStatusRef.current = saveStatus;
+    }, [saveStatus, saveError, toast]);
 
     const [quickTrimOpen, setQuickTrimOpen] = useState(false);
     const [lastTrim, setLastTrim] = useState<{ url: string; name: string } | null>(null);

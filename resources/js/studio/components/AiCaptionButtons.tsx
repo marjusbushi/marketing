@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AxiosInstance } from 'axios';
+import { useToast } from '@studio/components/ToastHost';
 import type { StudioEndpoints } from '@studio/types/props';
 import type { CreativeBriefPayload, PostType } from '@studio/services/creativeBriefClient';
 
@@ -24,6 +25,7 @@ interface AiCaptionButtonsProps {
  * product id, empty caption) so the user never clicks into a 422.
  */
 export function AiCaptionButtons({ http, endpoints, brief, onCaptionGenerated, onRewriteCompleted }: AiCaptionButtonsProps) {
+    const toast = useToast();
     const [language, setLanguage] = useState<Language>('both');
     const [generating, setGenerating] = useState(false);
     const [rewritingSq, setRewritingSq] = useState(false);
@@ -47,8 +49,11 @@ export function AiCaptionButtons({ http, endpoints, brief, onCaptionGenerated, o
                 caption_en: data.caption_en,
                 hashtags: data.hashtags ?? [],
             });
+            toast.success('Caption u gjenerua me AI.');
         } catch (e) {
-            setError(friendly(e));
+            const msg = friendly(e);
+            setError(msg);
+            toast.error('AI: ' + msg);
         } finally {
             setGenerating(false);
         }
@@ -65,8 +70,11 @@ export function AiCaptionButtons({ http, endpoints, brief, onCaptionGenerated, o
                 { text: current, language: lang, tone: 'brand' },
             );
             onRewriteCompleted(lang, data.text);
+            toast.success(lang === 'sq' ? 'Caption u rishkrua (sq).' : 'Caption rewritten (en).');
         } catch (e) {
-            setError(friendly(e));
+            const msg = friendly(e);
+            setError(msg);
+            toast.error('AI rewrite: ' + msg);
         } finally {
             lang === 'sq' ? setRewritingSq(false) : setRewritingEn(false);
         }

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { AxiosInstance, AxiosProgressEvent } from 'axios';
+import { useToast } from '@studio/components/ToastHost';
 import type { StudioEndpoints, StudioLimits } from '@studio/types/props';
 
 interface VideoUploadButtonProps {
@@ -42,6 +43,7 @@ export function VideoUploadButton({
     onQuickTrimRequested,
 }: VideoUploadButtonProps) {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const toast = useToast();
 
     const [stage, setStage] = useState<'idle' | 'probing' | 'uploading' | 'done'>('idle');
     const [progress, setProgress] = useState(0);
@@ -105,9 +107,12 @@ export function VideoUploadButton({
             setLastSlot(response.data.slot);
             onUploaded?.(response.data.slot);
             setStage('done');
+            toast.success(`Video u ngarkua (${formatSize(file.size)}).`);
         } catch (e) {
             setStage('idle');
-            setError(friendly(e));
+            const msg = friendly(e);
+            setError(msg);
+            toast.error('Upload video: ' + msg);
         }
     }
 
@@ -262,8 +267,15 @@ function formatSize(bytes: number): string {
 
 function friendly(e: unknown): string {
     if (e && typeof e === 'object' && 'response' in e) {
-        const res = (e as { response?: { data?: { message?: string } } }).response;
+        const res = (e as { response?: { status?: number; data?: { message?: string } } }).response;
+        // nginx/PHP enforce the real ceiling before Laravel sees the request,
+        // so 413 comes back without a JSON body. Translate it into the
+        // actionable hint: trim the video with Quick Trim first.
+        if (res?.status === 413) {
+            return 'Video tepër e madhe për server-in. Provo ta shkurtosh me Quick Trim.';
+        }
         if (res?.data?.message) return res.data.message;
+        if (res?.status) return `HTTP ${res.status}`;
     }
     if (e instanceof Error) return e.message;
     return 'Upload dështoi.';

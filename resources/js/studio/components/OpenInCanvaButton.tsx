@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AxiosInstance } from 'axios';
 import { CanvaClient, type CanvaExportJob } from '@studio/services/canvaClient';
+import { useToast } from '@studio/components/ToastHost';
 import type { StudioEndpoints } from '@studio/types/props';
 
 type Format = 'png' | 'jpg' | 'pdf';
@@ -50,6 +51,7 @@ export function OpenInCanvaButton({
         clientRef.current = new CanvaClient(http, endpoints);
     }
     const client = clientRef.current;
+    const toast = useToast();
 
     const [stage, setStage] = useState<'idle' | 'checking' | 'creating' | 'editing' | 'exporting' | 'attaching'>('idle');
     const [designId, setDesignId] = useState<string | null>(null);
@@ -99,7 +101,9 @@ export function OpenInCanvaButton({
             setStage('editing');
         } catch (e) {
             setStage('idle');
-            setError(friendly(e));
+            const msg = friendly(e);
+            setError(msg);
+            toast.error('Canva: ' + msg);
         }
     }
 
@@ -130,13 +134,16 @@ export function OpenInCanvaButton({
                 asset_url: final.job.urls[0],
                 format: exportFormat,
             });
+            toast.success('Dizajni i Canva-s u bashkangjit te posti.');
 
             setStage('idle');
             setDesignId(null);
             setEditUrl(null);
         } catch (e) {
             setStage('editing');
-            setError(friendly(e));
+            const msg = friendly(e);
+            setError(msg);
+            toast.error('Canva: ' + msg);
         }
     }
 
