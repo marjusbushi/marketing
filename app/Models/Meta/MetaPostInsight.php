@@ -41,6 +41,13 @@ class MetaPostInsight extends Model
 
     protected $table = 'meta_post_insights';
 
+    // The table intentionally has no created_at/updated_at columns —
+    // synced_at (when we last pulled from Graph API) and created_at_meta
+    // (when Meta created the post) cover the two meaningful timestamps.
+    // Without this flag Eloquent injects both columns on insert and the
+    // whole INSERT fails with "Unknown column 'updated_at'".
+    public $timestamps = false;
+
     protected $fillable = [
         'source',
         'source_id',
