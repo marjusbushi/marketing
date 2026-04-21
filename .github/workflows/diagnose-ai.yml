@@ -1,0 +1,44 @@
+name: Diagnose AI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/diagnose-ai.yml'
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect AI config + test a clean caption call
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          script: |
+            set -e
+            cd "$APP_PATH"
+
+            echo "=== AI env presence (masked) ==="
+            grep -E '^(ANTHROPIC|MARKETING_AI)_' .env | sed 's|=.*|=***set|' || echo "NO AI VARS IN .env"
+
+            echo ""
+            echo "=== Live config after config:clear ==="
+            php artisan config:clear
+            php artisan tinker --no-interaction --execute='echo "api_key_set=".(!empty(config("anthropic.api_key")) ? "yes" : "NO").PHP_EOL; echo "model=".(string) config("anthropic.model").PHP_EOL; echo "base_url=".(string) config("anthropic.base_url").PHP_EOL;'
+            php artisan config:cache
+
+            echo ""
+            echo "=== cleanCaption live test ==="
+            php artisan tinker --no-interaction --execute='try { $svc = app(App\Services\Marketing\AIContentService::class); $out = $svc->cleanCaption("pershendetje si je"); echo "CLEANED: [".$out."]".PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== Last 3 marketing_ai_calls audit rows ==="
+            php artisan tinker --no-interaction --execute='foreach (DB::table("marketing_ai_calls")->orderByDesc("id")->limit(3)->get() as $r) { echo $r->id." endpoint=".$r->endpoint." model=".$r->model." ok=".($r->ok ? "1" : "0")." tokens_in=".($r->tokens_in ?? 0)." tokens_out=".($r->tokens_out ?? 0)." err=".($r->error_code ?? "-").PHP_EOL; }'
+
+            echo "=== DONE ==="
