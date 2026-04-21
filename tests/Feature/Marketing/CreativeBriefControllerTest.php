@@ -100,6 +100,29 @@ class CreativeBriefControllerTest extends TestCase
             ->assertJsonPath('creative_brief.state.pages.0.id', 'p1');
     }
 
+    public function test_show_exposes_primary_item_group_key_for_ai(): void
+    {
+        // `primary_item_group_id` / `primary_item_group_name` power the
+        // AI "Generate Caption" button in the editor — the presence of the
+        // keys in the response is the contract we lock down here. The
+        // actual lookup goes cross-DB (item_groups lives in DIS), which
+        // the SQLite-per-connection test harness can't faithfully model;
+        // end-to-end validation happens on prod/staging MySQL.
+        $brief = CreativeBrief::query()->create([
+            'post_type' => 'reel',
+            'source'    => 'manual',
+        ]);
+
+        $response = $this->getJson("/marketing/api/creative-briefs/{$brief->id}")
+            ->assertOk();
+
+        $payload = $response->json('creative_brief');
+        $this->assertArrayHasKey('primary_item_group_id', $payload);
+        $this->assertArrayHasKey('primary_item_group_name', $payload);
+        $this->assertNull($payload['primary_item_group_id']);   // no post linked
+        $this->assertNull($payload['primary_item_group_name']);
+    }
+
     public function test_update_persists_caption_and_state(): void
     {
         $brief = CreativeBrief::query()->create(['post_type' => 'reel', 'source' => 'manual']);

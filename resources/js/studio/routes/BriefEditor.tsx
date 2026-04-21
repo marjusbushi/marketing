@@ -4,6 +4,7 @@ import { StudioLayout } from '@studio/components/Layout';
 import { QuickTrimModal } from '@studio/components/QuickTrimModal';
 import { OpenInCanvaButton } from '@studio/components/OpenInCanvaButton';
 import { VideoUploadButton } from '@studio/components/VideoUploadButton';
+import { AiCaptionButtons } from '@studio/components/AiCaptionButtons';
 import { createApiClient } from '@studio/services/api';
 import { CreativeBriefClient, type CapcutStateEntry, type CanvaStateEntry } from '@studio/services/creativeBriefClient';
 import { useAutoSaveBrief, type SaveStatus } from '@studio/hooks/useAutoSaveBrief';
@@ -217,6 +218,36 @@ export function BriefEditor({ studio }: BriefEditorProps) {
                             className="mt-2 w-full rounded border border-zinc-800 bg-zinc-900 p-2 text-zinc-200 outline-none focus:border-violet-500"
                             disabled={!brief || !studio.permissions['content_planner.edit']}
                         />
+
+                        {studio.permissions['content_planner.edit'] ? (
+                            <div className="mt-2">
+                                <AiCaptionButtons
+                                    http={http}
+                                    endpoints={studio.endpoints}
+                                    brief={brief}
+                                    onCaptionGenerated={({ caption_sq, caption_en, hashtags }) => {
+                                        patch({
+                                            caption_sq: caption_sq ?? brief?.caption_sq ?? null,
+                                            caption_en: caption_en ?? brief?.caption_en ?? null,
+                                            hashtags: hashtags && hashtags.length > 0 ? hashtags : brief?.hashtags ?? null,
+                                        });
+                                    }}
+                                    onRewriteCompleted={(language, text) => {
+                                        patch(language === 'sq' ? { caption_sq: text } : { caption_en: text });
+                                    }}
+                                />
+                            </div>
+                        ) : null}
+
+                        {brief?.hashtags && brief.hashtags.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                                {brief.hashtags.map((tag, i) => (
+                                    <span key={i} className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-300">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
                     </section>
 
                     {lastTrim ? (

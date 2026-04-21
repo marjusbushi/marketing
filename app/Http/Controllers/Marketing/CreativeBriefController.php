@@ -59,10 +59,14 @@ class CreativeBriefController extends Controller
 
     public function show(CreativeBrief $creativeBrief): JsonResponse
     {
-        $creativeBrief->load(['template', 'dailyBasketPost']);
+        $creativeBrief->load(['template', 'dailyBasketPost.itemGroups']);
 
         return response()->json([
-            'creative_brief' => $this->serialize($creativeBrief, includeState: true),
+            'creative_brief' => $this->serialize(
+                $creativeBrief,
+                includeState: true,
+                includeProduct: true,
+            ),
         ]);
     }
 
@@ -271,7 +275,7 @@ class CreativeBriefController extends Controller
         ], 201);
     }
 
-    private function serialize(CreativeBrief $brief, bool $includeState = false): array
+    private function serialize(CreativeBrief $brief, bool $includeState = false, bool $includeProduct = false): array
     {
         $data = [
             'id'                   => $brief->id,
@@ -296,6 +300,15 @@ class CreativeBriefController extends Controller
 
         if ($includeState) {
             $data['state'] = $brief->state;
+        }
+
+        if ($includeProduct) {
+            // AI caption endpoints need a product context. Expose the
+            // first item group from the linked daily-basket post so the
+            // editor's "Generate" button works out of the box.
+            $firstGroup = $brief->dailyBasketPost?->itemGroups?->first();
+            $data['primary_item_group_id'] = $firstGroup?->id;
+            $data['primary_item_group_name'] = $firstGroup?->name ?? null;
         }
 
         return $data;

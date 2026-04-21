@@ -60,6 +60,9 @@ export interface CreativeBriefPayload {
     state: BriefState | null;
     created_at: string | null;
     updated_at: string | null;
+    /** Populated only by `show` — first item group on the linked post. */
+    primary_item_group_id?: number | null;
+    primary_item_group_name?: string | null;
 }
 
 export interface BriefState {
