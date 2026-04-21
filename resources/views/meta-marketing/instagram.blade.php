@@ -848,6 +848,30 @@
     }
 
     // Top Posts
+    function renderTopPostsError(grid, message) {
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
+        const wrap = document.createElement('div');
+        wrap.className = 'text-center py-8 col-span-full';
+        const title = document.createElement('div');
+        title.className = 'text-slate-500 text-sm mb-3';
+        title.textContent = 'Nuk u ngarkuan top postimet';
+        const detail = document.createElement('div');
+        detail.className = 'text-xs text-slate-400 mb-3';
+        detail.textContent = message || 'Gabim i panjohur';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-600 text-white text-xs font-semibold hover:bg-primary-700 transition-colors';
+        btn.textContent = 'Provo perseri';
+        btn.addEventListener('click', () => {
+            const preset = datePresetEl.value !== 'custom' ? datePresetEl.value : null;
+            loadTopPosts(currentPostFilter, dateFromEl.value, dateToEl.value, preset);
+        });
+        wrap.appendChild(title);
+        wrap.appendChild(detail);
+        wrap.appendChild(btn);
+        grid.appendChild(wrap);
+    }
+
     async function loadTopPosts(type, from, to, preset = null, extra = {}, gen = null) {
         const grid = document.getElementById('topPostsGrid');
         const params = { limit: 12, ...extra };
@@ -856,17 +880,38 @@
         if (to) params.to = to;
         if (preset) params.preset = preset;
 
-        const { data } = await fetchApi('ig-top-posts', params);
+        while (grid.firstChild) grid.removeChild(grid.firstChild);
+        const loading = document.createElement('div');
+        loading.className = 'text-center py-8 text-slate-400 col-span-full';
+        loading.textContent = 'Duke ngarkuar...';
+        grid.appendChild(loading);
+
+        let data;
+        try {
+            const res = await fetchApi('ig-top-posts', params);
+            data = res.data;
+        } catch (e) {
+            if (gen !== null && gen !== loadGeneration) return;
+            console.error('Top posts load failed:', e);
+            renderTopPostsError(grid, e && e.message);
+            return;
+        }
         if (gen !== null && gen !== loadGeneration) return;
 
-        if (!data.length) {
-            grid.innerHTML = '<div class="text-center py-8 text-slate-400 col-span-full">Nuk ka postime</div>';
+        if (!Array.isArray(data) || !data.length) {
+            while (grid.firstChild) grid.removeChild(grid.firstChild);
+            const empty = document.createElement('div');
+            empty.className = 'text-center py-8 text-slate-400 col-span-full';
+            empty.textContent = 'Nuk ka postime per kete periudhe';
+            grid.appendChild(empty);
             return;
         }
 
         grid.innerHTML = data.map(p => {
             const imageUrl = p.media_url || null;
-            const typeLabel = p.post_type || 'post';
+            // Backend shape returns post_type uppercase ("REEL"); normalise for
+            // the badge lookup so we match reel/photo/video keys.
+            const typeLabel = (p.post_type || 'post').toString().toLowerCase();
             const typeBadge = {
                 'reel': { bg: '#F3E5F5', color: '#7B1FA2', icon: 'heroicons-outline:play' },
                 'story': { bg: '#FFF3E0', color: '#E65100', icon: 'heroicons-outline:clock' },
@@ -912,7 +957,8 @@
                 btn.className = 'inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors post-filter';
             }
         });
-        loadTopPosts(type, dateFromEl.value, dateToEl.value);
+        const preset = datePresetEl.value !== 'custom' ? datePresetEl.value : null;
+        loadTopPosts(type, dateFromEl.value, dateToEl.value, preset);
     }
 
     document.addEventListener('DOMContentLoaded', () => loadAll());
