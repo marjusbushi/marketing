@@ -23,24 +23,25 @@ jobs:
           script: |
             set -e
             cd "$APP_PATH"
-            echo "=== PATH ==="
-            pwd
             echo "=== GIT ==="
             git log --oneline -3
-            echo "=== DIS ENV ==="
-            grep -E "^DIS_DB_" .env | grep -v PASSWORD || echo "no DIS_DB_ vars in .env"
-            echo "=== DB COUNTS ==="
-            php artisan tinker --no-interaction --execute='echo "dis db: ".config("database.connections.dis.database").PHP_EOL; echo "ads total: ".App\Models\Meta\MetaAdsInsight::count().PHP_EOL; echo "ads apr26: ".App\Models\Meta\MetaAdsInsight::whereBetween("date",["2026-04-01","2026-04-30"])->count().PHP_EOL; echo "ads max: ".(App\Models\Meta\MetaAdsInsight::max("date") ?: "none").PHP_EOL; echo "fb total: ".App\Models\Meta\MetaPageInsight::count().PHP_EOL; echo "fb apr26: ".App\Models\Meta\MetaPageInsight::whereBetween("date",["2026-04-01","2026-04-30"])->count().PHP_EOL; echo "fb max: ".(App\Models\Meta\MetaPageInsight::max("date") ?: "none").PHP_EOL; echo "ig total: ".App\Models\Meta\MetaIgInsight::count().PHP_EOL; echo "ig apr26: ".App\Models\Meta\MetaIgInsight::whereBetween("date",["2026-04-01","2026-04-30"])->count().PHP_EOL; echo "ig max: ".(App\Models\Meta\MetaIgInsight::max("date") ?: "none").PHP_EOL; echo "tt total: ".App\Models\TikTok\TikTokAdsInsight::count().PHP_EOL;'
-            echo "=== DEEP TRACE ==="
-            php artisan tinker --no-interaction --execute='try { $r = app(App\Services\Meta\MetaDataResolverService::class); echo "direct app(): ".get_class($r).PHP_EOL; } catch (Throwable $e) { echo "RESOLVER APP EXC: ".get_class($e)." - ".$e->getMessage()." @ ".$e->getFile().":".$e->getLine().PHP_EOL; }'
-            echo "=== WINDOW TOTALS DIRECT ==="
-            php artisan tinker --no-interaction --execute='try { $s = app(App\Services\Meta\MetaMarketingV2ReportService::class); $ref = new ReflectionClass($s); $m = $ref->getMethod("windowTotals"); $m->setAccessible(true); $w = $m->invoke($s, "2026-04-01","2026-04-18",null,true,false); echo "window: ".json_encode($w); } catch (Throwable $e) { echo "WINDOW EXC: ".$e->getMessage()." @ ".$e->getFile().":".$e->getLine().PHP_EOL.$e->getTraceAsString(); }'
-            echo "=== SERVICE.totalKpis (Ky Muaj = Apr 1..18) ==="
-            php artisan tinker --no-interaction --execute='try { $s = app(App\Services\Meta\MetaMarketingV2ReportService::class); $out = $s->totalKpis("2026-04-01","2026-04-18",null,true); echo json_encode($out); } catch (Throwable $e) { echo "EXCEPTION: ".$e->getMessage()." @ ".$e->getFile().":".$e->getLine(); }'
             echo ""
-            echo "=== META CONFIG ==="
-            php artisan tinker --no-interaction --execute='echo "db_first_mode: ".var_export(config("meta.features.db_first_mode"),1).PHP_EOL; echo "page_id: ".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id: ".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL; echo "tiktok_module: ".var_export(config("tiktok.features.tiktok_module"),1).PHP_EOL;'
-            echo "=== HTTP CURL (localhost) ==="
-            curl -s -H "Cookie: $(echo)" "http://127.0.0.1/marketing/analytics/api/total-kpis?from=2026-04-01&to=2026-04-18&nocache=1" | head -c 500 || echo "curl failed"
+            echo "=== LARAVEL LOG (last 120 lines) ==="
+            tail -120 storage/logs/laravel.log || echo "no log"
+            echo ""
+            echo "=== ROUTES canva ==="
+            php artisan route:list --name=canva 2>&1 | head -20 || echo "route list failed"
+            echo ""
+            echo "=== CANVA ROUTE sync exists? ==="
+            php artisan tinker --no-interaction --execute='try { echo route("marketing.api.canva.brand-kit.sync").PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; }'
+            echo ""
+            echo "=== VIEW CACHE dir ==="
+            ls -la storage/framework/views/ | head -10 || true
+            echo ""
+            echo "=== curl brand-kit HEAD ==="
+            curl -sI "http://127.0.0.1/marketing/settings/brand-kit" | head -5 || echo "curl failed"
+            echo ""
+            echo "=== curl daily-basket HEAD ==="
+            curl -sI "http://127.0.0.1/marketing/daily-basket?week=12" | head -5 || echo "curl failed"
             echo ""
             echo "=== DONE ==="
