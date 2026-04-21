@@ -83,6 +83,38 @@ class StudioControllerTest extends TestCase
         $this->assertContains($response->status(), [302, 401, 403], 'expected auth redirect or block');
     }
 
+    public function test_embedded_variant_uses_minimal_shell_without_app_chrome(): void
+    {
+        $this->seedMarketingUserWithPermissions([P::CONTENT_PLANNER_VIEW->value]);
+
+        $response = $this->get('/marketing/studio?embedded=1');
+
+        $response->assertOk();
+        $response->assertSee('id="studio-app"', false);
+        $this->assertSame(true, $this->extractProp($response->getContent(), 'embedded'));
+    }
+
+    public function test_non_embedded_variant_keeps_full_layout(): void
+    {
+        $this->seedMarketingUserWithPermissions([P::CONTENT_PLANNER_VIEW->value]);
+
+        $response = $this->get('/marketing/studio');
+        $response->assertOk();
+        $this->assertSame(false, $this->extractProp($response->getContent(), 'embedded'));
+    }
+
+    /**
+     * Pull a single key out of the JSON blob Blade stores in data-props.
+     * The attribute is HTML-entity encoded; decode before parsing.
+     */
+    private function extractProp(string $html, string $key): mixed
+    {
+        $this->assertSame(1, preg_match('/data-props="([^"]+)"/', $html, $matches));
+        $decoded = json_decode(html_entity_decode($matches[1], ENT_QUOTES), true);
+        $this->assertIsArray($decoded);
+        return $decoded[$key] ?? null;
+    }
+
     private function seedMarketingUserWithPermissions(array $permissions): void
     {
         DB::connection('dis')->table('users')->insert([

@@ -27,9 +27,16 @@ class StudioController extends Controller
     {
         $brief = $creativeBrief && $creativeBrief->exists ? $creativeBrief : null;
 
+        // `?embedded=1` strips the app chrome (nav, sidebar, header) so the
+        // Studio page can mount inside an iframe opened from the daily-basket
+        // inline editor modal (#1247). The SPA itself is unchanged — only
+        // the Blade shell swaps its layout.
+        $embedded = $request->boolean('embedded');
+
         return view('marketing.studio', [
             'title'     => 'Visual Studio',
             'pageTitle' => $brief ? "Visual Studio — Brief #{$brief->id}" : 'Visual Studio',
+            'embedded'  => $embedded,
             'props'     => [
                 'brand_kit'         => $this->brandKitService->get()->toArray(),
                 'creative_brief_id' => $brief?->id,
@@ -63,6 +70,7 @@ class StudioController extends Controller
                 'limits' => [
                     'video_max_size_mb' => (int) config('content-planner.video_max_size_mb', 500),
                 ],
+                'embedded' => $embedded,
             ],
         ]);
     }

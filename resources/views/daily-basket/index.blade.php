@@ -610,6 +610,42 @@
     }
     .db-plan-cell-del:hover { background: #fee2e2; color: #dc2626; }
 
+    /* Edit-in-Studio button on each filled cell — opens the Studio inline
+       in an iframe modal so the user never leaves daily-basket (#1247). */
+    .db-plan-cell-edit {
+        border: 1px solid var(--db-border);
+        background: #fff;
+        color: var(--db-text-2);
+        cursor: pointer;
+        font-size: 11px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        line-height: 1.4;
+    }
+    .db-plan-cell-edit:hover { border-color: var(--db-text); background: var(--db-accent-soft); color: var(--db-text); }
+
+    /* Full-featured editor modal — larger than the create-post modal because
+       it hosts the Studio SPA in an iframe. 80vw × 85vh per spec §1247. */
+    .db-studio-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9995; display: none; align-items: center; justify-content: center; }
+    .db-studio-modal-backdrop.open { display: flex; }
+    .db-studio-modal { background: #09090b; border-radius: 10px; width: 80vw; height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+    .db-studio-modal-head { padding: 10px 14px; border-bottom: 1px solid #27272a; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #18181b; color: #e4e4e7; }
+    .db-studio-modal-title { font-size: 13px; font-weight: 600; }
+    .db-studio-modal-actions { display: flex; gap: 8px; align-items: center; }
+    .db-studio-modal-open {
+        font-size: 11px;
+        text-decoration: none;
+        color: #a78bfa;
+        border: 1px solid #6d28d9;
+        background: rgba(109, 40, 217, 0.25);
+        padding: 4px 10px;
+        border-radius: 5px;
+    }
+    .db-studio-modal-open:hover { background: rgba(109, 40, 217, 0.45); }
+    .db-studio-modal-close { background: none; border: none; cursor: pointer; color: #a1a1aa; font-size: 20px; padding: 2px 8px; }
+    .db-studio-modal-close:hover { color: #fff; }
+    .db-studio-modal-iframe { flex: 1; border: 0; width: 100%; height: 100%; background: #09090b; }
+
     /* "+ Shto post" button under the plan grid */
     .db-plan-add-row { margin-top: 14px; display: flex; justify-content: center; }
     .db-plan-add-btn {
@@ -728,6 +764,26 @@
         </div>
         <div class="db-pano-body" id="dbPanoBody">
             <div class="db-pano-empty">Po ngarkohet…</div>
+        </div>
+    </div>
+
+    <!-- Studio editor modal (iframe → /marketing/studio/{id}?embedded=1) (#1247) -->
+    <div class="db-studio-modal-backdrop" id="dbStudioModal" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="db-studio-modal">
+            <div class="db-studio-modal-head">
+                <div class="db-studio-modal-title" id="dbStudioModalTitle">Visual Studio</div>
+                <div class="db-studio-modal-actions">
+                    <a id="dbStudioModalOpenFull" class="db-studio-modal-open" href="#" target="_blank" rel="noopener">Hap në Studio</a>
+                    <button class="db-studio-modal-close" id="dbStudioModalClose" type="button" aria-label="Mbyll">×</button>
+                </div>
+            </div>
+            <iframe
+                id="dbStudioModalIframe"
+                class="db-studio-modal-iframe"
+                title="Visual Studio editor"
+                src="about:blank"
+                allow="clipboard-read; clipboard-write; fullscreen"
+            ></iframe>
         </div>
     </div>
 
@@ -1688,6 +1744,20 @@
         dot.dataset.stage = post.stage;
         dot.title = post.stage_label || post.stage;
         right.appendChild(dot);
+
+        // "Edito në Studio" — opens the iframe modal so captions, Canva
+        // designs, and CapCut uploads can be edited without leaving the
+        // daily-basket view (#1247).
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'db-plan-cell-edit';
+        edit.title = 'Hap editor-in në Studio';
+        edit.textContent = '✎';
+        edit.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openStudioModal(post).catch((err) => showError('Hapja dështoi: ' + err.message));
+        });
+        right.appendChild(edit);
 
         const del = document.createElement('button');
         del.type = 'button';
@@ -3126,11 +3196,92 @@
         if (createdId != null) selectPost(num(createdId));
     }
 
+    // ─── Studio editor modal (iframe) ────────────────────────────────
+    // Hosts /marketing/studio/{brief}?embedded=1 inside the daily-basket
+    // page so content edits (Canva, CapCut, AI caption) never force a
+    // full navigation. Auto-creates a creative_brief row on first open so
+    // the iframe URL is always valid (#1247).
+
+    const studioModalState = { open: false, postId: null };
+
+    async function openStudioModal(post) {
+        if (studioModalState.open) return;
+        studioModalState.open = true;
+        studioModalState.postId = num(post.id);
+
+        let briefId = num(post.creative_brief_id || 0);
+        if (!briefId) {
+            try {
+                const created = await apiPost('/marketing/api/creative-briefs', {
+                    daily_basket_post_id: studioModalState.postId,
+                    post_type: post.post_type,
+                });
+                briefId = num(created && created.creative_brief && created.creative_brief.id);
+            } catch (e) {
+                studioModalState.open = false;
+                throw e;
+            }
+        }
+
+        if (!briefId) {
+            studioModalState.open = false;
+            throw new Error('Brief id mungon pas krijimit.');
+        }
+
+        const iframe = document.getElementById('dbStudioModalIframe');
+        const openFull = document.getElementById('dbStudioModalOpenFull');
+        const title = document.getElementById('dbStudioModalTitle');
+        const backdrop = document.getElementById('dbStudioModal');
+
+        const embedUrl = '/marketing/studio/' + briefId + '?embedded=1';
+        const fullUrl  = '/marketing/studio/' + briefId;
+
+        iframe.src = embedUrl;
+        openFull.href = fullUrl;
+        title.textContent = (post.title || 'Post ' + studioModalState.postId) + ' · Brief #' + briefId;
+
+        backdrop.classList.add('open');
+        backdrop.setAttribute('aria-hidden', 'false');
+    }
+
+    async function closeStudioModal() {
+        if (!studioModalState.open) return;
+        studioModalState.open = false;
+
+        const backdrop = document.getElementById('dbStudioModal');
+        const iframe = document.getElementById('dbStudioModalIframe');
+
+        backdrop.classList.remove('open');
+        backdrop.setAttribute('aria-hidden', 'true');
+        // Unload the iframe so auto-save timers stop immediately and a
+        // reopen shows a fresh load instead of cached state.
+        iframe.src = 'about:blank';
+
+        // Refresh the plan grid so any new media / caption reflects the
+        // user's work without needing a manual refresh.
+        try {
+            await selectDay(state.selectedDate);
+        } catch (_) { /* non-fatal */ }
+    }
+
+    function wireStudioModal() {
+        document.getElementById('dbStudioModalClose').addEventListener('click', () => {
+            closeStudioModal();
+        });
+        document.getElementById('dbStudioModal').addEventListener('click', (e) => {
+            if (e.target.id === 'dbStudioModal') closeStudioModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && studioModalState.open) closeStudioModal();
+        });
+    }
+
     function wireModalOnce() {
         document.getElementById('dbBtnNewPost').addEventListener('click', openNewPostModal);
         document.getElementById('dbModalClose').addEventListener('click', closeNewPostModal);
         document.getElementById('dbModalCancel').addEventListener('click', closeNewPostModal);
         document.getElementById('dbModalSubmit').addEventListener('click', submitModal);
+        wireStudioModal();
 
         // Panorama
         document.getElementById('dbBtnPano').addEventListener('click', openPanorama);
