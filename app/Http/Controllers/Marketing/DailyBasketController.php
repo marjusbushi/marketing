@@ -9,6 +9,7 @@ use App\Models\DailyBasket;
 use App\Models\DailyBasketPost;
 use App\Models\DailyBasketPostMedia;
 use App\Models\Content\ContentMedia;
+use App\Models\Marketing\CreativeBrief;
 use App\Services\ContentPlanner\ContentPostService;
 use App\Services\DisApiClient;
 use Carbon\Carbon;
@@ -554,16 +555,37 @@ class DailyBasketController extends Controller
         $platforms = $post->target_platforms ?? [];
         $platform = count($platforms) === 1 ? $platforms[0] : 'multi';
 
-        // Compose a small "notes" blob so the publisher can see provenance
+        // The creative brief (#1247/#1248/#1249) is the canonical source for
+        // the *composed* post — caption, hashtags, and final media. We fall
+        // back to the post's own fields only when no brief is wired up
+        // (legacy posts created before the pivot editor).
+        $brief = $post->creative_brief_id
+            ? CreativeBrief::query()->find($post->creative_brief_id)
+            : null;
+
+        $caption = $brief?->caption_sq ?: $post->caption;
+
+        $hashtags = is_array($brief?->hashtags ?? null) && ! empty($brief->hashtags)
+            ? implode(' ', $brief->hashtags)
+            : (string) ($post->hashtags ?? '');
+
         $notes = trim(
-            ($post->hashtags ? $post->hashtags."\n\n" : '').
-            'From Shporta Ditore #'.$post->daily_basket_id.' · post #'.$post->id
+            ($hashtags ? $hashtags."\n\n" : '').
+            'From Shporta Ditore #'.$post->daily_basket_id.' · post #'.$post->id.
+            ($brief ? ' · brief #'.$brief->id : '')
         );
 
-        // Best-effort: attach product images as media so the planner shows them.
-        // Any failure (DIS slow, download fail, storage fail) is logged but must
-        // not block the publish — the ContentPost can still be created without media.
-        $mediaIds = $this->cloneProductImagesToMedia($post);
+        // Media handoff strategy:
+        //   1. If the brief has media_slots (Canva designs or CapCut uploads),
+        //      clone those into ContentMedia — these are the *finished*
+        //      assets the user produced in Studio.
+        //   2. Fall back to product images only when the brief path
+        //      produced nothing (or no brief exists) so legacy basket posts
+        //      still render thumbnails in the planner.
+        $mediaIds = $brief ? $this->cloneBriefMediaToContentMedia($brief) : [];
+        if (empty($mediaIds)) {
+            $mediaIds = $this->cloneProductImagesToMedia($post);
+        }
 
         // Map the basket's post_type into Content Planner's content_type.
         // Stories need to go to the Stories strip; everything else is a feed post.
@@ -578,7 +600,7 @@ class DailyBasketController extends Controller
         $contentPost = $this->contentPostService->createPost([
             'platform' => $platform,
             'platforms' => $platforms,
-            'content' => $post->caption,
+            'content' => $caption,
             'content_type' => $contentType,
             'scheduled_at' => $post->scheduled_for?->toIso8601String(),
             'status' => 'scheduled',
@@ -587,6 +609,56 @@ class DailyBasketController extends Controller
         ], $this->currentUserId() ?? 1);
 
         return $contentPost->id;
+    }
+
+    /**
+     * Convert a brief's media_slots (Canva exports + CapCut uploads) into
+     * ContentMedia rows. Canva entries carry a public asset_url we download;
+     * CapCut entries already live on our public disk so we reference the
+     * existing file directly. Failures are swallowed and reported — the
+     * planner still gets created even if media attachment partially fails.
+     *
+     * @return array<int,int>  List of ContentMedia ids in media_slots order.
+     */
+    private function cloneBriefMediaToContentMedia(CreativeBrief $brief): array
+    {
+        $ids = [];
+
+        foreach ((array) ($brief->media_slots ?? []) as $slot) {
+            if (! is_array($slot)) continue;
+            $kind = (string) ($slot['kind'] ?? '');
+
+            try {
+                if ($kind === 'canva') {
+                    $url = (string) ($slot['url'] ?? $slot['asset_url'] ?? '');
+                    if ($url === '') continue;
+                    $media = $this->createMediaFromUrl($url, [
+                        'code' => 'canva-'.($slot['design_id'] ?? $brief->id),
+                        'name' => 'Canva design',
+                    ]);
+                    if ($media) $ids[] = $media->id;
+                } elseif ($kind === 'video' && ($slot['source'] ?? null) === 'capcut') {
+                    $path = (string) ($slot['path'] ?? '');
+                    if ($path === '' || ! Storage::disk('public')->exists($path)) continue;
+                    $media = ContentMedia::create([
+                        'uuid'              => (string) Str::uuid(),
+                        'user_id'           => $this->currentUserId() ?? 1,
+                        'filename'          => basename($path),
+                        'original_filename' => basename($path),
+                        'disk'              => 'public',
+                        'path'              => $path,
+                        'mime_type'         => (string) ($slot['mime_type'] ?? 'video/mp4'),
+                        'size_bytes'        => (int) ($slot['size_bytes'] ?? Storage::disk('public')->size($path)),
+                        'alt_text'          => 'Brief #'.$brief->id.' video',
+                    ]);
+                    $ids[] = $media->id;
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $ids;
     }
 
     /**
