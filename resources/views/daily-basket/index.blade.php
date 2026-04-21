@@ -544,18 +544,19 @@
     }
     .db-plan-pop-empty { padding: 16px; text-align: center; color: var(--db-text-3); font-size: 11px; }
 
-    /* Inline media thumb */
+    /* Inline media thumb — 4:5 (fashion/IG portrait) · contain = shfaq
+       foton e plote pa prere, sfond neutral ne hapesiren e mbetur. */
     .db-plan-media {
-        position: relative; width: 100%; aspect-ratio: 4/3;
+        position: relative; width: 100%; aspect-ratio: 4/5;
         border: 1.5px dashed var(--db-border-strong);
-        border-radius: 6px; background: #fafafa;
+        border-radius: 6px; background: #f4f4f5;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; overflow: hidden;
     }
     .db-plan-media:hover { border-color: var(--db-text); background: var(--db-accent-soft); }
-    .db-plan-media.has-media { border-style: solid; cursor: default; }
+    .db-plan-media.has-media { border-style: solid; cursor: default; background: #f4f4f5; }
     .db-plan-media.is-dragover { border-color: var(--db-text); background: #eef2ff; }
-    .db-plan-media img, .db-plan-media video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .db-plan-media img, .db-plan-media video { width: 100%; height: 100%; object-fit: contain; display: block; }
     .db-plan-media-empty { font-size: 10px; color: var(--db-text-3); text-align: center; padding: 4px 6px; }
     .db-plan-media-empty strong { font-size: 18px; display: block; color: var(--db-text-3); margin-bottom: 2px; }
     .db-plan-media-del {
