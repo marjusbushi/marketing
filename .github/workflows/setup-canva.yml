@@ -1,0 +1,59 @@
+name: Setup Canva Credentials
+
+on:
+  push:
+    paths:
+      - '.github/workflows/setup-canva.yml'
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inject CANVA_* into server .env via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+          CANVA_CLIENT_ID: ${{ secrets.CANVA_CLIENT_ID }}
+          CANVA_CLIENT_SECRET: ${{ secrets.CANVA_CLIENT_SECRET }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH,CANVA_CLIENT_ID,CANVA_CLIENT_SECRET
+          script: |
+            set -e
+            cd "$APP_PATH"
+
+            upsert() {
+              local key="$1"
+              local value="$2"
+              if grep -q "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${value}|" .env
+                echo "updated ${key}"
+              else
+                echo "${key}=${value}" >> .env
+                echo "appended ${key}"
+              fi
+            }
+
+            upsert CANVA_CLIENT_ID "$CANVA_CLIENT_ID"
+            upsert CANVA_CLIENT_SECRET "$CANVA_CLIENT_SECRET"
+            upsert CANVA_FEATURE_CONNECT "true"
+
+            echo ""
+            echo "=== Canva env (masked) ==="
+            grep '^CANVA_' .env | sed 's|=.*|=***|'
+
+            echo ""
+            echo "=== Rebuild caches ==="
+            php artisan config:clear
+            php artisan config:cache
+
+            echo ""
+            echo "=== Verify config loaded ==="
+            php artisan tinker --no-interaction --execute='echo "client_id=".(string) config("canva.client_id").PHP_EOL; echo "base_url=".(string) config("canva.base_url").PHP_EOL; echo "feature_connect=".(config("canva.feature_connect") ? "true" : "false").PHP_EOL; echo "redirect_uri=".(string) config("canva.redirect_uri").PHP_EOL;'
+
+            sudo -n systemctl reload php8.4-fpm 2>/dev/null || sudo -n systemctl reload php-fpm 2>/dev/null || echo "php-fpm reload skipped"
+            echo "=== DONE ==="
