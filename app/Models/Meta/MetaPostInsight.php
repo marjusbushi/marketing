@@ -2,6 +2,7 @@
 
 namespace App\Models\Meta;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -88,5 +89,18 @@ class MetaPostInsight extends Model
     public function mediaItems(): HasMany
     {
         return $this->hasMany(MetaPostMedia::class)->orderBy('position');
+    }
+
+    // Scopes — the `source` column stores lowercase 'facebook' / 'instagram'
+    // (see MetaPostSyncService). Callers lean on the scope names for
+    // readability instead of repeating the where() everywhere.
+    public function scopeInstagram(Builder $query): Builder
+    {
+        return $query->where('source', 'instagram');
+    }
+
+    public function scopeFacebook(Builder $query): Builder
+    {
+        return $query->where('source', 'facebook');
     }
 }
