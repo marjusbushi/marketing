@@ -262,6 +262,29 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             Route::delete('/assets/{asset}', [BrandKitController::class, 'deleteAsset'])->name('assets.destroy');
         });
 
+    // ─── Visual Studio: Creative Briefs ─────────────
+    Route::prefix('api/creative-briefs')
+        ->as('api.creative-briefs.')
+        ->group(function () {
+            Route::middleware('marketing.permission:' . P::CONTENT_PLANNER_VIEW->value)->group(function () {
+                Route::get('/', [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'index'])->name('index');
+                Route::get('/{creativeBrief}', [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'show'])->name('show');
+            });
+
+            Route::middleware('marketing.permission:' . P::CONTENT_PLANNER_CREATE->value)->group(function () {
+                Route::post('/', [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'store'])->name('store');
+                Route::post('/{creativeBrief}/duplicate', [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'duplicate'])->name('duplicate');
+            });
+
+            Route::middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value)->group(function () {
+                Route::put('/{creativeBrief}', [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'update'])->name('update');
+            });
+
+            Route::middleware('marketing.permission:' . P::CONTENT_PLANNER_DELETE->value)->group(function () {
+                Route::delete('/{creativeBrief}', [\App\Http\Controllers\Marketing\CreativeBriefController::class, 'destroy'])->name('destroy');
+            });
+        });
+
     // ─── Visual Studio: Templates ───────────────────
     Route::prefix('api/templates')
         ->as('api.templates.')
