@@ -262,6 +262,18 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             Route::delete('/assets/{asset}', [BrandKitController::class, 'deleteAsset'])->name('assets.destroy');
         });
 
+    // ─── Visual Studio: AI endpoints ────────────────
+    Route::prefix('api/ai')
+        ->as('api.ai.')
+        ->middleware([
+            'marketing.permission:' . P::CONTENT_PLANNER_EDIT->value,
+            'throttle:10,1', // 10 req/min per user per spec §8.1
+        ])
+        ->group(function () {
+            Route::post('caption', [\App\Http\Controllers\Marketing\MarketingAIController::class, 'caption'])->name('caption');
+            Route::post('rewrite', [\App\Http\Controllers\Marketing\MarketingAIController::class, 'rewrite'])->name('rewrite');
+        });
+
     // ─── Visual Studio: Creative Briefs ─────────────
     Route::prefix('api/creative-briefs')
         ->as('api.creative-briefs.')
