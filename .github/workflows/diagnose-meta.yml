@@ -65,4 +65,8 @@ jobs:
             ls -la storage/app/public/meta-downloads 2>/dev/null | head -10 || echo "dir missing"
             echo "count: $(ls storage/app/public/meta-downloads 2>/dev/null | wc -l)"
 
+            echo ""
+            echo "=== Run sync directly (FB + IG, full history) ==="
+            php artisan tinker --no-interaction --execute='try { $svc = app(App\Services\Meta\MetaPostSyncService::class); $fb = $svc->syncFacebookPosts(null, 5); $ig = $svc->syncInstagramPosts(null, 5); echo "fb_synced=".$fb." ig_synced=".$ig.PHP_EOL; echo "total_insights=".DB::table("meta_post_insights")->count().PHP_EOL; echo "downloads_count=".count(glob("storage/app/public/meta-downloads/*") ?: []).PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage().PHP_EOL; echo "trace: ".substr($e->getTraceAsString(), 0, 500).PHP_EOL; }'
+
             echo "=== DONE ==="
