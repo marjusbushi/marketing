@@ -1070,7 +1070,12 @@ class MetaMarketingV2ChannelService
     {
         $jsonPath = '$."' . $platform . '".messaging_conversations';
 
-        $rows = \DB::table('meta_ads_insights')
+        // meta_ads_insights lives in the DIS database (shared with the
+        // monolith). Using the default DB connection here silently returns
+        // zero rows on the za-marketing app DB, which is why paid DMs were
+        // 0 on the dashboard while the debug endpoint (correctly scoped to
+        // 'dis') showed the real number.
+        $rows = \DB::connection('dis')->table('meta_ads_insights')
             ->whereBetween('date', [$from, $to])
             ->whereNotNull('platform_breakdown')
             ->selectRaw('date, SUM(JSON_EXTRACT(platform_breakdown, ?)) as mc', [$jsonPath])
