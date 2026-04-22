@@ -479,7 +479,11 @@
     /* ─── Post card v2 (#1323) — flat grid inside .db-canvas ──── */
     .db-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        /* Columns are capped at 260px so cards don't stretch to 500px on
+           wide screens — a 9:16 reel at 500px wide would be >850px tall
+           and blow the row alignment apart. 260px keeps reels at ~460px
+           tall which is readable without dominating the layout. */
+        grid-template-columns: repeat(auto-fill, minmax(220px, 260px));
         gap: 14px;
         padding: 14px;
         background: #fff;
@@ -547,9 +551,10 @@
     .db-stage-dot[data-stage="scheduling"] { background: #7c3aed; }
     .db-stage-dot[data-stage="published"]  { background: #22c55e; }
 
-    /* Material thumbnail — 1:1 square frame (like Instagram's profile grid).
-       Photo itself uses object-fit: contain so the user sees the WHOLE image
-       (letterbox on the soft background instead of cropping the subject). */
+    /* Material thumbnail — aspect ratio matches Instagram per post type:
+       reel/story 9:16 vertical, everything else 1:1 square. object-fit is
+       contain so the whole photo stays visible. Grid column is capped at
+       260px (see .db-grid) so 9:16 reels stay ~460px tall max. */
     .db-mat {
         aspect-ratio: 1 / 1;
         background: var(--db-accent-soft);
@@ -558,6 +563,8 @@
         overflow: hidden;
         border-bottom: 1px solid var(--db-border);
     }
+    .db-mat[data-type="reel"],
+    .db-mat[data-type="story"]  { aspect-ratio: 9 / 16; }
     .db-mat-slot { position: absolute; inset: 0; display: block; }
     .db-mat-slot img, .db-mat-slot video,
     .db-mat > img, .db-mat > video {
@@ -902,8 +909,8 @@
     .db-media-slot.is-uploading { cursor: wait; }
     .db-media-slot-icon { font-size: 28px; color: var(--db-text-3); margin-bottom: 4px; }
     .db-media-slot-txt { font-size: 11px; color: var(--db-text-2); text-align: center; padding: 0 8px; }
-    .db-media-preview { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .db-media-video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+    .db-media-preview { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .db-media-video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
     .db-media-del {
         position: absolute; top: 6px; right: 6px;
         width: 22px; height: 22px; border-radius: 50%;
@@ -914,11 +921,10 @@
     }
     .db-media-del:hover { background: #dc2626; }
     .db-media-meta {
-        position: absolute; bottom: 0; left: 0; right: 0;
-        background: linear-gradient(transparent, rgba(0,0,0,0.6));
-        color: #fff; padding: 14px 8px 6px;
-        font-size: 10px; font-weight: 500;
-        pointer-events: none;
+        /* Filename bar removed — was visual noise on the thumbnail. Kept
+           the rule so legacy renders that still attach .db-media-meta
+           collapse silently instead of breaking layout. */
+        display: none;
     }
     .db-media-order {
         position: absolute; top: 6px; left: 6px;
@@ -3455,14 +3461,6 @@
             img.alt = media.original_filename || '';
             tile.appendChild(img);
         }
-
-        const meta = document.createElement('div');
-        meta.className = 'db-media-meta';
-        const parts = [];
-        if (media.original_filename) parts.push(media.original_filename);
-        if (media.size_bytes) parts.push(humanSize(media.size_bytes));
-        meta.textContent = parts.join(' · ');
-        tile.appendChild(meta);
 
         const del = document.createElement('button');
         del.className = 'db-media-del';
