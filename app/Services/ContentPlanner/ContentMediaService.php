@@ -243,17 +243,23 @@ class ContentMediaService
     }
 
     /**
-     * Infer a single "active" collection for a set of products by looking at
-     * how those products are currently used across Daily Basket posts.
+     * Infer a single "active" collection for a set of products.
      *
-     * Returns the distribution_week_id IFF exactly one week covers ALL the
-     * given products (via basket posts). Returns null otherwise — the user
-     * should pick manually when the product lives in multiple collections.
+     * Strategy (in order):
+     *   1. Look at Daily Basket posts in za-marketing — if a product is
+     *      actively planned in a post and that post lives in one basket/week,
+     *      that's the best signal.
+     *   2. Fall back to DIS merch_calendar: query the
+     *      distribution_week_item_group_dates pivot cross-DB. Products that
+     *      haven't been scheduled in a basket yet still have a week in DIS
+     *      where marketing assigned them — that's the "campaign".
      *
-     * Rationale: in ~90% of cases a product sits in one active collection
-     * (current campaign). Linking media to a product can then auto-apply the
-     * collection, saving a click. When the product is in 2+ campaigns, we
-     * stay silent to avoid polluting collection filters.
+     * Returns the distribution_week_id IFF exactly one week covers the given
+     * products. Returns null when zero or multiple matches exist.
+     *
+     * Rationale: in ~90% of cases a product sits in one active collection.
+     * Linking media to a product can then auto-apply the collection, saving
+     * a click. Ambiguous cases stay silent to avoid polluting filters.
      */
     public function inferCollectionForProducts(array $productIds): ?int
     {
@@ -262,6 +268,7 @@ class ContentMediaService
             return null;
         }
 
+        // Step 1: basket posts (local, fastest, most explicit marketing intent)
         $weekIds = \Illuminate\Support\Facades\DB::table('daily_baskets')
             ->join('daily_basket_posts', 'daily_basket_posts.daily_basket_id', '=', 'daily_baskets.id')
             ->join('daily_basket_post_products', 'daily_basket_post_products.daily_basket_post_id', '=', 'daily_basket_posts.id')
@@ -275,7 +282,34 @@ class ContentMediaService
             ->values()
             ->all();
 
-        return count($weekIds) === 1 ? $weekIds[0] : null;
+        if (count($weekIds) === 1) {
+            return $weekIds[0];
+        }
+        if (count($weekIds) > 1) {
+            return null; // ambiguous in basket — don't let DIS override
+        }
+
+        // Step 2: DIS fallback — the product hasn't been planned into a basket
+        // yet, but merch calendar has already assigned it to a week. Use that.
+        try {
+            $disWeekIds = \Illuminate\Support\Facades\DB::connection('dis')
+                ->table('distribution_week_item_group_dates')
+                ->whereIn('item_group_id', $ids)
+                ->distinct()
+                ->pluck('distribution_week_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all();
+
+            return count($disWeekIds) === 1 ? $disWeekIds[0] : null;
+        } catch (\Throwable $e) {
+            // DIS unavailable or connection misconfigured — don't block the
+            // primary flow. Logged but not rethrown.
+            report($e);
+
+            return null;
+        }
     }
 
     /**
