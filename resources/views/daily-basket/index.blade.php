@@ -645,6 +645,40 @@
     }
     .db-post-ref-compact:hover { background: var(--db-border); color: var(--db-text); }
 
+    /* Inline "add" affordances on the card body — keep products + reference
+       editable without forcing the user into the detail view. */
+    .db-post-chip-add {
+        padding: 2px 7px; border-radius: 10px;
+        border: 1px dashed var(--db-border-strong);
+        font-size: 10px; color: var(--db-text-3);
+        background: transparent; cursor: pointer;
+    }
+    .db-post-chip-add:hover { border-color: var(--db-text); color: var(--db-text); background: var(--db-accent-soft); }
+
+    .db-post-ref-add {
+        display: inline-flex; align-items: center;
+        padding: 2px 7px; border-radius: 5px;
+        border: 1px dashed var(--db-border-strong);
+        background: transparent; color: var(--db-text-3);
+        font-size: 10px; cursor: pointer;
+        align-self: flex-start;
+    }
+    .db-post-ref-add:hover { border-color: var(--db-text); color: var(--db-text); background: var(--db-accent-soft); }
+
+    /* Delete button on card header — only shows on hover so the header
+       stays clean most of the time. */
+    .db-post-del {
+        width: 18px; height: 18px; border-radius: 50%;
+        border: none; background: transparent;
+        color: var(--db-text-3); cursor: pointer;
+        font-size: 14px; line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; opacity: 0;
+        transition: opacity 0.12s, background 0.12s, color 0.12s;
+    }
+    .db-post:hover .db-post-del { opacity: 1; }
+    .db-post-del:hover { background: #fee2e2; color: #dc2626; opacity: 1; }
+
     /* Empty / "+ Post i ri" card */
     .db-post-empty {
         border-style: dashed; border-color: var(--db-border-strong);
@@ -1913,6 +1947,30 @@
         stage.appendChild(document.createTextNode(STAGE_SHORT[post.stage] || post.stage_label || ''));
         top.appendChild(stage);
 
+        // Delete button — removes the whole post after confirm. Visible on
+        // hover only so it doesn't compete with the stage/type badges.
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'db-post-del';
+        del.title = 'Hiq këtë post';
+        del.textContent = '×';
+        del.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (!confirm('Të hiqet ky post? (' + (post.title || 'Post #' + post.id) + ')')) return;
+            try {
+                await apiDelete('/marketing/daily-basket/api/posts/' + num(post.id));
+                if (state.selectedPostId === post.id) {
+                    state.selectedPostId = null;
+                    persistSelectedPostId(null);
+                }
+                await selectDay(state.selectedDate);
+                showSuccess('Posti u hoq.');
+            } catch (err) {
+                showError('Heqja dështoi: ' + err.message);
+            }
+        });
+        top.appendChild(del);
+
         return top;
     }
 
@@ -2022,19 +2080,31 @@
         const body = document.createElement('div');
         body.className = 'db-post-body';
 
-        if (post.products && post.products.length) {
-            const chips = document.createElement('div');
-            chips.className = 'db-post-chips';
-            post.products.slice(0, 4).forEach(p => chips.appendChild(buildPostChip(p)));
-            if (post.products.length > 4) {
-                const more = document.createElement('span');
-                more.className = 'db-post-chip';
-                more.style.paddingLeft = '7px';
-                more.textContent = '+' + (post.products.length - 4);
-                chips.appendChild(more);
-            }
-            body.appendChild(chips);
+        // Product chips — always render the row with a trailing "+" button
+        // so the user can attach products without opening the detail view.
+        const chips = document.createElement('div');
+        chips.className = 'db-post-chips';
+        const products = post.products || [];
+        products.slice(0, 4).forEach(p => chips.appendChild(buildPostChip(p)));
+        if (products.length > 4) {
+            const more = document.createElement('span');
+            more.className = 'db-post-chip';
+            more.style.paddingLeft = '7px';
+            more.textContent = '+' + (products.length - 4);
+            chips.appendChild(more);
         }
+
+        const addProd = document.createElement('button');
+        addProd.type = 'button';
+        addProd.className = 'db-post-chip-add';
+        addProd.textContent = products.length === 0 ? '+ Shto produkt' : '+';
+        addProd.title = 'Shto produkt nga shporta';
+        addProd.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPlanProductPicker(post, addProd);
+        });
+        chips.appendChild(addProd);
+        body.appendChild(chips);
 
         // Reference chip (favicon + host) — renders only when there's a URL.
         if (post.reference_url) {
@@ -2073,6 +2143,29 @@
             ref.appendChild(arrow);
 
             body.appendChild(ref);
+        } else {
+            // No reference yet — render a compact "+" button that prompts
+            // for a URL inline. Saves through savePostField → PUT /posts/{id}
+            // and reloads the day so the compact chip replaces this button.
+            const addRef = document.createElement('button');
+            addRef.type = 'button';
+            addRef.className = 'db-post-ref-add';
+            addRef.textContent = '+ Shto reference';
+            addRef.title = 'Shto URL referencë (Pinterest, Instagram, etj.)';
+            addRef.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const url = prompt('URL e referencës (p.sh. https://pinterest.com/pin/…):', '');
+                if (url == null) return;
+                const trimmed = url.trim();
+                if (trimmed === '') return;
+                try {
+                    await savePostField(post, { reference_url: trimmed });
+                    await selectDay(state.selectedDate);
+                } catch (err) {
+                    showError('Ruajtja dështoi: ' + err.message);
+                }
+            });
+            body.appendChild(addRef);
         }
 
         return body;
