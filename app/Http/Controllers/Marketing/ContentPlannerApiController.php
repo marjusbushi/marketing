@@ -345,7 +345,16 @@ class ContentPlannerApiController extends Controller
 
     public function uploadMedia(Request $request): JsonResponse
     {
-        $maxSize = config('content-planner.media_max_size_mb', 50) * 1024;
+        // Dinamik: video deri 500MB (CapCut 4K exports), image deri 25MB, rest 50MB.
+        $file = $request->file('file');
+        $mime = $file?->getMimeType() ?? '';
+        if (str_starts_with($mime, 'video/')) {
+            $maxSize = (int) config('content-planner.video_max_size_mb', 500) * 1024;
+        } elseif (str_starts_with($mime, 'image/')) {
+            $maxSize = (int) config('content-planner.photo_max_size_mb', 25) * 1024;
+        } else {
+            $maxSize = (int) config('content-planner.media_max_size_mb', 50) * 1024;
+        }
 
         $request->validate([
             'file' => "required|file|max:{$maxSize}",

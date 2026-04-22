@@ -125,7 +125,7 @@
          onclick="document.getElementById('fileInput').click()">
         <iconify-icon icon="heroicons-outline:cloud-arrow-up" width="36" class="text-slate-300 mx-auto block"></iconify-icon>
         <p class="text-sm text-slate-600 mt-3 font-medium">Drop files here or <span class="text-primary-600 font-semibold">browse</span></p>
-        <p class="text-[11px] text-slate-400 mt-1">JPG, PNG, GIF, WEBP, MP4, MOV — Max 50MB</p>
+        <p class="text-[11px] text-slate-400 mt-1">Images up to 25MB · Videos up to 500MB (MP4, MOV, AVI, WEBM)</p>
         <input id="fileInput" type="file" accept="image/*,video/*" multiple class="hidden" onchange="handleFiles(this.files)">
     </div>
 

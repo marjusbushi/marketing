@@ -208,8 +208,8 @@
                             <div id="composerMediaGrid" style="display:flex; gap:6px; overflow-x:auto;"></div>
                         </div>
                     </div>
-                    <input id="mediaFileInput" type="file" accept="image/*" multiple style="display:none;" onchange="handleMediaSelect(this.files); this.value='';">
-                    <input id="mediaVideoInput" type="file" accept="video/*" multiple style="display:none;" onchange="handleMediaSelect(this.files); this.value='';">
+                    <input id="mediaFileInput" type="file" accept="image/*,video/*" multiple style="display:none;" onchange="handleMediaSelect(this.files); this.value='';">
+                    <input id="mediaVideoInput" type="file" accept="image/*,video/*" multiple style="display:none;" onchange="handleMediaSelect(this.files); this.value='';">
                 </div>
             </div>
 

@@ -928,7 +928,16 @@ class DailyBasketController extends Controller
      */
     public function uploadMedia(Request $request, DailyBasketPost $post): JsonResponse
     {
-        $maxSize = config('content-planner.media_max_size_mb', 50) * 1024;
+        // Limit dinamik sipas mime-type: video deri 500MB, image deri 25MB.
+        $uploaded = $request->file('file');
+        $mime = $uploaded?->getMimeType() ?? '';
+        if (str_starts_with($mime, 'video/')) {
+            $maxSize = (int) config('content-planner.video_max_size_mb', 500) * 1024;
+        } elseif (str_starts_with($mime, 'image/')) {
+            $maxSize = (int) config('content-planner.photo_max_size_mb', 25) * 1024;
+        } else {
+            $maxSize = (int) config('content-planner.media_max_size_mb', 50) * 1024;
+        }
 
         $request->validate([
             'file' => "required|file|max:{$maxSize}",

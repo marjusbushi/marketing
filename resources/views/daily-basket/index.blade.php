@@ -3642,14 +3642,9 @@
     }
 
     function acceptFor(postType) {
-        switch (postType) {
-            case 'photo':    return 'image/*';
-            case 'video':
-            case 'reel':     return 'video/*';
-            case 'story':    return 'image/*,video/*';
-            case 'carousel': return 'image/*';
-            default:         return 'image/*,video/*';
-        }
+        // Liberal by default — pranojmë cdo image/video per cdo lloj posti.
+        // IG carousel gjithashtu mbeshtet video ne slide, keshtu qe nuk bllokojme.
+        return 'image/*,video/*';
     }
 
     function humanSize(bytes) {
