@@ -6,6 +6,7 @@ use App\Http\Middleware\MetaMarketingCache;
 use App\Models\Meta\MetaAdsInsight;
 use App\Models\Meta\MetaCampaign;
 use App\Models\Meta\MetaAdSet;
+use App\Models\Meta\MetaIgDmEvent;
 use App\Models\Meta\MetaIgInsight;
 use App\Models\Meta\MetaMessagingStat;
 use App\Models\Meta\MetaPageInsight;
@@ -541,10 +542,23 @@ class MetaDataResolverService
 
     /**
      * Return daily messaging data from DB.
+     *
+     * For Instagram with META_IG_WEBHOOK_START_DATE set, dates on/after the
+     * activation date come from meta_ig_dm_events (exact, real-time). Dates
+     * before activation continue to use the MetaMessagingStat sample path so
+     * historical charts stay intact. Each row is tagged source=webhook|sample.
      */
     public function resolveMessagingDaily(string $platform, string $from, string $to): array
     {
         $this->ensureMessagingData($platform, $from, $to);
+
+        $webhookStart = $platform === 'instagram'
+            ? (string) config('meta.ig_webhook_start_date', '')
+            : '';
+
+        if ($webhookStart !== '') {
+            return $this->resolveIgMessagingDailyDual($from, $to, $webhookStart);
+        }
 
         $dbRows = MetaMessagingStat::where('platform', $platform)
             ->whereBetween('date', [$from, $to])
@@ -560,6 +574,7 @@ class MetaDataResolverService
 
             $result[] = [
                 'date' => $dateStr,
+                'source' => 'sample',
                 'conversations' => $row ? (int) $row->new_conversations : 0,
                 'messages_received' => $row ? (int) $row->total_messages_received : 0,
                 'messages_sent' => $row ? (int) $row->total_messages_sent : 0,
@@ -567,6 +582,105 @@ class MetaDataResolverService
                 'total_messages_received' => $row ? (int) $row->total_messages_received : 0,
                 'total_messages_sent' => $row ? (int) $row->total_messages_sent : 0,
             ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Dual-source IG messaging daily resolver.
+     *
+     * webhook_era (dates >= $webhookStart): COUNT(*) of first-of-thread, organic,
+     * incoming DMs from meta_ig_dm_events, bucketed by Europe/Tirana local date.
+     * Uses the `dis` connection since the table lives in DIS DB; we are a reader
+     * here. ad_id IS NULL filter is CRITICAL — ad-initiated DMs are counted by
+     * the paid path (meta_ads_insights.messaging_conversations) and double-count
+     * must be avoided.
+     *
+     * sample_era (dates < $webhookStart): existing MetaMessagingStat path.
+     *
+     * Caveat: conversations that existed before webhook launch and re-activate
+     * within the first ~24h post-launch will be flagged is_first_of_thread=true
+     * by the session gap logic (no prior incoming within the configured gap
+     * window), slightly inflating webhook_era counts for the first day. Effect
+     * dissipates after ~48h as sessions expire. If gap vs Meta BS still exceeds
+     * 2% after a week, tune meta.ig_conversation_gap_minutes.
+     */
+    private function resolveIgMessagingDailyDual(string $from, string $to, string $webhookStart): array
+    {
+        $fromC = Carbon::parse($from)->startOfDay();
+        $toC = Carbon::parse($to)->endOfDay();
+        $startC = Carbon::parse($webhookStart)->startOfDay();
+
+        // ─── Webhook era: query meta_ig_dm_events keyed by Tirana local date ───
+        $webhookRowsByDate = [];
+        if ($toC->gte($startC)) {
+            $webhookFromC = $fromC->gte($startC) ? $fromC : $startC;
+
+            // received_at is stored in UTC. Bucket by Tirana local date (+01:00
+            // fixed offset per task spec). Query span must cover UTC instants
+            // that map to the target local-date range: subtract 1h from both
+            // bounds so the UTC window fully contains the Tirana window.
+            $fromUtc = $webhookFromC->copy()->subHour()->format('Y-m-d H:i:s');
+            $toUtc = $toC->copy()->subHour()->format('Y-m-d H:i:s');
+
+            $rows = DB::connection('dis')->table('meta_ig_dm_events')
+                ->selectRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00')) as d, COUNT(*) as new_conversations")
+                ->where('platform', 'instagram')
+                ->where('is_from_page', false)
+                ->where('is_first_of_thread', true)
+                ->whereNull('ad_id')
+                ->whereBetween('received_at', [$fromUtc, $toUtc])
+                ->groupByRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00'))")
+                ->orderBy('d')
+                ->get();
+
+            foreach ($rows as $r) {
+                $webhookRowsByDate[(string) $r->d] = (int) $r->new_conversations;
+            }
+        }
+
+        // ─── Sample era: existing MetaMessagingStat path for dates before launch ───
+        $sampleRowsByDate = collect();
+        if ($fromC->lt($startC)) {
+            $sampleToC = $toC->lt($startC) ? $toC : $startC->copy()->subDay();
+            $sampleRowsByDate = MetaMessagingStat::where('platform', 'instagram')
+                ->whereBetween('date', [$fromC->toDateString(), $sampleToC->toDateString()])
+                ->orderBy('date')
+                ->get()
+                ->keyBy(fn ($row) => $row->date->toDateString());
+        }
+
+        // ─── Merge into per-day result, tagged with source ───
+        $result = [];
+        for ($d = $fromC->copy()->startOfDay(); $d->lte($toC); $d->addDay()) {
+            $dateStr = $d->toDateString();
+
+            if ($d->gte($startC)) {
+                $count = $webhookRowsByDate[$dateStr] ?? 0;
+                $result[] = [
+                    'date' => $dateStr,
+                    'source' => 'webhook',
+                    'conversations' => $count,
+                    'messages_received' => $count,
+                    'messages_sent' => 0,
+                    'new_conversations' => $count,
+                    'total_messages_received' => $count,
+                    'total_messages_sent' => 0,
+                ];
+            } else {
+                $row = $sampleRowsByDate[$dateStr] ?? null;
+                $result[] = [
+                    'date' => $dateStr,
+                    'source' => 'sample',
+                    'conversations' => $row ? (int) $row->new_conversations : 0,
+                    'messages_received' => $row ? (int) $row->total_messages_received : 0,
+                    'messages_sent' => $row ? (int) $row->total_messages_sent : 0,
+                    'new_conversations' => $row ? (int) $row->new_conversations : 0,
+                    'total_messages_received' => $row ? (int) $row->total_messages_received : 0,
+                    'total_messages_sent' => $row ? (int) $row->total_messages_sent : 0,
+                ];
+            }
         }
 
         return $result;

@@ -246,6 +246,9 @@ class MetaMarketingV2ChannelsController extends Controller
         [$from, $to] = $this->resolveRange($request);
 
         try {
+            $webhookStart = (string) config('meta.ig_webhook_start_date', '');
+            $webhookActive = $webhookStart !== '';
+
             $organicRows = MetaMessagingStat::where('platform', 'instagram')
                 ->whereBetween('date', [$from, $to])
                 ->orderBy('date')
@@ -260,24 +263,65 @@ class MetaMarketingV2ChannelsController extends Controller
                 ->groupBy('date')
                 ->pluck('mc', 'date');
 
+            // Webhook-era per-day counts, bucketed by Tirana local date.
+            $webhookByDate = [];
+            if ($webhookActive) {
+                $fromUtc = Carbon::parse($from)->startOfDay()->subHour()->format('Y-m-d H:i:s');
+                $toUtc = Carbon::parse($to)->endOfDay()->subHour()->format('Y-m-d H:i:s');
+
+                $webhookRows = DB::connection('dis')->table('meta_ig_dm_events')
+                    ->selectRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00')) as d, COUNT(*) as c")
+                    ->where('platform', 'instagram')
+                    ->where('is_from_page', false)
+                    ->where('is_first_of_thread', true)
+                    ->whereNull('ad_id')
+                    ->whereBetween('received_at', [$fromUtc, $toUtc])
+                    ->groupByRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00'))")
+                    ->get();
+
+                foreach ($webhookRows as $r) {
+                    $webhookByDate[(string) $r->d] = (int) $r->c;
+                }
+            }
+
             $daily = [];
             $organicTotal = 0;
             $paidTotal = 0;
+            $webhookTotal = 0;
+            $sampleTotal = 0;
+            $webhookDays = 0;
+            $totalDays = 0;
+
+            $startC = $webhookActive ? Carbon::parse($webhookStart)->startOfDay() : null;
 
             for ($d = Carbon::parse($from)->copy(); $d->lte(Carbon::parse($to)); $d->addDay()) {
                 $date = $d->toDateString();
-                $organic = (int) ($organicRows->firstWhere(fn ($r) => (string) ($r->date instanceof \DateTimeInterface ? $r->date->format('Y-m-d') : $r->date) === $date)?->new_conversations ?? 0);
+                $sampleCount = (int) ($organicRows->firstWhere(fn ($r) => (string) ($r->date instanceof \DateTimeInterface ? $r->date->format('Y-m-d') : $r->date) === $date)?->new_conversations ?? 0);
                 $paid = (int) ($paidRows[$date] ?? 0);
+                $webhookCount = $webhookByDate[$date] ?? 0;
+
+                $isWebhookEra = $webhookActive && $d->gte($startC);
+                $effectiveSource = $isWebhookEra ? 'webhook' : 'sample';
+                $effectiveOrganic = $isWebhookEra ? $webhookCount : $sampleCount;
 
                 $daily[] = [
                     'date' => $date,
-                    'organic' => $organic,
+                    'effective_source' => $effectiveSource,
+                    'webhook_count' => $webhookCount,
+                    'sample_count' => $sampleCount,
+                    'organic' => $effectiveOrganic,
                     'paid' => $paid,
-                    'total' => $organic + $paid,
+                    'total' => $effectiveOrganic + $paid,
                 ];
 
-                $organicTotal += $organic;
+                $organicTotal += $effectiveOrganic;
                 $paidTotal += $paid;
+                $webhookTotal += $webhookCount;
+                $sampleTotal += $sampleCount;
+                $totalDays++;
+                if ($isWebhookEra) {
+                    $webhookDays++;
+                }
             }
 
             $lastMessagingSync = MetaMessagingStat::where('platform', 'instagram')
@@ -289,20 +333,34 @@ class MetaMarketingV2ChannelsController extends Controller
                 ->orderByDesc('synced_at')
                 ->value('synced_at');
 
+            $lastWebhookEvent = $webhookActive
+                ? DB::connection('dis')->table('meta_ig_dm_events')
+                    ->where('platform', 'instagram')
+                    ->orderByDesc('received_at')
+                    ->value('received_at')
+                : null;
+
             return response()->json([
                 'from' => $from,
                 'to' => $to,
+                'webhook_start_date' => $webhookStart ?: null,
+                'webhook_coverage_pct' => $totalDays > 0 ? round($webhookDays / $totalDays * 100, 1) : 0.0,
                 'organic_total' => $organicTotal,
                 'paid_total' => $paidTotal,
                 'combined_total' => $organicTotal + $paidTotal,
+                'webhook_total' => $webhookTotal,
+                'sample_total' => $sampleTotal,
                 'last_messaging_sync' => $lastMessagingSync,
                 'last_ads_sync' => $lastAdsSync,
+                'last_webhook_event' => $lastWebhookEvent,
                 'daily' => $daily,
                 'notes' => [
-                    'organic_source' => 'MetaMessagingStat.new_conversations (from Conversations API, folder=instagram)',
+                    'organic_source' => $webhookActive
+                        ? 'meta_ig_dm_events (webhook, is_first_of_thread=true, ad_id IS NULL) for dates >= ' . $webhookStart . '; MetaMessagingStat (Conversations API sample) for earlier dates'
+                        : 'MetaMessagingStat.new_conversations (from Conversations API, folder=instagram)',
                     'paid_source' => 'meta_ads_insights.platform_breakdown.instagram.messaging_conversations (from Ads API)',
                     'dashboard_formula' => 'combined_total = organic_total + paid_total',
-                    'meta_timezone' => 'Meta Business Suite reports in Pacific Time; our query uses local dates. A 1-day offset between displays is expected near midnight.',
+                    'meta_timezone' => 'Meta Business Suite reports in Pacific Time; our query uses Europe/Tirana (+01:00) local dates. A 1-day offset between displays is expected near midnight.',
                 ],
             ]);
         } catch (Throwable $e) {
