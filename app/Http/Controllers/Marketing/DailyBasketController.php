@@ -788,6 +788,8 @@ class DailyBasketController extends Controller
                         'mime_type'         => (string) ($slot['mime_type'] ?? 'video/mp4'),
                         'size_bytes'        => (int) ($slot['size_bytes'] ?? Storage::disk('public')->size($path)),
                         'alt_text'          => 'Brief #'.$brief->id.' video',
+                        'folder'            => 'videos',
+                        'stage'             => 'final',
                     ]);
                     $ids[] = $media->id;
                 } elseif ($kind === 'photo' && ($slot['source'] ?? null) === 'upload') {
@@ -806,6 +808,8 @@ class DailyBasketController extends Controller
                         'mime_type'         => (string) ($slot['mime_type'] ?? 'image/jpeg'),
                         'size_bytes'        => (int) ($slot['size_bytes'] ?? Storage::disk('public')->size($path)),
                         'alt_text'          => 'Brief #'.$brief->id.' photo',
+                        'folder'            => 'photos',
+                        'stage'             => 'final',
                     ]);
                     $ids[] = $media->id;
                 }
@@ -900,6 +904,8 @@ class DailyBasketController extends Controller
             'mime_type'         => $mime,
             'size_bytes'        => strlen($body),
             'alt_text'          => $product['name'] ?? null,
+            'folder'            => 'photos',
+            'stage'             => 'final',
         ]);
     }
 
@@ -955,6 +961,59 @@ class DailyBasketController extends Controller
         ]);
 
         return response()->json($this->serializeMedia($media), 201);
+    }
+
+    /**
+     * Attach existing ContentMedia records (from Media Library) to this post.
+     * Copies metadata (path/disk/mime/etc.) into daily_basket_post_media so the
+     * basket-side flow remains uniform. The underlying file is NOT re-uploaded
+     * — both records reference the same storage path.
+     */
+    public function attachFromLibrary(Request $request, DailyBasketPost $post): JsonResponse
+    {
+        $validated = $request->validate([
+            'media_ids' => 'required|array|min:1',
+            'media_ids.*' => 'integer|exists:content_media,id',
+        ]);
+
+        $isCarousel = $post->post_type->value === 'carousel';
+
+        // For non-carousel posts, replace any existing media.
+        if (! $isCarousel) {
+            foreach ($post->media()->get() as $old) {
+                $this->deleteMediaFiles($old);
+                $old->delete();
+            }
+        }
+
+        $nextOrder = (int) ($post->media()->max('sort_order') ?? -1) + 1;
+        $created = [];
+
+        $contentMedia = ContentMedia::whereIn('id', $validated['media_ids'])->get()->keyBy('id');
+
+        foreach ($validated['media_ids'] as $mid) {
+            $cm = $contentMedia->get($mid);
+            if (! $cm) continue;
+
+            $media = $post->media()->create([
+                'disk' => $cm->disk ?? 'public',
+                'path' => $cm->path,
+                'original_filename' => $cm->original_filename,
+                'mime_type' => $cm->mime_type,
+                'size_bytes' => $cm->size_bytes,
+                'width' => $cm->width,
+                'height' => $cm->height,
+                'duration_seconds' => $cm->duration_seconds,
+                'sort_order' => $nextOrder++,
+            ]);
+
+            $created[] = $this->serializeMedia($media);
+
+            // For non-carousel, stop after first (replace semantics).
+            if (! $isCarousel) break;
+        }
+
+        return response()->json(['media' => $created], 201);
     }
 
     /**

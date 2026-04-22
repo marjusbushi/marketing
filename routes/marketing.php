@@ -100,6 +100,24 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->name('api.media.destroy')
             ->middleware('marketing.permission:' . P::CONTENT_PLANNER_DELETE->value);
 
+        // API: Media folders + bulk ops (Media Library v2)
+        Route::get('/api/media/folders', [ContentPlannerApiController::class, 'listMediaFolders'])
+            ->name('api.media.folders.index');
+        Route::patch('/api/media/{id}/folder', [ContentPlannerApiController::class, 'moveMediaToFolder'])
+            ->name('api.media.folder.update')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::post('/api/media/bulk-move', [ContentPlannerApiController::class, 'bulkMoveMedia'])
+            ->name('api.media.bulk-move')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::patch('/api/media/{id}/stage', [ContentPlannerApiController::class, 'setMediaStage'])
+            ->name('api.media.stage.update')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::post('/api/media/bulk-stage', [ContentPlannerApiController::class, 'bulkSetMediaStage'])
+            ->name('api.media.bulk-stage')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::get('/api/media/{id}/used-by', [ContentPlannerApiController::class, 'mediaUsedByPosts'])
+            ->name('api.media.used-by');
+
         // API: Comments (edit permission for create/resolve, delete for remove)
         Route::post('/api/comments', [ContentPlannerApiController::class, 'storeComment'])
             ->name('api.comments.store')
@@ -244,6 +262,8 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         // Post media (inline uploader)
         Route::post('/api/posts/{post}/media', [DailyBasketController::class, 'uploadMedia'])
             ->name('api.posts.media.upload');
+        Route::post('/api/posts/{post}/media/attach-from-library', [DailyBasketController::class, 'attachFromLibrary'])
+            ->name('api.posts.media.attach-from-library');
         Route::put('/api/posts/{post}/media/reorder', [DailyBasketController::class, 'reorderPostMedia'])
             ->name('api.posts.media.reorder');
         Route::delete('/api/posts/{post}/media/{mediaId}', [DailyBasketController::class, 'deletePostMedia'])

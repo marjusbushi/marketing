@@ -86,6 +86,7 @@
 </div>
 
 @include('content-planner._partials.post-composer-modal')
+@include('content-planner._partials.media-picker-modal')
 @include('content-planner._partials.image-editor-modal')
 
 <style>

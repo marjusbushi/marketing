@@ -23,7 +23,7 @@ class ContentMediaService
         $this->thumbQuality = config('content-planner.thumbnail_quality', 80);
     }
 
-    public function upload(UploadedFile $file, int $userId): ContentMedia
+    public function upload(UploadedFile $file, int $userId, array $overrides = []): ContentMedia
     {
         $uuid = (string) Str::uuid();
         $extension = $file->getClientOriginalExtension();
@@ -51,6 +51,9 @@ class ContentMediaService
             }
         }
 
+        $folder = $overrides['folder'] ?? $this->classifyFolder($file->getMimeType(), $width, $height);
+        $stage = $overrides['stage'] ?? 'raw';
+
         return ContentMedia::create([
             'uuid' => $uuid,
             'user_id' => $userId,
@@ -63,7 +66,95 @@ class ContentMediaService
             'width' => $width,
             'height' => $height,
             'thumbnail_path' => $thumbnailPath,
+            'folder' => $folder,
+            'stage' => in_array($stage, ContentMedia::STAGES, true) ? $stage : 'raw',
         ]);
+    }
+
+    /**
+     * Auto-klasifikimi i folder-it nga mime-type + dimensionet.
+     *
+     * Video portrait ose 9:16 → reels; video landscape → videos;
+     * çdo image → photos; audio ose i panjohur → null (user klasifikon).
+     * Stories shkruhen manualisht (s'ka dallim nga photo/reels pa kontekst).
+     */
+    public function classifyFolder(?string $mimeType, ?int $width, ?int $height): ?string
+    {
+        if (! $mimeType) {
+            return null;
+        }
+
+        if (str_starts_with($mimeType, 'video/')) {
+            if ($width && $height && $height > $width) {
+                return 'reels';
+            }
+
+            return 'videos';
+        }
+
+        if (str_starts_with($mimeType, 'image/')) {
+            return 'photos';
+        }
+
+        return null;
+    }
+
+    public function setFolder(ContentMedia $media, ?string $folder): ContentMedia
+    {
+        if ($folder !== null && ! in_array($folder, ContentMedia::FOLDERS, true)) {
+            throw new \InvalidArgumentException("Invalid folder: {$folder}");
+        }
+
+        $media->update(['folder' => $folder]);
+
+        return $media->fresh();
+    }
+
+    public function setStage(ContentMedia $media, string $stage): ContentMedia
+    {
+        if (! in_array($stage, ContentMedia::STAGES, true)) {
+            throw new \InvalidArgumentException("Invalid stage: {$stage}");
+        }
+
+        $media->update(['stage' => $stage]);
+
+        return $media->fresh();
+    }
+
+    public function bulkMove(array $ids, ?string $folder): int
+    {
+        if ($folder !== null && ! in_array($folder, ContentMedia::FOLDERS, true)) {
+            throw new \InvalidArgumentException("Invalid folder: {$folder}");
+        }
+
+        return ContentMedia::whereIn('id', $ids)->update(['folder' => $folder]);
+    }
+
+    public function bulkSetStage(array $ids, string $stage): int
+    {
+        if (! in_array($stage, ContentMedia::STAGES, true)) {
+            throw new \InvalidArgumentException("Invalid stage: {$stage}");
+        }
+
+        return ContentMedia::whereIn('id', $ids)->update(['stage' => $stage]);
+    }
+
+    public function folderCounts(): array
+    {
+        $raw = ContentMedia::query()
+            ->selectRaw('COALESCE(folder, \'__null\') AS folder, COUNT(*) AS n')
+            ->groupBy('folder')
+            ->pluck('n', 'folder')
+            ->all();
+
+        $out = [];
+        foreach (ContentMedia::FOLDERS as $f) {
+            $out[$f] = (int) ($raw[$f] ?? 0);
+        }
+        $out['__uncategorized'] = (int) ($raw['__null'] ?? 0);
+        $out['__all'] = array_sum($out);
+
+        return $out;
     }
 
     protected function generateThumbnail(UploadedFile $file, string $originalPath): ?string
@@ -90,8 +181,14 @@ class ContentMediaService
     {
         $query = ContentMedia::query()
             ->withCount('posts')
-            ->where('path', 'not like', 'content-planner/meta-imports/%')
             ->orderByDesc('created_at');
+
+        // Përjashto meta imports default, përveç kur user-i po shikon folder='imported'
+        // ose po kërkon me path (rast i rrallë).
+        $folder = $filters['folder'] ?? null;
+        if ($folder !== 'imported' && $folder !== '__all') {
+            $query->where('path', 'not like', 'content-planner/meta-imports/%');
+        }
 
         if (!empty($filters['type'])) {
             if ($filters['type'] === 'image') {
@@ -111,6 +208,18 @@ class ContentMediaService
             } elseif ($filters['usage'] === 'unused') {
                 $query->whereDoesntHave('posts');
             }
+        }
+
+        if ($folder !== null && $folder !== '' && $folder !== '__all') {
+            if ($folder === '__uncategorized') {
+                $query->whereNull('folder');
+            } elseif (in_array($folder, ContentMedia::FOLDERS, true)) {
+                $query->where('folder', $folder);
+            }
+        }
+
+        if (!empty($filters['stage']) && in_array($filters['stage'], ContentMedia::STAGES, true)) {
+            $query->where('stage', $filters['stage']);
         }
 
         return $query->paginate($perPage);

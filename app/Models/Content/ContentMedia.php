@@ -29,7 +29,12 @@ class ContentMedia extends Model
         'duration_seconds',
         'thumbnail_path',
         'alt_text',
+        'folder',
+        'stage',
     ];
+
+    public const FOLDERS = ['reels', 'videos', 'photos', 'stories', 'referenca', 'imported'];
+    public const STAGES = ['raw', 'edited', 'final'];
 
     protected $appends = [
         'url',

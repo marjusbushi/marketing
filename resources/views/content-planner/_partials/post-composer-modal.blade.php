@@ -122,7 +122,7 @@
 
                         {{-- Photo toolbar left --}}
                         <div id="composerPhotoToolbarLeft" style="display:none; position:absolute; top:12px; left:12px; z-index:10; gap:4px;">
-                            <button onclick="document.getElementById('mediaFileInput').click()" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Replace photo">
+                            <button onclick="openMediaLibraryPicker()" style="width:30px; height:30px; border-radius:50%; background:rgba(0,0,0,0.5); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center;" title="Replace photo">
                                 <iconify-icon icon="heroicons-outline:camera" width="14" style="color:#fff;"></iconify-icon>
                             </button>
                             <button onclick="editCurrentMedia()" type="button" style="width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,0.65); border:1.5px solid rgba(255,255,255,0.4); cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);" title="Edit photo (crop, filter, resize)">
@@ -177,7 +177,7 @@
                                 {{-- Dots indicator (bottom, IG style) --}}
                                 <div id="composerCarouselDots" style="display:none; position:absolute; bottom:10px; left:0; right:0; justify-content:center; gap:4px; pointer-events:none;"></div>
                             </div>
-                            <div id="composerMediaEmpty" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; cursor:pointer; aspect-ratio:1; background:#f8fafc;" onclick="document.getElementById('mediaFileInput').click()">
+                            <div id="composerMediaEmpty" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; cursor:pointer; aspect-ratio:1; background:#f8fafc;" onclick="openMediaLibraryPicker()">
                                 <iconify-icon icon="heroicons-outline:photo" width="48" style="color:#d1d5db;"></iconify-icon>
                                 <span style="font-size:13px; color:#94a3b8;">Click to add media</span>
                             </div>
@@ -941,6 +941,25 @@
     }
 
     function openMediaLibraryPicker() {
+        // Prefer the embedded MediaPicker modal when available (Media Library v2).
+        // Falls back to the legacy pop-up window if the partial wasn't included.
+        if (window.MediaPicker && typeof window.MediaPicker.open === 'function') {
+            window.MediaPicker.open({
+                multiple: true,
+                defaultFolder: '__all',
+                onConfirm: (mediaArray) => {
+                    if (!mediaArray || !mediaArray.length) return;
+                    mediaArray.forEach(m => {
+                        if (!composerState.mediaIds.includes(m.id)) {
+                            composerState.mediaIds.push(m.id);
+                            composerState.mediaItems.push(m);
+                            addMediaToComposer(m);
+                        }
+                    });
+                },
+            });
+            return;
+        }
         window.open('{{ route("marketing.planner.media") }}?picker=1', 'mediaLibrary', 'width=900,height=600');
     }
 

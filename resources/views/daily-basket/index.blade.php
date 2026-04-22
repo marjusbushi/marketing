@@ -2825,13 +2825,10 @@
             ph.appendChild(tx);
             wrap.appendChild(ph);
 
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = acceptFor(post.post_type);
-            input.style.display = 'none';
-            wrap.appendChild(input);
-
-            wrap.addEventListener('click', () => input.click());
+            // Click → opens the Media Library picker (select existing or
+            // upload new). Drag-drop from the desktop still uploads directly
+            // as a quick shortcut.
+            wrap.addEventListener('click', () => openBasketMediaPicker(post));
             wrap.addEventListener('dragover', (e) => { e.preventDefault(); wrap.classList.add('is-dragover'); });
             wrap.addEventListener('dragleave', () => wrap.classList.remove('is-dragover'));
             wrap.addEventListener('drop', (e) => {
@@ -2840,9 +2837,6 @@
                 if (e.dataTransfer?.files?.length) {
                     uploadToPlanCell(post, e.dataTransfer.files[0]);
                 }
-            });
-            input.addEventListener('change', () => {
-                if (input.files?.length) uploadToPlanCell(post, input.files[0]);
             });
         }
 
@@ -3592,14 +3586,10 @@
             : 'Kliko ose tërhiq skedarin ketu';
         tile.appendChild(txt);
 
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = acceptFor(post.post_type);
-        input.style.display = 'none';
-        if (opts.isCarousel) input.multiple = true;
-        tile.appendChild(input);
-
-        const trigger = () => input.click();
+        // Click → opens the Media Library picker (select existing or upload
+        // new). Drag-drop from the desktop still uploads directly as a quick
+        // shortcut.
+        const trigger = () => openBasketMediaPicker(post);
         tile.addEventListener('click', trigger);
         tile.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); }
@@ -3616,12 +3606,6 @@
             tile.classList.remove('is-dragover');
             if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
                 handleUpload(post, tile, Array.from(e.dataTransfer.files));
-            }
-        });
-
-        input.addEventListener('change', () => {
-            if (input.files && input.files.length) {
-                handleUpload(post, tile, Array.from(input.files));
             }
         });
 
@@ -4316,6 +4300,48 @@
         wireModalOnce();
         bootstrap();
     });
+
+    // ── Media Picker integration (Media Library v2) ──
+    // Opens the shared media-picker-modal, lets user pick one or more media
+    // from the central library, then attaches them to the current post via
+    // the attach-from-library endpoint (no re-upload — references shared
+    // storage path).
+    window.openBasketMediaPicker = function(post) {
+        if (!window.MediaPicker || typeof window.MediaPicker.open !== 'function') {
+            console.error('MediaPicker not loaded');
+            return;
+        }
+        const isCarousel = post && post.post_type === 'carousel';
+        window.MediaPicker.open({
+            multiple: !!isCarousel,
+            defaultFolder: '__all',
+            onConfirm: async (mediaArray) => {
+                if (!mediaArray || !mediaArray.length) return;
+                try {
+                    const res = await fetch('/marketing/daily-basket/api/posts/' + num(post.id) + '/media/attach-from-library', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ media_ids: mediaArray.map(m => m.id) }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        showError('Bashkëngjitja dështoi: ' + (err.error || err.message || res.statusText));
+                        return;
+                    }
+                    await selectDay(state.selectedDate);
+                } catch (e) {
+                    showError('Bashkëngjitja dështoi: ' + e.message);
+                }
+            },
+        });
+    };
 })();
 </script>
+
+{{-- Media Picker Modal (Media Library v2) --}}
+@include('content-planner._partials.media-picker-modal')
 @endsection

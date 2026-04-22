@@ -306,6 +306,8 @@ class ContentFeedImportService
                 'size_bytes' => strlen($response->body()),
                 'width' => $width,
                 'height' => $height,
+                'folder' => 'imported',
+                'stage' => 'final',
             ]);
 
             // Attach to post

@@ -369,6 +369,8 @@ class ContentPlannerApiController extends Controller
                 'type' => $request->get('type'),
                 'search' => $request->get('search'),
                 'usage' => $request->get('usage'),
+                'folder' => $request->get('folder'),
+                'stage' => $request->get('stage'),
             ],
             (int) $request->get('per_page', 30),
         );
@@ -382,6 +384,127 @@ class ContentPlannerApiController extends Controller
         $this->mediaService->delete($media);
 
         return response()->json(['message' => 'Media deleted.']);
+    }
+
+    // ── Media folders (Media Library v2) ──
+
+    public function listMediaFolders(): JsonResponse
+    {
+        $counts = $this->mediaService->folderCounts();
+
+        $folders = [
+            ['key' => '__all', 'label' => 'All media', 'icon' => '📁', 'count' => $counts['__all']],
+            ['key' => 'reels', 'label' => 'Reels', 'icon' => '🎬', 'count' => $counts['reels']],
+            ['key' => 'videos', 'label' => 'Videos', 'icon' => '📹', 'count' => $counts['videos']],
+            ['key' => 'photos', 'label' => 'Photos', 'icon' => '📷', 'count' => $counts['photos']],
+            ['key' => 'stories', 'label' => 'Stories', 'icon' => '📖', 'count' => $counts['stories']],
+            ['key' => 'referenca', 'label' => 'Referenca', 'icon' => '🔖', 'count' => $counts['referenca']],
+            ['key' => 'imported', 'label' => 'Imported', 'icon' => '📥', 'count' => $counts['imported']],
+            ['key' => '__uncategorized', 'label' => 'Uncategorized', 'icon' => '📂', 'count' => $counts['__uncategorized']],
+        ];
+
+        return response()->json(['folders' => $folders]);
+    }
+
+    public function moveMediaToFolder(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'folder' => 'nullable|string|in:' . implode(',', ContentMedia::FOLDERS),
+        ]);
+
+        $media = ContentMedia::findOrFail($id);
+
+        try {
+            $media = $this->mediaService->setFolder($media, $request->input('folder'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'media' => $media,
+            'counts' => $this->mediaService->folderCounts(),
+        ]);
+    }
+
+    public function bulkMoveMedia(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:content_media,id',
+            'folder' => 'nullable|string|in:' . implode(',', ContentMedia::FOLDERS),
+        ]);
+
+        try {
+            $updated = $this->mediaService->bulkMove($request->input('ids'), $request->input('folder'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'updated' => $updated,
+            'counts' => $this->mediaService->folderCounts(),
+        ]);
+    }
+
+    public function setMediaStage(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'stage' => 'required|string|in:' . implode(',', ContentMedia::STAGES),
+        ]);
+
+        $media = ContentMedia::findOrFail($id);
+
+        try {
+            $media = $this->mediaService->setStage($media, $request->input('stage'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['media' => $media]);
+    }
+
+    public function bulkSetMediaStage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:content_media,id',
+            'stage' => 'required|string|in:' . implode(',', ContentMedia::STAGES),
+        ]);
+
+        try {
+            $updated = $this->mediaService->bulkSetStage($request->input('ids'), $request->input('stage'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['updated' => $updated]);
+    }
+
+    public function mediaUsedByPosts(int $id): JsonResponse
+    {
+        $media = ContentMedia::findOrFail($id);
+
+        $posts = $media->posts()
+            ->with('media')
+            ->orderByDesc('scheduled_at')
+            ->get()
+            ->map(function (ContentPost $post) {
+                $firstMedia = $post->media->first();
+                $content = $post->content ?? '';
+
+                return [
+                    'id' => $post->id,
+                    'content_preview' => mb_strimwidth(trim(preg_replace('/\s+/', ' ', $content)), 0, 60, '…'),
+                    'thumbnail_url' => $firstMedia?->thumbnail_url ?? $firstMedia?->url,
+                    'scheduled_at' => $post->scheduled_at?->toIso8601String(),
+                    'status' => $post->status,
+                    'status_label' => $post->status_label,
+                    'status_color' => $post->status_color,
+                    'platform' => $post->platform,
+                ];
+            });
+
+        return response()->json(['posts' => $posts]);
     }
 
     // ── Comments ──
