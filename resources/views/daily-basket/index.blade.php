@@ -547,11 +547,9 @@
     .db-stage-dot[data-stage="scheduling"] { background: #7c3aed; }
     .db-stage-dot[data-stage="published"]  { background: #22c55e; }
 
-    /* Material thumbnail — always 1:1 square in the grid (like Instagram's
-       profile grid view). The type badge at the top already labels reel /
-       photo / story / carousel, so forcing 9:16 on reels here would just
-       create inconsistent row heights and blow the grid apart. Real aspect
-       stays preserved in the detail view via .db-media-reel / .db-media-grid. */
+    /* Material thumbnail — 1:1 square frame (like Instagram's profile grid).
+       Photo itself uses object-fit: contain so the user sees the WHOLE image
+       (letterbox on the soft background instead of cropping the subject). */
     .db-mat {
         aspect-ratio: 1 / 1;
         background: var(--db-accent-soft);
@@ -560,15 +558,45 @@
         overflow: hidden;
         border-bottom: 1px solid var(--db-border);
     }
-    .db-mat img, .db-mat video {
+    .db-mat-slot { position: absolute; inset: 0; display: block; }
+    .db-mat-slot img, .db-mat-slot video,
+    .db-mat > img, .db-mat > video {
         width: 100%; height: 100%;
-        object-fit: cover; display: block;
+        object-fit: contain; display: block;
     }
     .db-mat-empty {
         display: flex; flex-direction: column; align-items: center; gap: 4px;
         color: var(--db-text-3); font-size: 11px; padding: 16px; text-align: center;
     }
     .db-mat-empty .icon { font-size: 22px; }
+
+    /* Carousel nav overlays */
+    .db-mat-dots {
+        position: absolute; bottom: 8px; left: 0; right: 0;
+        display: flex; gap: 4px; justify-content: center; z-index: 2;
+        pointer-events: none;
+    }
+    .db-mat-dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: rgba(255, 255, 255, 0.55);
+        box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
+        cursor: pointer; pointer-events: auto;
+        transition: background 0.12s, transform 0.12s;
+    }
+    .db-mat-dot:hover { transform: scale(1.2); }
+    .db-mat-dot.active { background: #fff; }
+    .db-mat-arrow {
+        position: absolute; top: 50%; transform: translateY(-50%);
+        width: 26px; height: 26px; border-radius: 50%;
+        border: none; background: rgba(0, 0, 0, 0.55); color: #fff;
+        font-size: 16px; line-height: 1; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity 0.15s; z-index: 2;
+    }
+    .db-mat:hover .db-mat-arrow { opacity: 1; }
+    .db-mat-arrow:hover { background: rgba(0, 0, 0, 0.75); }
+    .db-mat-arrow.prev { left: 6px; }
+    .db-mat-arrow.next { right: 6px; }
 
     .db-post-body {
         padding: 9px 11px;
@@ -1886,37 +1914,88 @@
     function buildPostMat(post) {
         const mat = document.createElement('div');
         mat.className = 'db-mat';
-        // data-type drives the aspect-ratio in CSS so the thumbnail frames
-        // the way Instagram renders that format: reel/story = 9:16 vertical,
-        // photo/carousel/video = 1:1 square.
         mat.dataset.type = post.post_type || 'photo';
 
-        const media = (post.media && post.media[0]) || null;
-        if (media && media.thumbnail_url) {
-            const img = document.createElement('img');
-            img.src = media.thumbnail_url;
-            img.alt = '';
-            img.loading = 'lazy';
-            img.onerror = () => { img.remove(); mat.appendChild(buildMatEmpty()); };
-            mat.appendChild(img);
-        } else if (media && media.url && media.is_video) {
-            // Video without a poster — render the element itself paused on
-            // the first frame. Muted + no controls so it stays decorative.
-            const v = document.createElement('video');
-            v.src = media.url;
-            v.muted = true;
-            v.playsInline = true;
-            v.preload = 'metadata';
-            mat.appendChild(v);
-        } else if (media && media.url) {
-            const img = document.createElement('img');
-            img.src = media.url;
-            img.alt = '';
-            img.loading = 'lazy';
-            img.onerror = () => { img.remove(); mat.appendChild(buildMatEmpty()); };
-            mat.appendChild(img);
-        } else {
+        const all = Array.isArray(post.media) ? post.media : [];
+
+        if (all.length === 0) {
             mat.appendChild(buildMatEmpty());
+            return mat;
+        }
+
+        // Single slot that the render() function overwrites when the user
+        // clicks dots / arrows. Kept in one place so we don't rebuild the
+        // whole card on every navigation click.
+        const slot = document.createElement('div');
+        slot.className = 'db-mat-slot';
+        mat.appendChild(slot);
+
+        let idx = 0;
+        const renderSlot = () => {
+            slot.textContent = '';
+            const m = all[idx];
+            if (!m) return;
+            if (m.is_video) {
+                const v = document.createElement('video');
+                v.src = m.url;
+                v.muted = true;
+                v.playsInline = true;
+                v.preload = 'metadata';
+                if (m.thumbnail_url) v.poster = m.thumbnail_url;
+                slot.appendChild(v);
+            } else {
+                const img = document.createElement('img');
+                img.src = m.thumbnail_url || m.url;
+                img.alt = '';
+                img.loading = 'lazy';
+                img.onerror = () => { slot.textContent = ''; slot.appendChild(buildMatEmpty()); };
+                slot.appendChild(img);
+            }
+        };
+        renderSlot();
+
+        // Carousel navigation only appears when there are 2+ items.
+        // Dots are always visible (Instagram-style), arrows only on hover.
+        // Clicks on either stop propagation so the card's selectPost
+        // handler doesn't fire underneath.
+        if (all.length > 1) {
+            const dots = document.createElement('div');
+            dots.className = 'db-mat-dots';
+            const dotEls = all.map((_, i) => {
+                const d = document.createElement('span');
+                d.className = 'db-mat-dot' + (i === 0 ? ' active' : '');
+                d.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    idx = i;
+                    dotEls.forEach((x, k) => x.classList.toggle('active', k === idx));
+                    renderSlot();
+                });
+                dots.appendChild(d);
+                return d;
+            });
+            mat.appendChild(dots);
+
+            const step = (delta) => (e) => {
+                e.stopPropagation();
+                idx = (idx + delta + all.length) % all.length;
+                dotEls.forEach((x, k) => x.classList.toggle('active', k === idx));
+                renderSlot();
+            };
+            const prev = document.createElement('button');
+            prev.type = 'button';
+            prev.className = 'db-mat-arrow prev';
+            prev.textContent = '‹';
+            prev.title = 'Foto e mëparshme';
+            prev.addEventListener('click', step(-1));
+
+            const next = document.createElement('button');
+            next.type = 'button';
+            next.className = 'db-mat-arrow next';
+            next.textContent = '›';
+            next.title = 'Foto tjetër';
+            next.addEventListener('click', step(+1));
+
+            mat.append(prev, next);
         }
 
         return mat;
@@ -2904,7 +2983,7 @@
         // ── Col 1: Burimi (products + reference) ──
         const col1 = colGroup('📦', 'Burimi');
 
-        col1.appendChild(labeledField('Produktet', renderProductsBlock(post)));
+        col1.appendChild(labeledField('Produktet', buildDetailProductsEditor(post)));
 
         col1.appendChild(buildReferenceUrlBlock(post));
 
@@ -3503,6 +3582,29 @@
         if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
         if (bytes >= 1024)    return Math.round(bytes / 1024) + ' KB';
         return bytes + ' B';
+    }
+
+    // Editable product chips for the detail view — list current products as
+    // chips with ×, plus a "+ Shto" button that opens the picker popover
+    // (openPlanProductPicker, reused from the previous plan view).
+    function buildDetailProductsEditor(post) {
+        const wrap = document.createElement('div');
+        wrap.className = 'db-plan-chips';
+        wrap.style.marginTop = '4px';
+
+        (post.products || []).forEach(p => wrap.appendChild(buildProductChip(post, p)));
+
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'db-plan-chip-add';
+        addBtn.textContent = '+ Shto nga shporta';
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPlanProductPicker(post, addBtn);
+        });
+        wrap.appendChild(addBtn);
+
+        return wrap;
     }
 
     // Products display is still read-only inline — edits happen through the
