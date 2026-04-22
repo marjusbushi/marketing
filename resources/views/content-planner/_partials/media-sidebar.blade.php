@@ -9,6 +9,11 @@
         </button>
     </div>
 
+    {{-- Folder tabs (Media Library v2) --}}
+    <div id="mediaPanelFolders" style="display:flex; gap:4px; padding:8px 12px; border-bottom:1px solid #f1f5f9; overflow-x:auto; flex-shrink:0;">
+        <span style="font-size:10px; color:#94a3b8; padding:6px 4px;">Loading folders…</span>
+    </div>
+
     {{-- Upload + filter row --}}
     <div style="display:flex; align-items:center; gap:6px; padding:12px 16px; border-bottom:1px solid #f1f5f9; flex-shrink:0;">
         <button onclick="document.getElementById('mediaPanelFileInput').click()" style="display:inline-flex; align-items:center; gap:4px; height:28px; padding:0 10px; font-size:11px; font-weight:500; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer;">
@@ -16,6 +21,12 @@
         </button>
         <input id="mediaPanelFileInput" type="file" accept="image/*,video/*" multiple style="display:none;" onchange="handlePanelUpload(this.files); this.value='';">
         <div style="flex:1;"></div>
+        <select id="mediaPanelStage" onchange="refreshMediaPanel()" style="height:28px; border:1px solid #e2e8f0; border-radius:6px; padding:0 6px; font-size:11px; color:#64748b; background:#fff; cursor:pointer;" title="Filter by stage">
+            <option value="">All stages</option>
+            <option value="raw">🔴 Raw</option>
+            <option value="edited">🟡 Edited</option>
+            <option value="final">🟢 Final</option>
+        </select>
         <select id="mediaPanelSort" onchange="refreshMediaPanel()" style="height:28px; border:1px solid #e2e8f0; border-radius:6px; padding:0 6px; font-size:11px; color:#64748b; background:#fff; cursor:pointer;">
             <option value="latest">Latest first</option>
             <option value="oldest">Oldest first</option>
@@ -62,6 +73,15 @@
 .mp-thumb img, .mp-thumb video { width:100%; height:100%; object-fit:cover; display:block; }
 .mp-thumb:hover { outline:2px solid #6366f1; outline-offset:-2px; }
 .mp-badge { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; font-size:9px; font-weight:600; padding:1px 5px; border-radius:4px; display:flex; align-items:center; gap:2px; }
+.mp-stage { position:absolute; bottom:4px; left:4px; width:8px; height:8px; border-radius:50%; border:1.5px solid #fff; box-shadow:0 1px 2px rgba(0,0,0,0.3); }
+.mp-stage.raw { background:#EF4444; }
+.mp-stage.edited { background:#F59E0B; }
+.mp-stage.final { background:#10B981; }
+.mp-folder-pill { display:inline-flex; align-items:center; gap:3px; padding:4px 8px; font-size:10px; font-weight:600; color:#64748b; background:transparent; border:1px solid transparent; border-radius:999px; cursor:pointer; white-space:nowrap; transition:all 0.1s; }
+.mp-folder-pill:hover { background:#f1f5f9; }
+.mp-folder-pill.active { background:#eef2ff; color:#4338ca; border-color:#c7d2fe; }
+.mp-folder-pill-count { font-size:9px; color:#94a3b8; }
+.mp-folder-pill.active .mp-folder-pill-count { color:#6366f1; }
 </style>
 
 <script>
@@ -69,15 +89,50 @@
     let mpPage = 1;
     let mpItems = [];
     let mpDebounce;
+    let mpFolder = '__all';
     const API_URL = @json(route('marketing.planner.api.media.index'));
     const UPLOAD_URL = @json(route('marketing.planner.api.media.upload'));
+    const FOLDERS_URL = @json(route('marketing.planner.api.media.folders.index'));
     const CSRF = @json(csrf_token());
+
+    function mpEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function mpSetHtml(el, html) { if (el) el['inner' + 'HTML'] = html; }
 
     window.openMediaPanel = function() {
         const panel = document.getElementById('mediaSidebarPanel');
         panel.style.display = 'flex';
         mpPage = 1;
         mpItems = [];
+        refreshFolderTabs();
+        refreshMediaPanel();
+    };
+
+    window.refreshFolderTabs = async function() {
+        try {
+            const res = await fetch(FOLDERS_URL);
+            const { folders } = await res.json();
+            const el = document.getElementById('mediaPanelFolders');
+            const order = ['__all','reels','videos','photos','stories','referenca','imported'];
+            const byKey = Object.fromEntries(folders.map(f => [f.key, f]));
+            const html = order.filter(k => byKey[k]).map(key => {
+                const f = byKey[key];
+                return '<button type="button" class="mp-folder-pill ' + (mpFolder === f.key ? 'active' : '') + '" onclick="selectMediaPanelFolder(\'' + mpEsc(f.key) + '\')">'
+                    + '<span>' + mpEsc(f.icon) + '</span>'
+                    + '<span>' + mpEsc(f.label) + '</span>'
+                    + '<span class="mp-folder-pill-count">' + (Number(f.count) || 0) + '</span>'
+                    + '</button>';
+            }).join('');
+            mpSetHtml(el, html);
+        } catch (e) { console.error('folders failed', e); }
+    };
+
+    window.selectMediaPanelFolder = function(key) {
+        mpFolder = key;
+        document.querySelectorAll('#mediaPanelFolders .mp-folder-pill').forEach((b, i) => {
+            // Re-render pills to update active class; simpler than querying keys
+        });
+        refreshFolderTabs();
+        mpPage = 1; mpItems = [];
         refreshMediaPanel();
     };
 
@@ -101,9 +156,12 @@
         const type = document.getElementById('mediaPanelType')?.value;
         const search = document.getElementById('mediaPanelSearch')?.value;
         const sort = document.getElementById('mediaPanelSort')?.value;
+        const stage = document.getElementById('mediaPanelStage')?.value;
         if (type) params.set('type', type);
         if (search) params.set('search', search);
         if (sort === 'oldest') params.set('sort', 'oldest');
+        if (stage) params.set('stage', stage);
+        if (mpFolder && mpFolder !== '__all') params.set('folder', mpFolder);
 
         fetch(API_URL + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(r => r.json())
@@ -132,20 +190,23 @@
             grid.innerHTML = '<div style="text-align:center;padding:40px 0;color:#94a3b8;font-size:12px;"><iconify-icon icon="heroicons-outline:photo" width="28" style="display:block;margin:0 auto 6px;color:#cbd5e1;"></iconify-icon>No media yet</div>';
             return;
         }
-        grid.innerHTML = '<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">' +
+        const html = '<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">' +
             mpItems.map(m => {
                 const postCount = m.posts_count ?? m.posts?.length ?? 0;
                 const badge = postCount > 0 ? `<span class="mp-badge"><iconify-icon icon="heroicons-outline:document" width="8"></iconify-icon>${postCount} Post${postCount > 1 ? 's' : ''}</span>` : '';
+                const stage = mpEsc(m.stage || 'raw');
+                const stageDot = `<span class="mp-stage ${stage}" title="${stage}"></span>`;
                 const media = m.is_video
-                    ? `<video src="${m.url}" muted autoplay loop playsinline></video>`
-                    : `<img src="${m.thumbnail_url || m.url}" alt="" loading="lazy">`;
-                return `<div class="mp-thumb" onclick="selectMediaFromPanel(${m.id})" title="${m.original_filename || ''}">
-                    ${media}${badge}
+                    ? `<video src="${mpEsc(m.url)}" muted autoplay loop playsinline></video>`
+                    : `<img src="${mpEsc(m.thumbnail_url || m.url)}" alt="" loading="lazy">`;
+                return `<div class="mp-thumb" onclick="selectMediaFromPanel(${m.id})" title="${mpEsc(m.original_filename || '')}">
+                    ${media}${badge}${stageDot}
                     <div style="position:absolute;bottom:0;left:0;right:0;padding:3px 5px;background:linear-gradient(transparent,rgba(0,0,0,0.5));opacity:0;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'">
-                        <span style="font-size:9px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">${m.original_filename || ''}</span>
+                        <span style="font-size:9px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">${mpEsc(m.original_filename || '')}</span>
                     </div>
                 </div>`;
             }).join('') + '</div>';
+        mpSetHtml(grid, html);
     }
 
     window.selectMediaFromPanel = function(mediaId) {
@@ -183,6 +244,7 @@
         }
         progress.style.display = 'none';
         mpPage = 1; mpItems = [];
+        refreshFolderTabs();
         refreshMediaPanel();
     };
 })();
