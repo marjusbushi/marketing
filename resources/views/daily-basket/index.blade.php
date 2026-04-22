@@ -1849,7 +1849,7 @@
         card.dataset.productIds = (post.products || []).map(p => p.item_group_id).join(',');
         if (post.id === state.selectedPostId) card.classList.add('selected');
         card.addEventListener('click', (e) => {
-            if (e.target.closest('button, a, input, textarea, .db-post-chip-x')) return;
+            if (e.target.closest('button, a, input, textarea, .db-post-chip, .db-post-chip-x')) return;
             selectPost(num(post.id));
         });
 
@@ -2009,7 +2009,15 @@
     function buildPostChip(p) {
         const chip = document.createElement('span');
         chip.className = 'db-post-chip';
-        chip.title = p.name || '';
+        chip.style.cursor = 'pointer';
+        chip.title = 'Klik për preview · ' + (p.name || '');
+
+        // Click → show product detail popover (photo + name + code + price).
+        // stopPropagation so it doesn't also trigger selectPost on the card.
+        chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openProductPreview(p.item_group_id, chip);
+        });
 
         const thumbHost = document.createElement('span');
         thumbHost.className = 'db-post-chip-thumb';
@@ -3481,6 +3489,10 @@
                 post.media.push(uploaded);
             }
             renderSheet(post);
+            // Re-render the grid so the thumbnail appears on the post card
+            // immediately — without this the card keeps showing "Pa material
+            // ende" until the next selectDay / day switch.
+            if (state.kanban) renderBoard(state.kanban);
         } catch (e) {
             showError('Ngarkimi deshtoi: ' + e.message);
             tile.classList.remove('is-uploading');
