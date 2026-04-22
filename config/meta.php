@@ -106,4 +106,30 @@ return [
     'ads_attribution' => [
         'use_account_attribution_setting' => env('META_USE_ACCOUNT_ATTRIBUTION_SETTING', true),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Instagram DM Webhook
+    |--------------------------------------------------------------------------
+    |
+    | Meta delivers IG DM events to /webhooks/meta/instagram. The dashboard
+    | reads from meta_ig_dm_events for dates >= ig_webhook_start_date, giving
+    | 100% match with Meta Business Suite. Dates before start_date use the
+    | Conversations API sample (historical fallback).
+    |
+    | Setup:
+    | 1. Generate a random 32-char hex string: openssl rand -hex 16
+    | 2. Set META_WEBHOOK_VERIFY_TOKEN to that value (same value in Meta App
+    |    Dashboard > Webhooks > Verify Token).
+    | 3. META_APP_SECRET already set for OAuth — reused for HMAC signature.
+    | 4. After test DM succeeds, set META_IG_WEBHOOK_START_DATE=YYYY-MM-DD
+    |    (today's date when subscription went live).
+    | 5. ig_conversation_gap_minutes controls the "new conversation" threshold:
+    |    a message starts a new conversation if no prior incoming from same
+    |    thread within this window. 1440 (24h) is industry norm; tune if gap
+    |    vs Meta BS > 2%.
+    */
+    'webhook_verify_token' => env('META_WEBHOOK_VERIFY_TOKEN'),
+    'ig_webhook_start_date' => env('META_IG_WEBHOOK_START_DATE'),
+    'ig_conversation_gap_minutes' => (int) env('META_IG_CONVERSATION_GAP_MINUTES', 1440),
 ];

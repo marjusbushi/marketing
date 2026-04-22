@@ -22,12 +22,15 @@ jobs:
           META_BUSINESS_ID: ${{ secrets.META_BUSINESS_ID }}
           META_APP_ID: ${{ secrets.META_APP_ID }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_WEBHOOK_VERIFY_TOKEN: ${{ secrets.META_WEBHOOK_VERIFY_TOKEN }}
+          META_IG_WEBHOOK_START_DATE: ${{ secrets.META_IG_WEBHOOK_START_DATE }}
+          META_IG_CONVERSATION_GAP_MINUTES: ${{ secrets.META_IG_CONVERSATION_GAP_MINUTES }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           port: ${{ secrets.STAGING_PORT }}
-          envs: APP_PATH,META_SYSTEM_USER_TOKEN,META_PAGE_TOKEN,META_AD_ACCOUNT_ID,META_PAGE_ID,META_IG_ACCOUNT_ID,META_BUSINESS_ID,META_APP_ID,META_APP_SECRET
+          envs: APP_PATH,META_SYSTEM_USER_TOKEN,META_PAGE_TOKEN,META_AD_ACCOUNT_ID,META_PAGE_ID,META_IG_ACCOUNT_ID,META_BUSINESS_ID,META_APP_ID,META_APP_SECRET,META_WEBHOOK_VERIFY_TOKEN,META_IG_WEBHOOK_START_DATE,META_IG_CONVERSATION_GAP_MINUTES
           script: |
             set -e
             cd "$APP_PATH"
@@ -54,6 +57,9 @@ jobs:
             upsert META_APP_SECRET             "$META_APP_SECRET"
             upsert META_API_VERSION            "v24.0"
             upsert META_FEATURE_FACEBOOK_MODULE "true"
+            upsert META_WEBHOOK_VERIFY_TOKEN   "$META_WEBHOOK_VERIFY_TOKEN"
+            upsert META_IG_WEBHOOK_START_DATE  "$META_IG_WEBHOOK_START_DATE"
+            upsert META_IG_CONVERSATION_GAP_MINUTES "$META_IG_CONVERSATION_GAP_MINUTES"
 
             echo ""
             echo "=== Masked grep ==="
