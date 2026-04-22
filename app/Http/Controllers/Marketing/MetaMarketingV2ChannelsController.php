@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Marketing;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\MetaMarketingCache;
 use App\Jobs\MetaForceRefreshJob;
+use App\Models\Meta\MetaMessagingStat;
 use App\Models\Meta\MetaSyncLog;
 use App\Services\Meta\MetaDataResolverService;
 use App\Services\Meta\MetaMarketingV2ChannelService;
@@ -12,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -224,6 +226,85 @@ class MetaMarketingV2ChannelsController extends Controller
         try {
             $data = $service->igMessaging($from, $to, $noCache);
             return response()->json($data)->header('X-Meta-Cache', $service->wasCacheHit() ? 'HIT' : 'MISS');
+        } catch (Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Diagnostic endpoint — explains where the "Kontakte Aktive" number
+     * comes from so we can pinpoint why the dashboard count drifts from
+     * Meta Business Suite ("Messaging conversations started").
+     *
+     * Returns the three inputs used by the aggregation:
+     * 1. organic_new_conversations — from MetaMessagingStat.new_conversations
+     * 2. paid_messaging_conversations — summed from meta_ads_insights.platform_breakdown.instagram.messaging_conversations
+     * 3. last sync timestamps for both sources
+     */
+    public function igDmDebug(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->resolveRange($request);
+
+        try {
+            $organicRows = MetaMessagingStat::where('platform', 'instagram')
+                ->whereBetween('date', [$from, $to])
+                ->orderBy('date')
+                ->get();
+
+            $paidJsonPath = '$."instagram".messaging_conversations';
+            $paidRows = DB::connection('dis')
+                ->table('meta_ads_insights')
+                ->whereBetween('date', [$from, $to])
+                ->whereNotNull('platform_breakdown')
+                ->selectRaw('date, SUM(JSON_EXTRACT(platform_breakdown, ?)) as mc', [$paidJsonPath])
+                ->groupBy('date')
+                ->pluck('mc', 'date');
+
+            $daily = [];
+            $organicTotal = 0;
+            $paidTotal = 0;
+
+            for ($d = Carbon::parse($from)->copy(); $d->lte(Carbon::parse($to)); $d->addDay()) {
+                $date = $d->toDateString();
+                $organic = (int) ($organicRows->firstWhere(fn ($r) => (string) ($r->date instanceof \DateTimeInterface ? $r->date->format('Y-m-d') : $r->date) === $date)?->new_conversations ?? 0);
+                $paid = (int) ($paidRows[$date] ?? 0);
+
+                $daily[] = [
+                    'date' => $date,
+                    'organic' => $organic,
+                    'paid' => $paid,
+                    'total' => $organic + $paid,
+                ];
+
+                $organicTotal += $organic;
+                $paidTotal += $paid;
+            }
+
+            $lastMessagingSync = MetaMessagingStat::where('platform', 'instagram')
+                ->orderByDesc('synced_at')
+                ->value('synced_at');
+
+            $lastAdsSync = DB::connection('dis')
+                ->table('meta_ads_insights')
+                ->orderByDesc('synced_at')
+                ->value('synced_at');
+
+            return response()->json([
+                'from' => $from,
+                'to' => $to,
+                'organic_total' => $organicTotal,
+                'paid_total' => $paidTotal,
+                'combined_total' => $organicTotal + $paidTotal,
+                'last_messaging_sync' => $lastMessagingSync,
+                'last_ads_sync' => $lastAdsSync,
+                'daily' => $daily,
+                'notes' => [
+                    'organic_source' => 'MetaMessagingStat.new_conversations (from Conversations API, folder=instagram)',
+                    'paid_source' => 'meta_ads_insights.platform_breakdown.instagram.messaging_conversations (from Ads API)',
+                    'dashboard_formula' => 'combined_total = organic_total + paid_total',
+                    'meta_timezone' => 'Meta Business Suite reports in Pacific Time; our query uses local dates. A 1-day offset between displays is expected near midnight.',
+                ],
+            ]);
         } catch (Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 500);
         }

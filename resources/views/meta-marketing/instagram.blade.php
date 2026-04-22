@@ -254,6 +254,81 @@
         </div>
     </div>
 
+    {{-- Debug panel — only rendered when ?debug=1 is in the URL.
+         Explains where the "Kontakte Aktive" number comes from so we can
+         diagnose mismatches against Meta Business Suite's
+         "Messaging conversations started" metric. --}}
+    <div id="igDmDebugPanel" class="hidden bg-white rounded-xl border border-amber-300 overflow-hidden">
+        <div class="px-5 py-4 border-b border-amber-100 flex items-center gap-2 bg-amber-50">
+            <iconify-icon icon="heroicons-outline:wrench-screwdriver" width="18" class="text-amber-600"></iconify-icon>
+            <h3 class="text-sm font-semibold text-amber-800">Debug — IG DM Metrics</h3>
+            <span class="text-[11px] text-amber-600 ml-2">?debug=1</span>
+        </div>
+        <div class="p-5 space-y-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                <div class="px-4 py-3 rounded-lg border border-slate-200 bg-slate-50">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider">Organic total</div>
+                    <div id="dbg-organic" class="text-xl font-bold text-slate-800 mt-1 tabular-nums">&mdash;</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">MetaMessagingStat.new_conversations</div>
+                </div>
+                <div class="px-4 py-3 rounded-lg border border-slate-200 bg-slate-50">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider">Paid total</div>
+                    <div id="dbg-paid" class="text-xl font-bold text-slate-800 mt-1 tabular-nums">&mdash;</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">ads platform_breakdown.ig.messaging_conversations</div>
+                </div>
+                <div class="px-4 py-3 rounded-lg border border-pink-200 bg-pink-50">
+                    <div class="text-[10px] text-pink-700 uppercase tracking-wider">Combined (dashboard)</div>
+                    <div id="dbg-combined" class="text-xl font-bold text-pink-800 mt-1 tabular-nums">&mdash;</div>
+                    <div class="text-[10px] text-pink-600 mt-0.5">= organic + paid</div>
+                </div>
+                <div class="px-4 py-3 rounded-lg border border-slate-200 bg-slate-50">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider">Meta Business (manual)</div>
+                    <input id="dbg-meta-manual" type="number" placeholder="122"
+                           class="w-full text-xl font-bold text-slate-800 mt-1 tabular-nums text-center bg-white border border-slate-200 rounded px-2 py-1"
+                           oninput="updateDebugGap()" />
+                    <div id="dbg-gap" class="text-[10px] text-slate-400 mt-0.5">Fut numrin nga Meta</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 flex items-center gap-2">
+                    <iconify-icon icon="heroicons-outline:clock" width="14" class="text-slate-400"></iconify-icon>
+                    <span class="text-[11px] text-slate-500">Messaging sync:</span>
+                    <span id="dbg-msg-sync" class="text-[11px] font-semibold text-slate-700 ml-auto">&mdash;</span>
+                </div>
+                <div class="px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 flex items-center gap-2">
+                    <iconify-icon icon="heroicons-outline:clock" width="14" class="text-slate-400"></iconify-icon>
+                    <span class="text-[11px] text-slate-500">Ads sync:</span>
+                    <span id="dbg-ads-sync" class="text-[11px] font-semibold text-slate-700 ml-auto">&mdash;</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="text-[11px] font-semibold text-slate-600 mb-2">Per day breakdown</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200">
+                                <th class="text-left px-3 py-2 font-semibold text-slate-700">Data</th>
+                                <th class="text-right px-3 py-2 font-semibold text-slate-700">Organic</th>
+                                <th class="text-right px-3 py-2 font-semibold text-slate-700">Paid</th>
+                                <th class="text-right px-3 py-2 font-semibold text-slate-700">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dbg-daily-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-[11px] text-slate-500 bg-amber-50 border border-amber-200 rounded-lg p-3 leading-relaxed">
+                <b>Interpretimi:</b><br>
+                • Nese <b>organic &lt;&lt; Meta organic</b> &mdash; Conversations API (folder=instagram) po ngel bisedsa.<br>
+                • Nese <b>paid = 0</b> dhe Meta shfaq paid &gt; 0 &mdash; sync-i i Ads nuk ka perditesuar platform_breakdown.<br>
+                • Nese te dy numrat mungojne por sync timestamps jane te fresh &mdash; date-range nuk perputhet me timezone-in e Meta-s (Pacific vs Tirane).
+            </div>
+        </div>
+    </div>
+
     {{-- Daily Breakdown Table --}}
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
@@ -495,7 +570,8 @@
             loadKPIs(from, to, preset, extra, thisGen),
             loadCharts(from, to, preset, extra, thisGen),
             loadTopPosts(null, from, to, preset, extra, thisGen),
-            loadMessaging(from, to, preset, extra, thisGen)
+            loadMessaging(from, to, preset, extra, thisGen),
+            loadDebugPanel(from, to, preset, thisGen),
         ]);
 
         results.forEach((r, i) => {
@@ -812,6 +888,85 @@
                 </tr>
             `;
         }).join('');
+    }
+
+    // Debug panel — only active when ?debug=1 is in the URL.
+    const IG_DEBUG_ENABLED = new URLSearchParams(window.location.search).get('debug') === '1';
+
+    function fmtSync(ts) {
+        if (!ts) return 'asnjehere';
+        const d = new Date(ts);
+        if (isNaN(d)) return String(ts);
+        const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
+        if (diffMin < 1) return 'tani';
+        if (diffMin < 60) return diffMin + 'm më parë';
+        const h = Math.round(diffMin / 60);
+        if (h < 24) return h + 'h më parë';
+        return Math.round(h / 24) + 'd më parë';
+    }
+
+    function updateDebugGap() {
+        const combined = parseInt(document.getElementById('dbg-combined').textContent.replace(/\D/g, ''), 10) || 0;
+        const metaVal = parseInt(document.getElementById('dbg-meta-manual').value, 10) || 0;
+        const gapEl = document.getElementById('dbg-gap');
+        if (!metaVal) {
+            gapEl.textContent = 'Fut numrin nga Meta';
+            gapEl.style.color = '';
+            return;
+        }
+        const gap = combined - metaVal;
+        const pct = metaVal ? Math.round((gap / metaVal) * 100) : 0;
+        const sign = gap > 0 ? '+' : '';
+        gapEl.textContent = `Gap: ${sign}${gap} (${sign}${pct}%)`;
+        gapEl.style.color = Math.abs(pct) < 5 ? '#16a34a' : Math.abs(pct) < 20 ? '#d97706' : '#dc2626';
+    }
+
+    async function loadDebugPanel(from, to, preset = null, gen = null) {
+        if (!IG_DEBUG_ENABLED) return;
+        const panel = document.getElementById('igDmDebugPanel');
+        panel.classList.remove('hidden');
+
+        const params = { from, to };
+        if (preset) params.preset = preset;
+
+        let data;
+        try {
+            const res = await fetchApi('ig-dm-debug', params);
+            data = res.data;
+        } catch (e) {
+            console.error('Debug panel fetch failed:', e);
+            document.getElementById('dbg-organic').textContent = 'ERR';
+            document.getElementById('dbg-paid').textContent = 'ERR';
+            document.getElementById('dbg-combined').textContent = 'ERR';
+            return;
+        }
+        if (gen !== null && gen !== loadGeneration) return;
+
+        document.getElementById('dbg-organic').textContent = fmtNum(data.organic_total || 0);
+        document.getElementById('dbg-paid').textContent = fmtNum(data.paid_total || 0);
+        document.getElementById('dbg-combined').textContent = fmtNum(data.combined_total || 0);
+        document.getElementById('dbg-msg-sync').textContent = fmtSync(data.last_messaging_sync);
+        document.getElementById('dbg-ads-sync').textContent = fmtSync(data.last_ads_sync);
+
+        const body = document.getElementById('dbg-daily-body');
+        while (body.firstChild) body.removeChild(body.firstChild);
+        (data.daily || []).forEach(row => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-slate-100';
+            const mk = (text, cls = '') => {
+                const td = document.createElement('td');
+                td.className = 'px-3 py-1.5 ' + cls;
+                td.textContent = text;
+                return td;
+            };
+            tr.appendChild(mk(row.date, 'text-slate-600'));
+            tr.appendChild(mk(fmtNum(row.organic || 0), 'text-right text-slate-700 tabular-nums'));
+            tr.appendChild(mk(fmtNum(row.paid || 0), 'text-right text-slate-700 tabular-nums'));
+            tr.appendChild(mk(fmtNum(row.total || 0), 'text-right font-semibold text-slate-800 tabular-nums'));
+            body.appendChild(tr);
+        });
+
+        updateDebugGap();
     }
 
     // Messaging

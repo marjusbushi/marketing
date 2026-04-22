@@ -420,6 +420,7 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/api/ig-daily', [MetaMarketingV2ChannelsController::class, 'igDaily'])->name('api.ig-daily');
         Route::get('/api/ig-top-posts', [MetaMarketingV2ChannelsController::class, 'igTopPosts'])->name('api.ig-top-posts');
         Route::get('/api/ig-messaging', [MetaMarketingV2ChannelsController::class, 'igMessaging'])->name('api.ig-messaging');
+        Route::get('/api/ig-dm-debug', [MetaMarketingV2ChannelsController::class, 'igDmDebug'])->name('api.ig-dm-debug');
 
         // Facebook
         Route::get('/api/fb-kpis', [MetaMarketingV2ChannelsController::class, 'fbKpis'])->name('api.fb-kpis');
