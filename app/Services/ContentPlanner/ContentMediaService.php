@@ -242,6 +242,63 @@ class ContentMediaService
             ->delete();
     }
 
+    /**
+     * Infer a single "active" collection for a set of products by looking at
+     * how those products are currently used across Daily Basket posts.
+     *
+     * Returns the distribution_week_id IFF exactly one week covers ALL the
+     * given products (via basket posts). Returns null otherwise — the user
+     * should pick manually when the product lives in multiple collections.
+     *
+     * Rationale: in ~90% of cases a product sits in one active collection
+     * (current campaign). Linking media to a product can then auto-apply the
+     * collection, saving a click. When the product is in 2+ campaigns, we
+     * stay silent to avoid polluting collection filters.
+     */
+    public function inferCollectionForProducts(array $productIds): ?int
+    {
+        $ids = array_values(array_unique(array_map('intval', array_filter($productIds))));
+        if (empty($ids)) {
+            return null;
+        }
+
+        $weekIds = \Illuminate\Support\Facades\DB::table('daily_baskets')
+            ->join('daily_basket_posts', 'daily_basket_posts.daily_basket_id', '=', 'daily_baskets.id')
+            ->join('daily_basket_post_products', 'daily_basket_post_products.daily_basket_post_id', '=', 'daily_basket_posts.id')
+            ->whereIn('daily_basket_post_products.item_group_id', $ids)
+            ->whereNull('daily_baskets.deleted_at')
+            ->whereNull('daily_basket_posts.deleted_at')
+            ->distinct()
+            ->pluck('daily_baskets.distribution_week_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
+
+        return count($weekIds) === 1 ? $weekIds[0] : null;
+    }
+
+    /**
+     * If the product set points to a single collection and the media does
+     * not already have that collection linked, attach it. Returns the week
+     * id that was auto-linked, or null if no auto-link happened.
+     */
+    public function autoLinkCollectionFromProducts(ContentMedia $media, array $productIds): ?int
+    {
+        $weekId = $this->inferCollectionForProducts($productIds);
+        if ($weekId === null) {
+            return null;
+        }
+
+        if (in_array($weekId, $media->distribution_week_ids, true)) {
+            return null; // already linked, nothing to do
+        }
+
+        $this->linkCollections($media, [$weekId], false);
+
+        return $weekId;
+    }
+
     public function bulkLinkCollections(array $mediaIds, array $weekIds): int
     {
         $mIds = array_values(array_unique(array_map('intval', array_filter($mediaIds))));

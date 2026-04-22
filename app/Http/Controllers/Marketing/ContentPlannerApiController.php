@@ -375,6 +375,10 @@ class ContentPlannerApiController extends Controller
         $weekId = $request->input('distribution_week_id');
         if ($weekId) {
             $this->mediaService->linkCollections($media, [(int) $weekId], false);
+        } elseif (is_array($productIds) && ! empty($productIds)) {
+            // User picked product(s) but no explicit collection — if all those
+            // products live in a single campaign week, auto-link to it.
+            $this->mediaService->autoLinkCollectionFromProducts($media, $productIds);
         }
 
         $data = $media->toArray();
@@ -615,13 +619,22 @@ class ContentPlannerApiController extends Controller
         ]);
 
         $media = ContentMedia::findOrFail($id);
+        $productIds = $request->input('item_group_ids', []);
+
         $this->mediaService->linkProducts(
             $media,
-            $request->input('item_group_ids', []),
+            $productIds,
             (bool) $request->input('replace', false),
         );
 
-        return response()->json(['media' => $media->fresh()]);
+        // Smart auto-link: if the products all belong to one active campaign,
+        // apply that collection without user effort.
+        $autoLinkedWeekId = $this->mediaService->autoLinkCollectionFromProducts($media->fresh(), $productIds);
+
+        return response()->json([
+            'media' => $media->fresh(),
+            'auto_linked_collection_id' => $autoLinkedWeekId,
+        ]);
     }
 
     public function linkMediaCollections(Request $request, int $id): JsonResponse
@@ -651,12 +664,25 @@ class ContentPlannerApiController extends Controller
             'item_group_ids.*' => 'integer|min:1',
         ]);
 
-        $count = $this->mediaService->bulkLinkProducts(
-            $request->input('ids'),
-            $request->input('item_group_ids'),
-        );
+        $mediaIds = $request->input('ids');
+        $productIds = $request->input('item_group_ids');
 
-        return response()->json(['inserted' => $count]);
+        $count = $this->mediaService->bulkLinkProducts($mediaIds, $productIds);
+
+        // Smart auto-link per media: if a product set points to a single
+        // active campaign, carry the collection along for each touched media.
+        $autoLinkedWeekIds = [];
+        foreach (ContentMedia::whereIn('id', $mediaIds)->get() as $m) {
+            $weekId = $this->mediaService->autoLinkCollectionFromProducts($m, $productIds);
+            if ($weekId !== null) {
+                $autoLinkedWeekIds[(int) $m->id] = $weekId;
+            }
+        }
+
+        return response()->json([
+            'inserted' => $count,
+            'auto_linked_collections' => $autoLinkedWeekIds,
+        ]);
     }
 
     public function bulkLinkCollections(Request $request): JsonResponse

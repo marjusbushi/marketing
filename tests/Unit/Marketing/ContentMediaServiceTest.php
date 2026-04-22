@@ -304,6 +304,137 @@ class ContentMediaServiceTest extends TestCase
         $this->assertSame([], $collection->get(1)->distribution_week_ids);
     }
 
+    // ── Auto-link collection from product usage ──
+
+    public function test_infer_collection_returns_null_for_empty_products(): void
+    {
+        $this->assertNull($this->service->inferCollectionForProducts([]));
+    }
+
+    public function test_infer_collection_returns_null_when_product_never_used_in_basket(): void
+    {
+        $this->assertNull($this->service->inferCollectionForProducts([9999]));
+    }
+
+    public function test_infer_collection_returns_week_when_product_is_in_exactly_one(): void
+    {
+        // Seed: one basket (week=42) with one post that uses product 100
+        $basketId = \Illuminate\Support\Facades\DB::table('daily_baskets')->insertGetId([
+            'distribution_week_id' => 42,
+            'date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+        $postId = \Illuminate\Support\Facades\DB::table('daily_basket_posts')->insertGetId([
+            'daily_basket_id' => $basketId,
+            'title' => 'Test post',
+            'post_type' => 'photo',
+            'stage' => 'idea',
+            'priority' => 'medium',
+            'target_platforms' => json_encode(['instagram']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('daily_basket_post_products')->insert([
+            'daily_basket_post_id' => $postId,
+            'item_group_id' => 100,
+            'sort_order' => 0,
+            'is_hero' => 1,
+        ]);
+
+        $this->assertSame(42, $this->service->inferCollectionForProducts([100]));
+    }
+
+    public function test_infer_collection_returns_null_when_product_is_in_two_weeks(): void
+    {
+        foreach ([11, 22] as $weekId) {
+            $basketId = \Illuminate\Support\Facades\DB::table('daily_baskets')->insertGetId([
+                'distribution_week_id' => $weekId,
+                'date' => now()->subDays($weekId)->toDateString(),
+                'status' => 'active',
+            ]);
+            $postId = \Illuminate\Support\Facades\DB::table('daily_basket_posts')->insertGetId([
+                'daily_basket_id' => $basketId,
+                'title' => 'Test post',
+                'post_type' => 'photo',
+                'stage' => 'idea',
+                'priority' => 'medium',
+                'target_platforms' => json_encode(['instagram']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            \Illuminate\Support\Facades\DB::table('daily_basket_post_products')->insert([
+                'daily_basket_post_id' => $postId,
+                'item_group_id' => 200,
+                'sort_order' => 0,
+                'is_hero' => 1,
+            ]);
+        }
+
+        $this->assertNull($this->service->inferCollectionForProducts([200]));
+    }
+
+    public function test_auto_link_collection_from_products_attaches_when_singleton(): void
+    {
+        $basketId = \Illuminate\Support\Facades\DB::table('daily_baskets')->insertGetId([
+            'distribution_week_id' => 77,
+            'date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+        $postId = \Illuminate\Support\Facades\DB::table('daily_basket_posts')->insertGetId([
+            'daily_basket_id' => $basketId,
+            'title' => 'Test post',
+            'post_type' => 'photo',
+            'stage' => 'idea',
+            'priority' => 'medium',
+            'target_platforms' => json_encode(['instagram']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('daily_basket_post_products')->insert([
+            'daily_basket_post_id' => $postId,
+            'item_group_id' => 500,
+            'sort_order' => 0,
+            'is_hero' => 1,
+        ]);
+
+        $media = ContentMedia::create($this->mediaAttrs());
+        $linked = $this->service->autoLinkCollectionFromProducts($media, [500]);
+
+        $this->assertSame(77, $linked);
+        $this->assertSame([77], $media->fresh()->distribution_week_ids);
+    }
+
+    public function test_auto_link_collection_no_op_when_already_linked(): void
+    {
+        $basketId = \Illuminate\Support\Facades\DB::table('daily_baskets')->insertGetId([
+            'distribution_week_id' => 88,
+            'date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+        $postId = \Illuminate\Support\Facades\DB::table('daily_basket_posts')->insertGetId([
+            'daily_basket_id' => $basketId,
+            'title' => 'Test post',
+            'post_type' => 'photo',
+            'stage' => 'idea',
+            'priority' => 'medium',
+            'target_platforms' => json_encode(['instagram']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('daily_basket_post_products')->insert([
+            'daily_basket_post_id' => $postId,
+            'item_group_id' => 600,
+            'sort_order' => 0,
+            'is_hero' => 1,
+        ]);
+
+        $media = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkCollections($media, [88]);
+        $result = $this->service->autoLinkCollectionFromProducts($media->fresh(), [600]);
+
+        $this->assertNull($result, 'Already linked — should return null');
+    }
+
     // ── Existing tests continue below ──
 
     public function test_list_excludes_meta_imports_unless_imported_folder_or_all(): void
