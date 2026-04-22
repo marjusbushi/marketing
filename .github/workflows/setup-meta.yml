@@ -38,10 +38,12 @@ jobs:
             upsert() {
               local key="$1"
               local value="$2"
-              # Strip any trailing CR / LF that GitHub Secrets UI may paste in.
-              # A stray newline at the end of $value would break sed's
-              # expression ("unterminated `s' command" at the closing delimiter).
-              value="$(printf '%s' "$value" | tr -d '\r\n')"
+              # Strip ALL whitespace (CR, LF, tab, space) anywhere in value.
+              # GitHub Secrets UI sometimes pastes trailing whitespace that's
+              # invisible; a single extra space made webhook tokens compare
+              # unequal server-side. Safe for all our META_* values which are
+              # single-token strings with no legitimate whitespace.
+              value="$(printf '%s' "$value" | tr -d '[:space:]')"
               if grep -q "^${key}=" .env; then
                 sed -i "s|^${key}=.*|${key}=${value}|" .env
                 echo "updated ${key}"
