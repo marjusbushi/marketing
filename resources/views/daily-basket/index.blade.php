@@ -547,17 +547,19 @@
     .db-stage-dot[data-stage="scheduling"] { background: #7c3aed; }
     .db-stage-dot[data-stage="published"]  { background: #22c55e; }
 
-    /* Material thumbnail — aspect ratio matches Instagram per post type. */
+    /* Material thumbnail — always 1:1 square in the grid (like Instagram's
+       profile grid view). The type badge at the top already labels reel /
+       photo / story / carousel, so forcing 9:16 on reels here would just
+       create inconsistent row heights and blow the grid apart. Real aspect
+       stays preserved in the detail view via .db-media-reel / .db-media-grid. */
     .db-mat {
-        aspect-ratio: 1 / 1;           /* default (photo, carousel, video) */
+        aspect-ratio: 1 / 1;
         background: var(--db-accent-soft);
         position: relative;
         display: flex; align-items: center; justify-content: center;
         overflow: hidden;
         border-bottom: 1px solid var(--db-border);
     }
-    .db-mat[data-type="reel"],
-    .db-mat[data-type="story"]  { aspect-ratio: 9 / 16; }
     .db-mat img, .db-mat video {
         width: 100%; height: 100%;
         object-fit: cover; display: block;
