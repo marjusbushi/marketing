@@ -58,6 +58,15 @@
     .stage-badge.status-published      { background: #10B981; }
     .stage-badge.status-failed         { background: #EF4444; }
 
+    /* External (published) tiles show only a small dot — the caption-heavy
+       IG/FB style looks cleaner without a text label. */
+    .stage-dot {
+        position: absolute; top: 8px; left: 8px; z-index: 2;
+        width: 10px; height: 10px; border-radius: 999px;
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.9);
+    }
+    .stage-dot.status-published { background: #10B981; }
+
     /* Compact legend above the feed grid */
     .feed-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 20px 10px; font-size: 11px; color: #94a3b8; }
     .feed-legend .legend-item { display: inline-flex; align-items: center; gap: 5px; }
@@ -518,7 +527,7 @@
             stageBadgeHtml = `<span class="stage-badge ${stageClass}">${p.status_label || p.post_stage}</span>`;
             tileClasses += ` is-draft-basket ${stageClass}`;
         } else if (isExternal) {
-            stageBadgeHtml = `<span class="stage-badge status-published">Publikuar</span>`;
+            stageBadgeHtml = `<span class="stage-dot status-published" title="Publikuar"></span>`;
         } else if (p.status) {
             const statusLabelsAL = { draft:'Draft', pending_review:'Rishikim', approved:'Aprovuar', scheduled:'Skeduluar', published:'Publikuar', failed:'Dështoi' };
             stageBadgeHtml = `<span class="stage-badge status-${p.status}">${statusLabelsAL[p.status] || p.status}</span>`;
