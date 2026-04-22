@@ -36,6 +36,30 @@
     }
     .feed-tile-badge iconify-icon { width: 10px; height: 10px; }
 
+    /* Daily-basket draft tiles — stage badge (top-left) + status outline */
+    .stage-badge {
+        position: absolute; top: 6px; left: 6px; z-index: 2;
+        padding: 2px 7px; border-radius: 999px;
+        font-size: 9px; font-weight: 700; color: #fff;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        backdrop-filter: blur(4px);
+    }
+    .stage-badge.stage-planning   { background: #94a3b8; }
+    .stage-badge.stage-production { background: #f59e0b; }
+    .stage-badge.stage-editing    { background: #8b5cf6; }
+    .stage-badge.stage-scheduling { background: #3b82f6; }
+    .stage-badge.stage-published  { background: #22c55e; }
+    .feed-tile.is-draft-basket { outline: 2px solid transparent; outline-offset: -2px; }
+    .feed-tile.is-draft-basket.stage-planning   { outline-color: #94a3b8; }
+    .feed-tile.is-draft-basket.stage-production { outline-color: #f59e0b; }
+    .feed-tile.is-draft-basket.stage-editing    { outline-color: #8b5cf6; }
+    .feed-tile.is-draft-basket.stage-scheduling { outline-color: #3b82f6; }
+
+    /* Compact legend above the feed grid */
+    .feed-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 20px 10px; font-size: 11px; color: #94a3b8; }
+    .feed-legend .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .feed-legend .legend-dot { width: 7px; height: 7px; border-radius: 999px; display: inline-block; }
+
     .sortable-ghost { opacity: 0.4; }
     .sortable-chosen { box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important; }
 
@@ -196,6 +220,13 @@
 
     {{-- Feed section — natural aspect ratio, no placeholders --}}
     <div>
+        <div class="feed-legend">
+            <span class="legend-item"><span class="legend-dot" style="background:#94a3b8"></span>Planifikim</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Prodhim</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#8b5cf6"></span>Editim</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>Skedulim</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#22c55e"></span>Scheduled / Published</span>
+        </div>
         <div id="feedContainer" class="feed-grid"></div>
 
         {{-- "Shfaq me shume" — Planable-style incremental reveal. The server
@@ -432,11 +463,14 @@
     function buildFeedTileHtml(event) {
         const p = event.extendedProps || {};
         const isExternal = p.is_external === true || p.is_imported === true;
+        const isDraftBasket = p.is_draft_basket === true;
         const thumb = p.thumbnail;
         const mediaUrl = p.first_media_url;
         const isVideo = p.is_video;
         const permalink = p.permalink || p.url || '';
-        const dataAttr = isExternal ? 'data-external="1"' : `data-id="${event.id}"`;
+        const dataAttr = isExternal
+            ? 'data-external="1"'
+            : (isDraftBasket ? `data-basket-draft="1" data-id="${event.id}"` : `data-id="${event.id}"`);
 
         const placeholderHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f8fafc;"><iconify-icon icon="heroicons-outline:photo" width="28" style="color:#e2e8f0;"></iconify-icon></div>`;
 
@@ -469,17 +503,39 @@
         }
         mediaHtml += badgeHtml;
 
+        // Stage badge — only for daily-basket drafts so scheduled/published
+        // tiles keep the Planable look untouched.
+        let stageBadgeHtml = '';
+        let tileClasses = 'feed-tile';
+        if (isDraftBasket && p.post_stage) {
+            const stageClass = `stage-${p.post_stage}`;
+            stageBadgeHtml = `<span class="stage-badge ${stageClass}">${p.status_label || p.post_stage}</span>`;
+            tileClasses += ` is-draft-basket ${stageClass}`;
+        }
+
         const hoverHtml = `<div class="feed-hover"></div>`;
 
-        // Unified click — external + planned both open the in-app detail
-        // modal. The "Hap në Instagram" action lives inside the modal as a
-        // secondary button, never as an automatic redirect.
-        const clickFn = `openPostPreview('${String(event.id).replace(/'/g, "\\'")}')`;
+        // Click routing:
+        //   - draft basket tile → deep-link to daily-basket at the right day
+        //     (edit flow lives there; composer modal is only for ContentPost)
+        //   - everything else → shared in-app detail modal
+        const clickFn = isDraftBasket
+            ? `openBasketDraft(${p.db_post_id}, ${p.distribution_week_id}, '${p.basket_date}')`
+            : `openPostPreview('${String(event.id).replace(/'/g, "\\'")}')`;
 
-        return `<div class="feed-tile" ${dataAttr} onclick="${clickFn}">
+        return `<div class="${tileClasses}" ${dataAttr} onclick="${clickFn}">
+            ${stageBadgeHtml}
             ${mediaHtml}
             ${hoverHtml}
         </div>`;
+    }
+
+    // Deep-link to Shporta Ditore at the exact week+date, scrolling to the
+    // post. The daily-basket SPA honors ?week=&date=&post= on load.
+    function openBasketDraft(postId, weekId, basketDate) {
+        if (!weekId || !basketDate || !postId) return;
+        const base = '{{ route('marketing.daily-basket.index') }}';
+        window.location.href = `${base}?week=${weekId}&date=${basketDate}&post=${postId}`;
     }
 
     // Render the first visibleCount+FEED_PAGE_SIZE tiles from feedPostsCache.

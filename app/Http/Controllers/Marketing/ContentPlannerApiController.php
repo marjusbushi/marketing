@@ -16,6 +16,7 @@ use App\Services\ContentPlanner\ContentAiService;
 use App\Services\ContentPlanner\ContentFeedImportService;
 use App\Services\ContentPlanner\ContentMediaService;
 use App\Services\ContentPlanner\ContentPostService;
+use App\Services\ContentPlanner\DailyBasketGridService;
 use App\Services\ContentPlanner\ExternalPostService;
 use App\Services\ContentPlanner\ShareLinkService;
 use Carbon\Carbon;
@@ -31,6 +32,7 @@ class ContentPlannerApiController extends Controller
         protected ContentPostService $postService,
         protected ContentMediaService $mediaService,
         protected ExternalPostService $externalPostService,
+        protected DailyBasketGridService $basketGridService,
     ) {}
 
     // ── Posts ──
@@ -44,6 +46,7 @@ class ContentPlannerApiController extends Controller
         $labelIds = $request->get('label_ids') ? explode(',', $request->get('label_ids')) : null;
         $campaignId = $request->get('campaign_id') ? (int) $request->get('campaign_id') : null;
         $includeExternal = $request->get('include_external', '1') === '1';
+        $includeDrafts = $request->get('include_drafts', '1') === '1';
 
         $events = $this->postService->getPostsForCalendar(
             Carbon::parse($from),
@@ -85,6 +88,18 @@ class ContentPlannerApiController extends Controller
             }
 
             $events = array_merge($events, $externalEvents);
+        }
+
+        // Merge daily-basket drafts (stage != handed-off yet). Dedup is implicit:
+        // the service filters `content_post_id IS NULL`, so a post cannot appear
+        // in both sources.
+        if ($includeDrafts && !$statuses) {
+            $draftEvents = $this->basketGridService->getBasketDraftsForGrid(
+                Carbon::parse($from),
+                Carbon::parse($to),
+                $platforms,
+            );
+            $events = array_merge($events, $draftEvents);
         }
 
         return response()->json($events);

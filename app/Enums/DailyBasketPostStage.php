@@ -51,6 +51,17 @@ enum DailyBasketPostStage: string
         };
     }
 
+    public function bgColor(): string
+    {
+        return match ($this) {
+            self::PLANNING   => '#f1f5f9',
+            self::PRODUCTION => '#fef3c7',
+            self::EDITING    => '#ede9fe',
+            self::SCHEDULING => '#dbeafe',
+            self::PUBLISHED  => '#dcfce7',
+        };
+    }
+
     /**
      * Zero-indexed position in the pipeline (useful for progress bars).
      */

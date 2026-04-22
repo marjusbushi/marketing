@@ -55,6 +55,11 @@ class DailyBasketPost extends Model
         'post_type'        => DailyBasketPostType::class,
     ];
 
+    protected $appends = [
+        'thumbnail_url',
+        'is_video',
+    ];
+
     // ── Relationships ───────────────────────────────────────
 
     public function basket(): BelongsTo
@@ -99,6 +104,41 @@ class DailyBasketPost extends Model
         return $this->hasMany(DailyBasketPostMedia::class, 'daily_basket_post_id')
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    // ── Accessors ───────────────────────────────────────────
+
+    /**
+     * First media's URL (thumbnail for video, full URL for photo).
+     *
+     * Only populated when the `media` relation is eager-loaded — otherwise
+     * returns null rather than firing a per-post query. Service-layer
+     * callers that need a thumbnail must `->with('media')`. Product-image
+     * fallback is the service's job (cross-DB lookup against DIS).
+     */
+    public function getThumbnailUrlAttribute(): ?string
+    {
+        if (! $this->relationLoaded('media')) {
+            return null;
+        }
+
+        $first = $this->media->first();
+        if (! $first) {
+            return null;
+        }
+
+        return $first->is_video
+            ? ($first->thumbnail_url ?? $first->url)
+            : $first->url;
+    }
+
+    public function getIsVideoAttribute(): bool
+    {
+        if (! $this->relationLoaded('media')) {
+            return false;
+        }
+
+        return (bool) $this->media->first()?->is_video;
     }
 
     // ── Scopes ──────────────────────────────────────────────

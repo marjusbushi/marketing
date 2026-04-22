@@ -56,6 +56,11 @@
     .db-card { background: var(--db-surface); border: 1px solid var(--db-border); border-radius: 8px; padding: 12px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
     .db-card:hover { border-color: var(--db-border-strong); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     .db-card.selected { border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.06); }
+    @keyframes db-flash-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+        50%      { box-shadow: 0 0 0 6px rgba(245,158,11,0.4); }
+    }
+    .db-card.deeplink-flash { outline: 3px solid #f59e0b; outline-offset: 2px; animation: db-flash-pulse 0.8s ease-in-out 2; }
     .db-card-type { font-size: 10px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin-bottom: 6px; }
     .db-card-title { font-size: 13px; font-weight: 500; line-height: 1.35; margin-bottom: 10px; }
     .db-card-products { display: flex; gap: 3px; margin-bottom: 10px; }
@@ -1097,6 +1102,26 @@
         return parseInt(params.get('week'), 10) || null;
     }
 
+    function getInitialDateFromUrl() {
+        const params = new URLSearchParams(location.search);
+        const d = params.get('date');
+        return /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : null;
+    }
+
+    function getInitialPostIdFromUrl() {
+        const params = new URLSearchParams(location.search);
+        return parseInt(params.get('post'), 10) || null;
+    }
+
+    // Consume once — after a deep-link open we clear ?date & ?post so reloads
+    // or day changes don't keep flashing / overriding user navigation.
+    function consumeDeepLinkParams() {
+        const url = new URL(location.href);
+        url.searchParams.delete('date');
+        url.searchParams.delete('post');
+        history.replaceState(null, '', url.toString());
+    }
+
     function setUrlWeek(id) {
         const url = new URL(location.href);
         url.searchParams.set('week', String(id));
@@ -1140,9 +1165,16 @@
             renderCollectionHeader();
             renderDays();
 
+            // Deep-link: grid sends ?week=&date=&post=. Honor the requested day
+            // if it falls inside this collection; otherwise fall back to today
+            // or the first day like before.
             const today = new Date().toISOString().slice(0, 10);
+            const requested = getInitialDateFromUrl();
+            const requestedInRange = requested && state.days.find(d => d.date === requested);
             const todayInRange = state.days.find(d => d.date === today);
-            const targetDay = todayInRange ? today : state.days[0]?.date;
+            const targetDay = requestedInRange
+                ? requested
+                : (todayInRange ? today : state.days[0]?.date);
             if (targetDay) selectDay(targetDay);
         } catch (e) {
             showError('Ngarkimi dështoi: ' + e.message);
@@ -1312,6 +1344,20 @@
             document.getElementById('dbBtnNewPost').disabled = false;
             document.getElementById('dbBtnPano').disabled = false;
             renderPanorama();
+
+            // Deep-link from grid: scroll to + flash the requested post, then
+            // consume the URL params so subsequent navigation stays clean.
+            const deepPostId = getInitialPostIdFromUrl();
+            if (deepPostId) {
+                const card = document.querySelector(`.db-card[data-post-id="${deepPostId}"]`);
+                if (card) {
+                    selectPost(deepPostId);
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.classList.add('deeplink-flash');
+                    setTimeout(() => card.classList.remove('deeplink-flash'), 1800);
+                }
+                consumeDeepLinkParams();
+            }
         } catch (e) {
             showError('Ngarkimi i ditës dështoi: ' + e.message);
         }
