@@ -547,15 +547,17 @@
     .db-stage-dot[data-stage="scheduling"] { background: #7c3aed; }
     .db-stage-dot[data-stage="published"]  { background: #22c55e; }
 
-    /* Material thumbnail */
+    /* Material thumbnail — aspect ratio matches Instagram per post type. */
     .db-mat {
-        aspect-ratio: 1 / 1;
+        aspect-ratio: 1 / 1;           /* default (photo, carousel, video) */
         background: var(--db-accent-soft);
         position: relative;
         display: flex; align-items: center; justify-content: center;
         overflow: hidden;
         border-bottom: 1px solid var(--db-border);
     }
+    .db-mat[data-type="reel"],
+    .db-mat[data-type="story"]  { aspect-ratio: 9 / 16; }
     .db-mat img, .db-mat video {
         width: 100%; height: 100%;
         object-fit: cover; display: block;
@@ -565,13 +567,6 @@
         color: var(--db-text-3); font-size: 11px; padding: 16px; text-align: center;
     }
     .db-mat-empty .icon { font-size: 22px; }
-    .db-mat-url-overlay {
-        position: absolute; bottom: 6px; left: 6px; right: 6px;
-        background: rgba(0,0,0,0.72); color: #fff;
-        padding: 3px 7px; border-radius: 4px;
-        font-size: 10px; display: flex; align-items: center; gap: 4px;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
 
     .db-post-body {
         padding: 9px 11px;
@@ -1889,6 +1884,10 @@
     function buildPostMat(post) {
         const mat = document.createElement('div');
         mat.className = 'db-mat';
+        // data-type drives the aspect-ratio in CSS so the thumbnail frames
+        // the way Instagram renders that format: reel/story = 9:16 vertical,
+        // photo/carousel/video = 1:1 square.
+        mat.dataset.type = post.post_type || 'photo';
 
         const media = (post.media && post.media[0]) || null;
         if (media && media.thumbnail_url) {
@@ -1916,19 +1915,6 @@
             mat.appendChild(img);
         } else {
             mat.appendChild(buildMatEmpty());
-        }
-
-        // URL overlay — filename (when we have media) OR reference host
-        // (when we don't). Gives the user a "what am I basing this on" cue
-        // without having to open the detail view.
-        const overlayText = media && media.original_filename
-            ? media.original_filename
-            : (post.reference_host ? 'Reference: ' + post.reference_host : null);
-        if (overlayText) {
-            const ov = document.createElement('div');
-            ov.className = 'db-mat-url-overlay';
-            ov.textContent = overlayText;
-            mat.appendChild(ov);
         }
 
         return mat;
