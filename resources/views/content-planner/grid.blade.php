@@ -44,16 +44,19 @@
         text-transform: uppercase; letter-spacing: 0.04em;
         backdrop-filter: blur(4px);
     }
-    .stage-badge.stage-planning   { background: #94a3b8; }
-    .stage-badge.stage-production { background: #f59e0b; }
-    .stage-badge.stage-editing    { background: #8b5cf6; }
-    .stage-badge.stage-scheduling { background: #3b82f6; }
-    .stage-badge.stage-published  { background: #22c55e; }
-    .feed-tile.is-draft-basket { outline: 2px solid transparent; outline-offset: -2px; }
-    .feed-tile.is-draft-basket.stage-planning   { outline-color: #94a3b8; }
-    .feed-tile.is-draft-basket.stage-production { outline-color: #f59e0b; }
-    .feed-tile.is-draft-basket.stage-editing    { outline-color: #8b5cf6; }
-    .feed-tile.is-draft-basket.stage-scheduling { outline-color: #3b82f6; }
+    .stage-badge.stage-planning      { background: #94a3b8; }
+    .stage-badge.stage-production    { background: #f59e0b; }
+    .stage-badge.stage-editing       { background: #8b5cf6; }
+    .stage-badge.stage-scheduling    { background: #3b82f6; }
+    .stage-badge.stage-published     { background: #22c55e; }
+    /* Status badges for scheduled ContentPost + external published posts,
+       so every tile advertises its state (consistent with the legend). */
+    .stage-badge.status-draft          { background: #9CA3AF; }
+    .stage-badge.status-pending_review { background: #F59E0B; }
+    .stage-badge.status-approved       { background: #3B82F6; }
+    .stage-badge.status-scheduled      { background: #8B5CF6; }
+    .stage-badge.status-published      { background: #10B981; }
+    .stage-badge.status-failed         { background: #EF4444; }
 
     /* Compact legend above the feed grid */
     .feed-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 20px 10px; font-size: 11px; color: #94a3b8; }
@@ -503,14 +506,22 @@
         }
         mediaHtml += badgeHtml;
 
-        // Stage badge — only for daily-basket drafts so scheduled/published
-        // tiles keep the Planable look untouched.
+        // Status badge — every tile advertises its state so the legend at
+        // the top of the grid actually maps to what the user sees. Three
+        // cases: daily-basket drafts show their pipeline stage; external
+        // (IG/FB/TikTok) always show "Publikuar"; planned ContentPosts
+        // show their content_post.status.
         let stageBadgeHtml = '';
         let tileClasses = 'feed-tile';
         if (isDraftBasket && p.post_stage) {
             const stageClass = `stage-${p.post_stage}`;
             stageBadgeHtml = `<span class="stage-badge ${stageClass}">${p.status_label || p.post_stage}</span>`;
             tileClasses += ` is-draft-basket ${stageClass}`;
+        } else if (isExternal) {
+            stageBadgeHtml = `<span class="stage-badge status-published">Publikuar</span>`;
+        } else if (p.status) {
+            const statusLabelsAL = { draft:'Draft', pending_review:'Rishikim', approved:'Aprovuar', scheduled:'Skeduluar', published:'Publikuar', failed:'Dështoi' };
+            stageBadgeHtml = `<span class="stage-badge status-${p.status}">${statusLabelsAL[p.status] || p.status}</span>`;
         }
 
         const hoverHtml = `<div class="feed-hover"></div>`;
