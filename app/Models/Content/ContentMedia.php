@@ -41,7 +41,62 @@ class ContentMedia extends Model
         'thumbnail_url',
         'is_video',
         'human_size',
+        'item_group_ids',
+        'distribution_week_ids',
     ];
+
+    /**
+     * Linked DIS item_groups (products). Cross-DB: the pivot stores ids only,
+     * no model hydration on the other side — consumers look up item_group
+     * details via DisApiClient as needed.
+     *
+     * Cache the pluck per-instance so accessing the append twice during a
+     * single request doesn't fire the query twice. Use preloadLinkedIds() on
+     * the service for batch rendering.
+     */
+    public function getItemGroupIdsAttribute(): array
+    {
+        if (isset($this->relations['_item_group_ids'])) {
+            return $this->relations['_item_group_ids'];
+        }
+
+        if (! $this->exists) {
+            return [];
+        }
+
+        $ids = \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+            ->where('content_media_id', $this->id)
+            ->pluck('item_group_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $this->relations['_item_group_ids'] = $ids;
+
+        return $ids;
+    }
+
+    public function getDistributionWeekIdsAttribute(): array
+    {
+        if (isset($this->relations['_distribution_week_ids'])) {
+            return $this->relations['_distribution_week_ids'];
+        }
+
+        if (! $this->exists) {
+            return [];
+        }
+
+        $ids = \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+            ->where('content_media_id', $this->id)
+            ->pluck('distribution_week_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $this->relations['_distribution_week_ids'] = $ids;
+
+        return $ids;
+    }
 
     public function getUrlAttribute(): ?string
     {

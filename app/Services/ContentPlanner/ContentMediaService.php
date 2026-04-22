@@ -139,6 +139,191 @@ class ContentMediaService
         return ContentMedia::whereIn('id', $ids)->update(['stage' => $stage]);
     }
 
+    // ── Products (DIS item_groups) linking ──
+
+    public function linkProducts(ContentMedia $media, array $itemGroupIds, bool $replace = false): int
+    {
+        $ids = array_values(array_unique(array_map('intval', array_filter($itemGroupIds))));
+
+        if ($replace) {
+            \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+                ->where('content_media_id', $media->id)
+                ->delete();
+        }
+
+        if (empty($ids)) {
+            return 0;
+        }
+
+        $rows = array_map(fn ($id) => [
+            'content_media_id' => $media->id,
+            'item_group_id' => $id,
+            'created_at' => now(),
+        ], $ids);
+
+        return \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+            ->insertOrIgnore($rows);
+    }
+
+    public function unlinkProducts(ContentMedia $media, array $itemGroupIds): int
+    {
+        $ids = array_values(array_unique(array_map('intval', array_filter($itemGroupIds))));
+        if (empty($ids)) {
+            return 0;
+        }
+
+        return \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+            ->where('content_media_id', $media->id)
+            ->whereIn('item_group_id', $ids)
+            ->delete();
+    }
+
+    public function bulkLinkProducts(array $mediaIds, array $itemGroupIds): int
+    {
+        $mIds = array_values(array_unique(array_map('intval', array_filter($mediaIds))));
+        $pIds = array_values(array_unique(array_map('intval', array_filter($itemGroupIds))));
+
+        if (empty($mIds) || empty($pIds)) {
+            return 0;
+        }
+
+        $rows = [];
+        $now = now();
+        foreach ($mIds as $m) {
+            foreach ($pIds as $p) {
+                $rows[] = [
+                    'content_media_id' => $m,
+                    'item_group_id' => $p,
+                    'created_at' => $now,
+                ];
+            }
+        }
+
+        return \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+            ->insertOrIgnore($rows);
+    }
+
+    // ── Collections (DIS distribution_weeks) linking ──
+
+    public function linkCollections(ContentMedia $media, array $weekIds, bool $replace = false): int
+    {
+        $ids = array_values(array_unique(array_map('intval', array_filter($weekIds))));
+
+        if ($replace) {
+            \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+                ->where('content_media_id', $media->id)
+                ->delete();
+        }
+
+        if (empty($ids)) {
+            return 0;
+        }
+
+        $rows = array_map(fn ($id) => [
+            'content_media_id' => $media->id,
+            'distribution_week_id' => $id,
+            'created_at' => now(),
+        ], $ids);
+
+        return \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+            ->insertOrIgnore($rows);
+    }
+
+    public function unlinkCollections(ContentMedia $media, array $weekIds): int
+    {
+        $ids = array_values(array_unique(array_map('intval', array_filter($weekIds))));
+        if (empty($ids)) {
+            return 0;
+        }
+
+        return \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+            ->where('content_media_id', $media->id)
+            ->whereIn('distribution_week_id', $ids)
+            ->delete();
+    }
+
+    public function bulkLinkCollections(array $mediaIds, array $weekIds): int
+    {
+        $mIds = array_values(array_unique(array_map('intval', array_filter($mediaIds))));
+        $wIds = array_values(array_unique(array_map('intval', array_filter($weekIds))));
+
+        if (empty($mIds) || empty($wIds)) {
+            return 0;
+        }
+
+        $rows = [];
+        $now = now();
+        foreach ($mIds as $m) {
+            foreach ($wIds as $w) {
+                $rows[] = [
+                    'content_media_id' => $m,
+                    'distribution_week_id' => $w,
+                    'created_at' => $now,
+                ];
+            }
+        }
+
+        return \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+            ->insertOrIgnore($rows);
+    }
+
+    // ── Counts ──
+
+    public function productCounts(int $limit = 100): array
+    {
+        return \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+            ->selectRaw('item_group_id, COUNT(*) AS n')
+            ->groupBy('item_group_id')
+            ->orderByDesc('n')
+            ->limit($limit)
+            ->get()
+            ->mapWithKeys(fn ($r) => [(int) $r->item_group_id => (int) $r->n])
+            ->all();
+    }
+
+    public function collectionCounts(int $limit = 100): array
+    {
+        return \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+            ->selectRaw('distribution_week_id, COUNT(*) AS n')
+            ->groupBy('distribution_week_id')
+            ->orderByDesc('n')
+            ->limit($limit)
+            ->get()
+            ->mapWithKeys(fn ($r) => [(int) $r->distribution_week_id => (int) $r->n])
+            ->all();
+    }
+
+    /**
+     * Batch-populate the cached item_group_ids + distribution_week_ids
+     * attributes on a collection of ContentMedia — avoids N+1 when the API
+     * response appends those ids for each row.
+     */
+    public function preloadLinkedIds(\Illuminate\Support\Collection $media): void
+    {
+        if ($media->isEmpty()) {
+            return;
+        }
+
+        $ids = $media->pluck('id')->all();
+
+        $products = \Illuminate\Support\Facades\DB::table('content_media_item_groups')
+            ->whereIn('content_media_id', $ids)
+            ->get(['content_media_id', 'item_group_id'])
+            ->groupBy('content_media_id')
+            ->map(fn ($rows) => $rows->pluck('item_group_id')->map(fn ($x) => (int) $x)->values()->all());
+
+        $collections = \Illuminate\Support\Facades\DB::table('content_media_distribution_weeks')
+            ->whereIn('content_media_id', $ids)
+            ->get(['content_media_id', 'distribution_week_id'])
+            ->groupBy('content_media_id')
+            ->map(fn ($rows) => $rows->pluck('distribution_week_id')->map(fn ($x) => (int) $x)->values()->all());
+
+        $media->each(function ($m) use ($products, $collections) {
+            $m->setRelation('_item_group_ids', $products->get($m->id, []));
+            $m->setRelation('_distribution_week_ids', $collections->get($m->id, []));
+        });
+    }
+
     public function folderCounts(): array
     {
         $raw = ContentMedia::query()
@@ -222,7 +407,52 @@ class ContentMediaService
             $query->where('stage', $filters['stage']);
         }
 
-        return $query->paginate($perPage);
+        // Filter by product (DIS item_group). Accepts int, csv, or array.
+        if (!empty($filters['product'])) {
+            $productIds = $this->parseIdList($filters['product']);
+            if (!empty($productIds)) {
+                $query->whereExists(function ($q) use ($productIds) {
+                    $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                        ->from('content_media_item_groups')
+                        ->whereColumn('content_media_item_groups.content_media_id', 'content_media.id')
+                        ->whereIn('content_media_item_groups.item_group_id', $productIds);
+                });
+            }
+        }
+
+        // Filter by collection (DIS distribution_week). Accepts int, csv, or array.
+        if (!empty($filters['collection'])) {
+            $weekIds = $this->parseIdList($filters['collection']);
+            if (!empty($weekIds)) {
+                $query->whereExists(function ($q) use ($weekIds) {
+                    $q->select(\Illuminate\Support\Facades\DB::raw(1))
+                        ->from('content_media_distribution_weeks')
+                        ->whereColumn('content_media_distribution_weeks.content_media_id', 'content_media.id')
+                        ->whereIn('content_media_distribution_weeks.distribution_week_id', $weekIds);
+                });
+            }
+        }
+
+        $paginator = $query->paginate($perPage);
+
+        // Eager-populate cached linked ids so API responses include them
+        // without firing N+1 inside the accessors.
+        $this->preloadLinkedIds(collect($paginator->items()));
+
+        return $paginator;
+    }
+
+    private function parseIdList($raw): array
+    {
+        if (is_array($raw)) {
+            return array_values(array_filter(array_map('intval', $raw)));
+        }
+        if (is_string($raw) && str_contains($raw, ',')) {
+            return array_values(array_filter(array_map('intval', explode(',', $raw))));
+        }
+        $int = (int) $raw;
+
+        return $int > 0 ? [$int] : [];
     }
 
     public function delete(ContentMedia $media): bool

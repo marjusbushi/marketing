@@ -29,10 +29,22 @@
     .mp-tab-count { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: #e2e8f0; color: #475569; font-weight: 600; }
     .mp-tab.active .mp-tab-count { background: #eef2ff; color: #4338ca; }
 
-    .mp-toolbar { padding: 10px 18px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #f1f5f9; }
+    .mp-toolbar { padding: 10px 18px; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
     .mp-search { flex: 1; max-width: 260px; height: 32px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; outline: none; }
     .mp-search:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
     .mp-stage-select { height: 32px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; background: #fff; outline: none; }
+
+    .mp-link-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; background: #fff; cursor: pointer; color: #475569; white-space: nowrap; }
+    .mp-link-chip:hover { border-color: #cbd5e1; }
+    .mp-link-chip.active { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+    .mp-link-chip .x { margin-left: 4px; color: inherit; opacity: 0.5; }
+    .mp-link-chip .x:hover { opacity: 1; }
+    .mp-link-dropdown { position: absolute; z-index: 9998; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,0.14); width: 300px; max-height: 340px; display: none; flex-direction: column; overflow: hidden; }
+    .mp-link-dropdown.active { display: flex; }
+    .mp-link-dropdown input { height: 32px; padding: 0 10px; border: none; border-bottom: 1px solid #f1f5f9; font-size: 12px; outline: none; }
+    .mp-link-list { flex: 1; overflow-y: auto; padding: 4px; }
+    .mp-link-item { padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #334155; }
+    .mp-link-item:hover { background: #f1f5f9; }
 
     .mp-grid-wrap { flex: 1; overflow-y: auto; padding: 14px 18px; }
     .mp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
@@ -97,6 +109,20 @@
             <option value="edited">Edited</option>
             <option value="final">Final</option>
         </select>
+        <div style="position:relative;">
+            <button type="button" class="mp-link-chip" id="mp-product-chip" onclick="MediaPicker._toggleLinkDropdown('product')">📦 <span id="mp-product-label">Product</span></button>
+            <div id="mp-product-dropdown" class="mp-link-dropdown" style="top: calc(100% + 6px); left: 0;">
+                <input type="text" id="mp-product-search" placeholder="Search product…" autocomplete="off" oninput="MediaPicker._refreshLinkResults('product')">
+                <div id="mp-product-results" class="mp-link-list"></div>
+            </div>
+        </div>
+        <div style="position:relative;">
+            <button type="button" class="mp-link-chip" id="mp-collection-chip" onclick="MediaPicker._toggleLinkDropdown('collection')">🎯 <span id="mp-collection-label">Collection</span></button>
+            <div id="mp-collection-dropdown" class="mp-link-dropdown" style="top: calc(100% + 6px); left: 0;">
+                <input type="text" id="mp-collection-search" placeholder="Search collection…" autocomplete="off" oninput="MediaPicker._refreshLinkResults('collection')">
+                <div id="mp-collection-results" class="mp-link-list"></div>
+            </div>
+        </div>
     </div>
 
     <div class="mp-grid-wrap">
@@ -121,6 +147,8 @@
         folders: '{{ route("marketing.planner.api.media.folders.index") }}',
         list: '{{ route("marketing.planner.api.media.index") }}',
         upload: '{{ route("marketing.planner.api.media.upload") }}',
+        productsSearch: '{{ route("marketing.planner.api.media.products.search") }}',
+        collectionsRecent: '{{ route("marketing.planner.api.media.collections.recent") }}',
     };
 
     const state = {
@@ -134,6 +162,10 @@
         selected: new Map(),
         onConfirm: null,
         searchDebounce: null,
+        productFilter: null,       // {id, label} ose null
+        collectionFilter: null,    // {id, label} ose null
+        linkDebounce: null,
+        collectionsCache: null,
     };
 
     function escHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -163,6 +195,8 @@
         if (state.folder && state.folder !== '__all') params.set('folder', state.folder);
         if (state.stage) params.set('stage', state.stage);
         if (state.search) params.set('search', state.search);
+        if (state.productFilter) params.set('product', state.productFilter.id);
+        if (state.collectionFilter) params.set('collection', state.collectionFilter.id);
 
         try {
             const res = await fetch(`${routes.list}?${params}`);
@@ -233,9 +267,16 @@
             state.search = '';
             state.selected.clear();
             state.onConfirm = onConfirm;
+            state.productFilter = null;
+            state.collectionFilter = null;
 
             document.getElementById('mp-search').value = '';
             document.getElementById('mp-stage').value = '';
+            // Reset product/collection chips
+            const pc = document.getElementById('mp-product-chip');
+            if (pc) { pc.classList.remove('active'); document.getElementById('mp-product-label').textContent = 'Product'; const x = pc.querySelector('.x'); if (x) x.remove(); }
+            const cc = document.getElementById('mp-collection-chip');
+            if (cc) { cc.classList.remove('active'); document.getElementById('mp-collection-label').textContent = 'Collection'; const x = cc.querySelector('.x'); if (x) x.remove(); }
 
             document.getElementById('mp-overlay').classList.add('active');
             document.getElementById('mp-card').classList.add('active');
@@ -271,6 +312,112 @@
             fetchMedia();
         },
 
+        _toggleLinkDropdown(mode) {
+            const id = mode === 'product' ? 'mp-product-dropdown' : 'mp-collection-dropdown';
+            const dd = document.getElementById(id);
+            if (dd.classList.contains('active')) {
+                dd.classList.remove('active');
+                return;
+            }
+            // Close the other
+            document.getElementById(mode === 'product' ? 'mp-collection-dropdown' : 'mp-product-dropdown').classList.remove('active');
+            dd.classList.add('active');
+            const searchInput = document.getElementById(mode === 'product' ? 'mp-product-search' : 'mp-collection-search');
+            searchInput.focus();
+            this._refreshLinkResults(mode);
+        },
+
+        async _refreshLinkResults(mode) {
+            clearTimeout(state.linkDebounce);
+            state.linkDebounce = setTimeout(async () => {
+                if (mode === 'product') {
+                    const q = document.getElementById('mp-product-search').value.trim();
+                    const out = document.getElementById('mp-product-results');
+                    try {
+                        const res = await fetch(routes.productsSearch + '?q=' + encodeURIComponent(q));
+                        const { results } = await res.json();
+                        writeHtml(out, (results || []).slice(0, 30).map(r => {
+                            const id = r.id ?? r.item_group_id;
+                            const code = r.code ?? r.item_group_code ?? '';
+                            const name = r.name ?? r.title ?? '';
+                            const label = (code ? code + ' ' : '') + name;
+                            return '<div class="mp-link-item" onclick="MediaPicker._applyProductFilter(' + id + ', \'' + escHtml(label).replace(/'/g, '&#39;') + '\')">'
+                                + '<strong>' + escHtml(code) + '</strong> ' + escHtml(name)
+                                + '</div>';
+                        }).join('') || '<div class="mp-link-item" style="opacity:0.6;cursor:default">No results</div>');
+                    } catch (e) { writeHtml(out, '<div class="mp-link-item" style="color:#ef4444">Failed</div>'); }
+                } else {
+                    const q = document.getElementById('mp-collection-search').value.trim().toLowerCase();
+                    const out = document.getElementById('mp-collection-results');
+                    try {
+                        if (!state.collectionsCache) {
+                            const res = await fetch(routes.collectionsRecent);
+                            const { collections } = await res.json();
+                            state.collectionsCache = collections || [];
+                        }
+                        const filtered = state.collectionsCache.filter(c => !q || String(c.label || c.name || c.display_label || '').toLowerCase().includes(q));
+                        writeHtml(out, filtered.slice(0, 50).map(c => {
+                            const id = c.id;
+                            const label = c.display_label || c.label || c.name || ('Week #' + id);
+                            return '<div class="mp-link-item" onclick="MediaPicker._applyCollectionFilter(' + id + ', \'' + escHtml(label).replace(/'/g, '&#39;') + '\')">' + escHtml(label) + '</div>';
+                        }).join('') || '<div class="mp-link-item" style="opacity:0.6;cursor:default">No results</div>');
+                    } catch (e) { writeHtml(out, '<div class="mp-link-item" style="color:#ef4444">Failed</div>'); }
+                }
+            }, 200);
+        },
+
+        _applyProductFilter(id, label) {
+            state.productFilter = { id: Number(id), label };
+            const chip = document.getElementById('mp-product-chip');
+            chip.classList.add('active');
+            document.getElementById('mp-product-label').textContent = label.length > 20 ? label.slice(0, 20) + '…' : label;
+            if (!chip.querySelector('.x')) {
+                const x = document.createElement('span');
+                x.className = 'x';
+                x.textContent = '×';
+                x.onclick = (e) => { e.stopPropagation(); MediaPicker._clearProductFilter(); };
+                chip.appendChild(x);
+            }
+            document.getElementById('mp-product-dropdown').classList.remove('active');
+            fetchMedia();
+        },
+
+        _clearProductFilter() {
+            state.productFilter = null;
+            const chip = document.getElementById('mp-product-chip');
+            chip.classList.remove('active');
+            document.getElementById('mp-product-label').textContent = 'Product';
+            const x = chip.querySelector('.x');
+            if (x) x.remove();
+            fetchMedia();
+        },
+
+        _applyCollectionFilter(id, label) {
+            state.collectionFilter = { id: Number(id), label };
+            const chip = document.getElementById('mp-collection-chip');
+            chip.classList.add('active');
+            document.getElementById('mp-collection-label').textContent = label.length > 20 ? label.slice(0, 20) + '…' : label;
+            if (!chip.querySelector('.x')) {
+                const x = document.createElement('span');
+                x.className = 'x';
+                x.textContent = '×';
+                x.onclick = (e) => { e.stopPropagation(); MediaPicker._clearCollectionFilter(); };
+                chip.appendChild(x);
+            }
+            document.getElementById('mp-collection-dropdown').classList.remove('active');
+            fetchMedia();
+        },
+
+        _clearCollectionFilter() {
+            state.collectionFilter = null;
+            const chip = document.getElementById('mp-collection-chip');
+            chip.classList.remove('active');
+            document.getElementById('mp-collection-label').textContent = 'Collection';
+            const x = chip.querySelector('.x');
+            if (x) x.remove();
+            fetchMedia();
+        },
+
         _toggle(id) {
             const media = state.media.find(m => m.id === id);
             if (!media) return;
@@ -302,6 +449,10 @@
                 text.textContent = 'Uploading ' + (i+1) + '/' + files.length + ': ' + files[i].name;
                 const fd = new FormData();
                 fd.append('file', files[i]);
+                // Auto-link: if a product/collection filter is active, apply it
+                // to newly uploaded media so the filter keeps making sense.
+                if (state.productFilter) fd.append('item_group_ids[]', state.productFilter.id);
+                if (state.collectionFilter) fd.append('distribution_week_id', state.collectionFilter.id);
                 try {
                     const res = await fetch(routes.upload, {
                         method: 'POST',

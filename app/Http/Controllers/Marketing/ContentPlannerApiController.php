@@ -19,9 +19,11 @@ use App\Services\ContentPlanner\ContentPostService;
 use App\Services\ContentPlanner\DailyBasketGridService;
 use App\Services\ContentPlanner\ExternalPostService;
 use App\Services\ContentPlanner\ShareLinkService;
+use App\Services\DisApiClient;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -358,9 +360,22 @@ class ContentPlannerApiController extends Controller
 
         $request->validate([
             'file' => "required|file|max:{$maxSize}",
+            'item_group_ids' => 'nullable|array',
+            'item_group_ids.*' => 'integer|min:1',
+            'distribution_week_id' => 'nullable|integer|min:1',
         ]);
 
         $media = $this->mediaService->upload($request->file('file'), auth()->id());
+
+        // Auto-link any products / collection picked in the upload zone.
+        $productIds = $request->input('item_group_ids', []);
+        if (is_array($productIds) && ! empty($productIds)) {
+            $this->mediaService->linkProducts($media, $productIds, false);
+        }
+        $weekId = $request->input('distribution_week_id');
+        if ($weekId) {
+            $this->mediaService->linkCollections($media, [(int) $weekId], false);
+        }
 
         $data = $media->toArray();
         $data['url'] = Storage::disk($media->disk)->url($media->path);
@@ -380,6 +395,8 @@ class ContentPlannerApiController extends Controller
                 'usage' => $request->get('usage'),
                 'folder' => $request->get('folder'),
                 'stage' => $request->get('stage'),
+                'product' => $request->get('product'),
+                'collection' => $request->get('collection'),
             ],
             (int) $request->get('per_page', 30),
         );
@@ -487,6 +504,176 @@ class ContentPlannerApiController extends Controller
         }
 
         return response()->json(['updated' => $updated]);
+    }
+
+    // ── Products + Collections linking (Media Library v3) ──
+
+    public function searchProducts(Request $request, DisApiClient $dis): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+        $cacheKey = 'marketing.media.products.search.' . md5($q);
+
+        $results = Cache::remember($cacheKey, 60, function () use ($dis, $q) {
+            try {
+                return $dis->searchItemGroups($q);
+            } catch (\Throwable $e) {
+                return [];
+            }
+        });
+
+        return response()->json(['results' => $results]);
+    }
+
+    public function listRecentCollections(DisApiClient $dis): JsonResponse
+    {
+        // Prefer collections already referenced by at least one basket —
+        // these are "in-use" for marketing flows.
+        $referenced = \Illuminate\Support\Facades\DB::table('daily_baskets')
+            ->select('distribution_week_id')
+            ->distinct()
+            ->pluck('distribution_week_id')
+            ->all();
+
+        $cacheKey = 'marketing.media.collections.recent.' . md5(implode(',', $referenced) . Carbon::now()->format('Y-m-d'));
+
+        $summaries = Cache::remember($cacheKey, 300, function () use ($dis) {
+            try {
+                return $dis->listWeekSummaries(
+                    Carbon::now()->subDays(180)->toDateString(),
+                    Carbon::now()->addDays(60)->toDateString(),
+                );
+            } catch (\Throwable $e) {
+                return [];
+            }
+        });
+
+        // Attach media count per collection so the sidebar can show it.
+        $counts = $this->mediaService->collectionCounts(500);
+
+        $collections = collect($summaries)->map(function ($w) use ($counts) {
+            $id = (int) ($w['id'] ?? 0);
+            $w['media_count'] = $counts[$id] ?? 0;
+
+            return $w;
+        })->values()->all();
+
+        return response()->json(['collections' => $collections]);
+    }
+
+    public function listTopProducts(DisApiClient $dis): JsonResponse
+    {
+        $counts = $this->mediaService->productCounts(30);
+        if (empty($counts)) {
+            return response()->json(['products' => []]);
+        }
+
+        // Try to enrich with product names once, cached 10 min. Failure is
+        // non-fatal — we fall back to '#ID' labels in the UI.
+        $labels = Cache::remember('marketing.media.products.top.labels.' . md5(implode(',', array_keys($counts))), 600, function () use ($dis, $counts) {
+            try {
+                $all = $dis->searchItemGroups('');
+                $byId = [];
+                foreach ($all as $row) {
+                    $rid = (int) ($row['id'] ?? $row['item_group_id'] ?? 0);
+                    if (! $rid) continue;
+                    $byId[$rid] = [
+                        'code' => $row['code'] ?? $row['item_group_code'] ?? null,
+                        'name' => $row['name'] ?? $row['title'] ?? null,
+                    ];
+                }
+                $out = [];
+                foreach (array_keys($counts) as $id) {
+                    $out[$id] = $byId[$id] ?? null;
+                }
+
+                return $out;
+            } catch (\Throwable $e) {
+                return [];
+            }
+        });
+
+        $products = [];
+        foreach ($counts as $id => $count) {
+            $meta = $labels[$id] ?? null;
+            $products[] = [
+                'id' => $id,
+                'code' => $meta['code'] ?? null,
+                'name' => $meta['name'] ?? null,
+                'count' => $count,
+            ];
+        }
+
+        return response()->json(['products' => $products]);
+    }
+
+    public function linkMediaProducts(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'item_group_ids' => 'required|array',
+            'item_group_ids.*' => 'integer|min:1',
+            'replace' => 'nullable|boolean',
+        ]);
+
+        $media = ContentMedia::findOrFail($id);
+        $this->mediaService->linkProducts(
+            $media,
+            $request->input('item_group_ids', []),
+            (bool) $request->input('replace', false),
+        );
+
+        return response()->json(['media' => $media->fresh()]);
+    }
+
+    public function linkMediaCollections(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'distribution_week_ids' => 'required|array',
+            'distribution_week_ids.*' => 'integer|min:1',
+            'replace' => 'nullable|boolean',
+        ]);
+
+        $media = ContentMedia::findOrFail($id);
+        $this->mediaService->linkCollections(
+            $media,
+            $request->input('distribution_week_ids', []),
+            (bool) $request->input('replace', false),
+        );
+
+        return response()->json(['media' => $media->fresh()]);
+    }
+
+    public function bulkLinkProducts(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:content_media,id',
+            'item_group_ids' => 'required|array|min:1',
+            'item_group_ids.*' => 'integer|min:1',
+        ]);
+
+        $count = $this->mediaService->bulkLinkProducts(
+            $request->input('ids'),
+            $request->input('item_group_ids'),
+        );
+
+        return response()->json(['inserted' => $count]);
+    }
+
+    public function bulkLinkCollections(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:content_media,id',
+            'distribution_week_ids' => 'required|array|min:1',
+            'distribution_week_ids.*' => 'integer|min:1',
+        ]);
+
+        $count = $this->mediaService->bulkLinkCollections(
+            $request->input('ids'),
+            $request->input('distribution_week_ids'),
+        );
+
+        return response()->json(['inserted' => $count]);
     }
 
     public function mediaUsedByPosts(int $id): JsonResponse

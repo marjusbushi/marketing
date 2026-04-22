@@ -199,6 +199,113 @@ class ContentMediaServiceTest extends TestCase
         $this->assertSame(1, $result->total());
     }
 
+    // ── Products + Collections linking (Media Library v3) ──
+
+    public function test_link_products_inserts_new_and_ignores_duplicates(): void
+    {
+        $m = ContentMedia::create($this->mediaAttrs());
+        $this->assertSame(2, $this->service->linkProducts($m, [101, 202]));
+        // Re-linking same ids — insertOrIgnore returns 0 or 1 depending on driver;
+        // key assertion is that the pivot still has exactly 2 rows.
+        $this->service->linkProducts($m, [101, 303]);
+        $this->assertEqualsCanonicalizing([101, 202, 303], $m->fresh()->item_group_ids);
+    }
+
+    public function test_link_products_with_replace_wipes_previous(): void
+    {
+        $m = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkProducts($m, [101, 202]);
+        $this->service->linkProducts($m, [999], true);
+        $this->assertSame([999], $m->fresh()->item_group_ids);
+    }
+
+    public function test_unlink_products_removes_only_specified(): void
+    {
+        $m = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkProducts($m, [1, 2, 3]);
+        $this->service->unlinkProducts($m, [2]);
+        $this->assertEqualsCanonicalizing([1, 3], $m->fresh()->item_group_ids);
+    }
+
+    public function test_bulk_link_products_creates_cartesian(): void
+    {
+        $a = ContentMedia::create($this->mediaAttrs())->id;
+        $b = ContentMedia::create($this->mediaAttrs())->id;
+        $inserted = $this->service->bulkLinkProducts([$a, $b], [10, 20]);
+        $this->assertSame(4, $inserted);
+        $this->assertEqualsCanonicalizing([10, 20], ContentMedia::find($a)->item_group_ids);
+        $this->assertEqualsCanonicalizing([10, 20], ContentMedia::find($b)->item_group_ids);
+    }
+
+    public function test_link_collections_insert_and_replace(): void
+    {
+        $m = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkCollections($m, [5, 6]);
+        $this->assertEqualsCanonicalizing([5, 6], $m->fresh()->distribution_week_ids);
+        $this->service->linkCollections($m, [7], true);
+        $this->assertSame([7], $m->fresh()->distribution_week_ids);
+    }
+
+    public function test_product_counts_returns_top_sorted_desc(): void
+    {
+        $m1 = ContentMedia::create($this->mediaAttrs())->id;
+        $m2 = ContentMedia::create($this->mediaAttrs())->id;
+        $m3 = ContentMedia::create($this->mediaAttrs())->id;
+        // product 100 linked to all 3, product 200 to just 1
+        $this->service->bulkLinkProducts([$m1, $m2, $m3], [100]);
+        $this->service->bulkLinkProducts([$m1], [200]);
+        $counts = $this->service->productCounts();
+        $this->assertSame(3, $counts[100]);
+        $this->assertSame(1, $counts[200]);
+    }
+
+    public function test_list_filters_by_product(): void
+    {
+        $m1 = ContentMedia::create($this->mediaAttrs());
+        $m2 = ContentMedia::create($this->mediaAttrs());
+        $m3 = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkProducts($m1, [42]);
+        $this->service->linkProducts($m2, [42, 43]);
+        // m3 has no products
+
+        $this->assertSame(2, $this->service->list(['product' => 42])->total());
+        $this->assertSame(1, $this->service->list(['product' => 43])->total());
+        $this->assertSame(2, $this->service->list(['product' => '42,43'])->total());
+    }
+
+    public function test_list_filters_by_collection(): void
+    {
+        $m1 = ContentMedia::create($this->mediaAttrs());
+        $m2 = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkCollections($m1, [77]);
+        $this->service->linkCollections($m2, [88]);
+
+        $this->assertSame(1, $this->service->list(['collection' => 77])->total());
+        $this->assertSame(1, $this->service->list(['collection' => 88])->total());
+        $this->assertSame(2, $this->service->list(['collection' => [77, 88]])->total());
+    }
+
+    public function test_preload_linked_ids_populates_appended_attributes(): void
+    {
+        $m1 = ContentMedia::create($this->mediaAttrs());
+        $m2 = ContentMedia::create($this->mediaAttrs());
+        $this->service->linkProducts($m1, [1, 2]);
+        $this->service->linkCollections($m1, [10]);
+
+        $collection = collect([$m1->fresh(), $m2->fresh()]);
+        $this->service->preloadLinkedIds($collection);
+
+        // Accessing the appended attribute should NOT hit the DB again because
+        // the service already populated the cache. We verify values come back
+        // correctly.
+        $this->assertEqualsCanonicalizing([1, 2], $collection->get(0)->item_group_ids);
+        $this->assertSame([10], $collection->get(0)->distribution_week_ids);
+        $this->assertSame([], $collection->get(1)->item_group_ids);
+        $this->assertSame([], $collection->get(1)->distribution_week_ids);
+    }
+
+    // ── Existing tests continue below ──
+
     public function test_list_excludes_meta_imports_unless_imported_folder_or_all(): void
     {
         // Meta import record (path in the reserved prefix)

@@ -64,6 +64,13 @@
     #bulkToolbar .btn-ghost { background: transparent; border-color: transparent; color: rgba(255,255,255,0.7); }
     #bulkToolbar .btn-ghost:hover { color: #fff; background: rgba(255,255,255,0.08); }
 
+    /* Link badges (products + collections) on thumbnails */
+    .link-badges { position: absolute; bottom: 6px; right: 6px; display: inline-flex; gap: 3px; align-items: center; z-index: 3; pointer-events: none; }
+    .link-badges > * { pointer-events: auto; }
+    .product-pill { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; background: rgba(99,102,241,0.92); color: #fff; font-size: 9px; font-weight: 700; border-radius: 8px; letter-spacing: 0.03em; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+    .collection-dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+    .overflow-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; background: rgba(15,23,42,0.85); color: #fff; font-size: 9px; font-weight: 600; border-radius: 8px; }
+
     /* Drag-drop folder feedback */
     .folder-item.drop-target { background: #e0e7ff; outline: 2px dashed #6366f1; outline-offset: -2px; }
     .cp-media-card.dragging { opacity: 0.4; transform: scale(0.96); }
@@ -116,6 +123,30 @@
         <span id="mediaCount" class="text-xs text-slate-400"></span>
     </div>
 
+    {{-- Upload linker row — pick products + collection BEFORE upload so new
+         media auto-links (user can still skip). Kept in-between the nav and
+         the drop zone to establish "scope" mental model. --}}
+    <div class="bg-white rounded-xl border border-slate-200 p-3 flex flex-col sm:flex-row gap-3">
+        <div class="flex-1 min-w-0">
+            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">📦 Lidh me produkte (opsional)</label>
+            <div id="uploadProductsWrap" class="relative">
+                <div id="uploadProductsPills" class="flex flex-wrap items-center gap-1 px-2 py-1.5 border border-slate-200 rounded-md bg-white min-h-[32px] focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/20 cursor-text" onclick="document.getElementById('uploadProductsInput').focus()"></div>
+                <input id="uploadProductsInput" type="text" placeholder="Kërko produkt..." class="hidden w-full h-[26px] px-1 text-xs outline-none bg-transparent" autocomplete="off" oninput="searchUploadProducts()" onfocus="showUploadProductsDropdown()" onkeydown="handleProductsInputKeydown(event)">
+                <div id="uploadProductsDropdown" class="hidden absolute left-0 top-full mt-1 w-full max-h-[200px] overflow-y-auto bg-white border border-slate-200 rounded-md shadow-lg z-30"></div>
+            </div>
+        </div>
+        <div class="flex-1 min-w-0">
+            <label class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">🎯 Lidh me koleksion (opsional)</label>
+            <div id="uploadCollectionWrap" class="relative">
+                <div id="uploadCollectionBox" class="flex items-center gap-2 px-2 py-1.5 border border-slate-200 rounded-md bg-white min-h-[32px] cursor-pointer" onclick="toggleUploadCollectionDropdown()">
+                    <span id="uploadCollectionLabel" class="text-xs text-slate-400 flex-1 truncate">Zgjidh koleksion...</span>
+                    <button id="uploadCollectionClear" type="button" onclick="event.stopPropagation(); clearUploadCollection()" class="hidden text-slate-400 hover:text-red-500" title="Hiq">&times;</button>
+                </div>
+                <div id="uploadCollectionDropdown" class="hidden absolute left-0 top-full mt-1 w-full max-h-[240px] overflow-y-auto bg-white border border-slate-200 rounded-md shadow-lg z-30"></div>
+            </div>
+        </div>
+    </div>
+
     {{-- Upload zone --}}
     <div id="uploadZone"
          class="border-2 border-dashed border-slate-200 rounded-xl p-10 text-center cursor-pointer bg-white hover:border-primary-400 hover:bg-primary-50/30 transition-all"
@@ -148,6 +179,9 @@
             </ul>
             {{-- Stage filter section is injected by task #1336 below this divider --}}
             <div id="stageFilterSection"></div>
+            {{-- Collections + Products (Media Library v3) --}}
+            <div id="collectionsSection"></div>
+            <div id="productsSection"></div>
         </aside>
 
         {{-- Main column --}}
@@ -208,8 +242,23 @@
         <option value="edited">🟡 Edited</option>
         <option value="final">🟢 Final</option>
     </select>
+    <button onclick="openBulkLinkProducts()" title="Link selected media to a product">📦 Link product</button>
+    <button onclick="openBulkLinkCollections()" title="Link selected media to a collection">🎯 Link collection</button>
     <button class="btn-danger" onclick="bulkDeleteSelected()">Delete</button>
     <button class="btn-ghost" onclick="bulkDeselect()">×</button>
+</div>
+
+{{-- Bulk link mini-modal (product / collection picker) --}}
+<div id="bulkLinkOverlay" class="hidden fixed inset-0 bg-black/40 z-[9995]" onclick="closeBulkLink()"></div>
+<div id="bulkLinkCard" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9996] w-[420px] max-w-[94vw] bg-white rounded-xl shadow-2xl border border-slate-200 flex flex-col" style="max-height: 70vh;">
+    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <h3 id="bulkLinkTitle" class="text-sm font-semibold text-slate-800">Link to…</h3>
+        <button onclick="closeBulkLink()" class="w-7 h-7 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center">&times;</button>
+    </div>
+    <div class="px-4 py-3 border-b border-slate-100">
+        <input id="bulkLinkSearch" type="text" placeholder="Search…" class="w-full h-9 px-3 rounded-md border border-slate-200 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-500/20" autocomplete="off" oninput="refreshBulkLinkResults()">
+    </div>
+    <div id="bulkLinkResults" class="flex-1 overflow-y-auto p-2"></div>
 </div>
 
 {{-- Preview lightbox --}}
@@ -319,6 +368,9 @@
             progressText.textContent = `Uploading ${i+1}/${files.length}: ${files[i].name}`;
             const formData = new FormData();
             formData.append('file', files[i]);
+            // Auto-attach selected products + collection (Media Library v3).
+            Array.from(uploadProducts.values()).forEach(p => formData.append('item_group_ids[]', p.id));
+            if (uploadCollection) formData.append('distribution_week_id', uploadCollection.id);
             try {
                 const res = await fetch('{{ route("marketing.planner.api.media.upload") }}', { method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'}, body:formData });
                 if (!res.ok) { const err = await res.text(); alert('Upload failed for '+files[i].name); }
@@ -329,6 +381,149 @@
         refreshFolders();
     }
 
+    // ── Upload-zone product + collection selectors ──
+    const uploadProducts = new Map();   // id -> {id, code, name}
+    let uploadCollection = null;         // {id, code, name, display_label?}
+    let productSearchDebounce;
+
+    function renderUploadProductsPills() {
+        const wrap = document.getElementById('uploadProductsPills');
+        const input = document.getElementById('uploadProductsInput');
+        const pills = Array.from(uploadProducts.values()).map(p =>
+            `<span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-[11px] font-medium">
+                ${escHtml(p.code || p.id)}
+                <button type="button" onclick="removeUploadProduct(${p.id})" class="text-primary-400 hover:text-red-500" title="Hiq">&times;</button>
+            </span>`
+        ).join('');
+        wrap.innerHTML = pills + '<input id="uploadProductsInput" type="text" placeholder="' + (uploadProducts.size ? '+ shto' : 'Kërko produkt...') + '" class="flex-1 min-w-[100px] h-[24px] px-1 text-xs outline-none bg-transparent" autocomplete="off" oninput="searchUploadProducts()" onfocus="showUploadProductsDropdown()" onkeydown="handleProductsInputKeydown(event)">';
+    }
+
+    function removeUploadProduct(id) {
+        uploadProducts.delete(id);
+        renderUploadProductsPills();
+    }
+
+    async function searchUploadProducts() {
+        const input = document.getElementById('uploadProductsInput');
+        const q = (input?.value || '').trim();
+        clearTimeout(productSearchDebounce);
+        productSearchDebounce = setTimeout(async () => {
+            try {
+                const res = await fetch('{{ route("marketing.planner.api.media.products.search") }}?q=' + encodeURIComponent(q));
+                const { results } = await res.json();
+                renderProductsDropdown(results || []);
+            } catch (e) { console.error(e); }
+        }, 250);
+    }
+
+    function showUploadProductsDropdown() {
+        searchUploadProducts();
+    }
+
+    function renderProductsDropdown(results) {
+        const dd = document.getElementById('uploadProductsDropdown');
+        if (!results.length) {
+            dd.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">Nuk u gjetën rezultate</div>';
+        } else {
+            dd.innerHTML = results.slice(0, 20).map(r => {
+                const id = r.id ?? r.item_group_id;
+                const code = r.code ?? r.item_group_code ?? '';
+                const name = r.name ?? r.title ?? '';
+                const disabled = uploadProducts.has(id);
+                return `<div class="px-3 py-2 text-xs cursor-pointer ${disabled ? 'opacity-40' : 'hover:bg-primary-50'}" ${disabled ? '' : `onclick="addUploadProduct(${id}, '${escHtml(code)}', '${escHtml((name || '').replace(/'/g, '&#39;'))}')"`}>
+                    <span class="font-semibold text-slate-700">${escHtml(code)}</span>
+                    <span class="text-slate-500"> ${escHtml(name)}</span>
+                </div>`;
+            }).join('');
+        }
+        dd.classList.remove('hidden');
+    }
+
+    function addUploadProduct(id, code, name) {
+        uploadProducts.set(Number(id), { id: Number(id), code, name });
+        renderUploadProductsPills();
+        document.getElementById('uploadProductsInput').focus();
+    }
+
+    function handleProductsInputKeydown(e) {
+        if (e.key === 'Escape') {
+            document.getElementById('uploadProductsDropdown').classList.add('hidden');
+            e.target.blur();
+        }
+        if (e.key === 'Backspace' && !e.target.value && uploadProducts.size) {
+            const lastId = Array.from(uploadProducts.keys()).pop();
+            removeUploadProduct(lastId);
+        }
+    }
+
+    // Close products dropdown on outside click
+    document.addEventListener('click', (e) => {
+        const wrap = document.getElementById('uploadProductsWrap');
+        const dd = document.getElementById('uploadProductsDropdown');
+        if (wrap && !wrap.contains(e.target)) dd.classList.add('hidden');
+    });
+
+    // ── Upload collection (single-select) ──
+    let recentCollectionsCache = null;
+
+    async function fetchRecentCollections() {
+        if (recentCollectionsCache) return recentCollectionsCache;
+        try {
+            const res = await fetch('{{ route("marketing.planner.api.media.collections.recent") }}');
+            const { collections } = await res.json();
+            recentCollectionsCache = collections || [];
+            return recentCollectionsCache;
+        } catch (e) { return []; }
+    }
+
+    async function toggleUploadCollectionDropdown() {
+        const dd = document.getElementById('uploadCollectionDropdown');
+        if (!dd.classList.contains('hidden')) {
+            dd.classList.add('hidden');
+            return;
+        }
+        const collections = await fetchRecentCollections();
+        if (!collections.length) {
+            dd.innerHTML = '<div class="px-3 py-2 text-xs text-slate-400">Nuk u gjetën koleksione</div>';
+        } else {
+            dd.innerHTML = collections.slice(0, 40).map(c => {
+                const id = c.id;
+                const label = c.display_label || c.label || c.name || ('Week #' + id);
+                const start = c.start_date || c.starts_at || '';
+                return `<div class="px-3 py-2 text-xs cursor-pointer hover:bg-primary-50" onclick="setUploadCollection(${id}, '${escHtml(label.replace(/'/g, '&#39;'))}')">
+                    <div class="font-medium text-slate-700">${escHtml(label)}</div>
+                    ${start ? `<div class="text-[10px] text-slate-400">${escHtml(String(start).slice(0, 10))}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+        dd.classList.remove('hidden');
+    }
+
+    function setUploadCollection(id, label) {
+        uploadCollection = { id: Number(id), label };
+        const lab = document.getElementById('uploadCollectionLabel');
+        lab.textContent = label;
+        lab.classList.remove('text-slate-400');
+        lab.classList.add('text-slate-700', 'font-medium');
+        document.getElementById('uploadCollectionClear').classList.remove('hidden');
+        document.getElementById('uploadCollectionDropdown').classList.add('hidden');
+    }
+
+    function clearUploadCollection() {
+        uploadCollection = null;
+        const lab = document.getElementById('uploadCollectionLabel');
+        lab.textContent = 'Zgjidh koleksion...';
+        lab.classList.remove('text-slate-700', 'font-medium');
+        lab.classList.add('text-slate-400');
+        document.getElementById('uploadCollectionClear').classList.add('hidden');
+    }
+
+    document.addEventListener('click', (e) => {
+        const wrap = document.getElementById('uploadCollectionWrap');
+        const dd = document.getElementById('uploadCollectionDropdown');
+        if (wrap && !wrap.contains(e.target)) dd.classList.add('hidden');
+    });
+
     async function refreshMedia(page) {
         if (page) currentPage = page;
         const params = new URLSearchParams({ page:currentPage, per_page:30 });
@@ -338,6 +533,8 @@
         if (search) params.set('search',search); if (type) params.set('type',type); if (usage) params.set('usage',usage);
         if (currentFolder && currentFolder !== '__all') params.set('folder', currentFolder);
         if (typeof currentStage !== 'undefined' && currentStage) params.set('stage', currentStage);
+        if (typeof currentProduct !== 'undefined' && currentProduct) params.set('product', currentProduct);
+        if (typeof currentCollection !== 'undefined' && currentCollection) params.set('collection', currentCollection);
         try {
             const res = await fetch(`{{ route('marketing.planner.api.media.index') }}?${params}`);
             const data = await res.json();
@@ -371,11 +568,13 @@
             const bulkCheckbox = !isPickerMode
                 ? `<div class="bulk-cb" onclick="event.stopPropagation(); toggleBulkSelect(${m.id}, event)">${bulkSelected.has(m.id) ? '&#10003;' : ''}</div>`
                 : '';
+            const linkBadges = buildLinkBadges(m);
             return `<div class="cp-media-card${selectedClass}${bulkSelectedClass}" id="picker-card-${m.id}" onclick="${clickAction}" oncontextmenu="openCtxMenu(event, ${m.id}, '${escHtml(stage)}')" ${!isPickerMode ? `draggable="true" ondragstart="onMediaDragStart(event, ${m.id})" ondragend="onMediaDragEnd(event)"` : ''} style="position:relative;aspect-ratio:1;overflow:hidden;border-radius:8px;cursor:pointer;background:#f1f5f9;">
                 ${isPickerMode ? '<span class="cp-picker-check">&#10003;</span>' : ''}
                 ${bulkCheckbox}
                 ${usedByBadge}
                 ${stageDot}
+                ${linkBadges}
                 ${isVideo
                     ? `<video src="${m.url}" muted autoplay loop playsinline style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
                     : `<img src="${escapedThumb}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">`}
@@ -564,6 +763,115 @@
         } catch (e) { alert('Stage change failed: ' + e.message); }
     }
 
+    // ── Bulk link to product / collection ──
+    let bulkLinkMode = null;   // 'product' | 'collection'
+    let bulkLinkDebounce;
+
+    function openBulkLinkProducts() {
+        if (!bulkSelected.size) return;
+        bulkLinkMode = 'product';
+        document.getElementById('bulkLinkTitle').textContent = `Link ${bulkSelected.size} media to product`;
+        document.getElementById('bulkLinkSearch').value = '';
+        document.getElementById('bulkLinkSearch').placeholder = 'Search product…';
+        document.getElementById('bulkLinkOverlay').classList.remove('hidden');
+        document.getElementById('bulkLinkCard').classList.remove('hidden');
+        setTimeout(() => document.getElementById('bulkLinkSearch').focus(), 40);
+        refreshBulkLinkResults();
+    }
+
+    function openBulkLinkCollections() {
+        if (!bulkSelected.size) return;
+        bulkLinkMode = 'collection';
+        document.getElementById('bulkLinkTitle').textContent = `Link ${bulkSelected.size} media to collection`;
+        document.getElementById('bulkLinkSearch').value = '';
+        document.getElementById('bulkLinkSearch').placeholder = 'Search collection…';
+        document.getElementById('bulkLinkOverlay').classList.remove('hidden');
+        document.getElementById('bulkLinkCard').classList.remove('hidden');
+        setTimeout(() => document.getElementById('bulkLinkSearch').focus(), 40);
+        refreshBulkLinkResults();
+    }
+
+    function closeBulkLink() {
+        document.getElementById('bulkLinkOverlay').classList.add('hidden');
+        document.getElementById('bulkLinkCard').classList.add('hidden');
+        bulkLinkMode = null;
+    }
+
+    async function refreshBulkLinkResults() {
+        clearTimeout(bulkLinkDebounce);
+        bulkLinkDebounce = setTimeout(async () => {
+            const q = document.getElementById('bulkLinkSearch').value.trim();
+            const out = document.getElementById('bulkLinkResults');
+            out.innerHTML = '<div class="text-xs text-slate-400 p-3">Loading…</div>';
+            try {
+                if (bulkLinkMode === 'product') {
+                    const res = await fetch('{{ route("marketing.planner.api.media.products.search") }}?q=' + encodeURIComponent(q));
+                    const { results } = await res.json();
+                    out.innerHTML = (results || []).slice(0, 30).map(r => {
+                        const id = r.id ?? r.item_group_id;
+                        const code = r.code ?? r.item_group_code ?? '';
+                        const name = r.name ?? r.title ?? '';
+                        return `<div class="px-3 py-2 rounded-md hover:bg-primary-50 cursor-pointer text-sm" onclick="applyBulkLinkProduct(${id})">
+                            <span class="font-semibold text-slate-700">${escHtml(code)}</span>
+                            <span class="text-slate-500"> ${escHtml(name)}</span>
+                        </div>`;
+                    }).join('') || '<div class="text-xs text-slate-400 p-3">Nuk u gjet asgje.</div>';
+                } else {
+                    const res = await fetch('{{ route("marketing.planner.api.media.collections.recent") }}');
+                    const { collections } = await res.json();
+                    const filtered = (collections || []).filter(c => !q || String(c.label || c.name || c.display_label || '').toLowerCase().includes(q.toLowerCase())).slice(0, 40);
+                    out.innerHTML = filtered.map(c => {
+                        const id = c.id;
+                        const label = c.display_label || c.label || c.name || ('Week #' + id);
+                        const start = c.start_date || c.starts_at || '';
+                        return `<div class="px-3 py-2 rounded-md hover:bg-primary-50 cursor-pointer text-sm" onclick="applyBulkLinkCollection(${id})">
+                            <div class="font-medium text-slate-700">${escHtml(label)}</div>
+                            ${start ? `<div class="text-[10px] text-slate-400">${escHtml(String(start).slice(0, 10))}</div>` : ''}
+                        </div>`;
+                    }).join('') || '<div class="text-xs text-slate-400 p-3">Nuk u gjet asgje.</div>';
+                }
+            } catch (e) {
+                out.innerHTML = '<div class="text-xs text-red-500 p-3">Ngarkimi dështoi.</div>';
+            }
+        }, 200);
+    }
+
+    async function applyBulkLinkProduct(productId) {
+        const ids = Array.from(bulkSelected);
+        try {
+            const res = await fetch('/marketing/planner/api/media/bulk-products', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ ids, item_group_ids: [Number(productId)] }),
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            closeBulkLink();
+            bulkDeselect();
+            refreshMedia();
+            refreshProductsSection();
+            toast(`${data.inserted || 0} link(s) added`);
+        } catch (e) { alert('Link failed: ' + e.message); }
+    }
+
+    async function applyBulkLinkCollection(collectionId) {
+        const ids = Array.from(bulkSelected);
+        try {
+            const res = await fetch('/marketing/planner/api/media/bulk-collections', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ ids, distribution_week_ids: [Number(collectionId)] }),
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            closeBulkLink();
+            bulkDeselect();
+            refreshMedia();
+            refreshCollectionsSection();
+            toast(`${data.inserted || 0} link(s) added`);
+        } catch (e) { alert('Link failed: ' + e.message); }
+    }
+
     async function bulkDeleteSelected() {
         if (!bulkSelected.size) return;
         if (!confirm(`Delete ${bulkSelected.size} file(s)? This cannot be undone.`)) return;
@@ -680,6 +988,145 @@
         } catch (e) {
             alert('Move failed: ' + e.message);
         }
+    }
+
+    // ── Link badges (products + collections) on thumbnails ──
+    function collectionColor(id) {
+        // Deterministic hue from id so the same collection always renders
+        // with the same dot color. Avoid very-light hues so the dot stays
+        // readable on white thumbs.
+        const h = (Number(id) * 37) % 360;
+        return `hsl(${h}, 65%, 50%)`;
+    }
+
+    function buildLinkBadges(m) {
+        const productIds = Array.isArray(m.item_group_ids) ? m.item_group_ids : [];
+        const collectionIds = Array.isArray(m.distribution_week_ids) ? m.distribution_week_ids : [];
+        if (!productIds.length && !collectionIds.length) return '';
+
+        const pills = [];
+
+        // Show at most 2 product pills (first two), then '+N' for the rest.
+        const shownProducts = productIds.slice(0, 2);
+        const extraProducts = productIds.length - shownProducts.length;
+        shownProducts.forEach(pid => {
+            const label = productLabelCache.get(Number(pid));
+            const short = label ? String(label).split(' ')[0] : ('#' + pid);
+            const title = label || ('Product #' + pid);
+            pills.push(`<span class="product-pill" title="${escHtml(title)}">${escHtml(short.slice(0, 7))}</span>`);
+        });
+        if (extraProducts > 0) {
+            pills.push(`<span class="overflow-pill" title="${extraProducts} produkte te tjera">+${extraProducts}</span>`);
+        }
+
+        // Show at most 2 collection dots; '+N' for the rest.
+        const shownCollections = collectionIds.slice(0, 2);
+        const extraCollections = collectionIds.length - shownCollections.length;
+        shownCollections.forEach(cid => {
+            const label = collectionLabelCache.get(Number(cid)) || ('Collection #' + cid);
+            pills.push(`<span class="collection-dot" style="background:${collectionColor(cid)}" title="${escHtml(label)}"></span>`);
+        });
+        if (extraCollections > 0) {
+            pills.push(`<span class="overflow-pill" title="${extraCollections} koleksione te tjera">+${extraCollections}</span>`);
+        }
+
+        return `<div class="link-badges">${pills.join('')}</div>`;
+    }
+
+    // ── Collections + Products filters (Media Library v3) ──
+    let currentProduct = Number(new URLSearchParams(window.location.search).get('product')) || null;
+    let currentCollection = Number(new URLSearchParams(window.location.search).get('collection')) || null;
+    const productLabelCache = new Map();     // id -> "FMP-001 Fund me pala"
+    const collectionLabelCache = new Map();  // id -> "Week 17 — Summer"
+
+    async function refreshCollectionsSection() {
+        const section = document.getElementById('collectionsSection');
+        try {
+            const res = await fetch('{{ route("marketing.planner.api.media.collections.recent") }}');
+            const { collections } = await res.json();
+            const filtered = (collections || []).filter(c => (c.media_count || 0) > 0).slice(0, 10);
+
+            // Cache labels for use elsewhere (badges, pills)
+            filtered.forEach(c => {
+                const label = c.display_label || c.label || c.name || ('Week #' + c.id);
+                collectionLabelCache.set(Number(c.id), label);
+            });
+
+            if (!filtered.length) {
+                section.innerHTML = '<div class="folder-divider"></div><div class="ml-sidebar-heading">Collections</div><div class="text-[11px] text-slate-400 px-3 py-1">Ende asnjë.</div>';
+                return;
+            }
+
+            const html = '<div class="folder-divider"></div><div class="ml-sidebar-heading">Collections</div><ul style="list-style:none;padding:0;margin:0;">' +
+                filtered.map(c => {
+                    const id = Number(c.id);
+                    const label = c.display_label || c.label || c.name || ('Week #' + id);
+                    const count = Number(c.media_count) || 0;
+                    const active = currentCollection === id;
+                    return `<li><button type="button" onclick="selectCollection(${id})" class="folder-item ${active ? 'active' : ''}" data-collection-id="${id}">
+                        <span class="folder-icon">🎯</span>
+                        <span class="folder-label">${escHtml(label)}</span>
+                        <span class="folder-count">${count}</span>
+                    </button></li>`;
+                }).join('') + '</ul>';
+            section.innerHTML = html;
+        } catch (e) { console.error('collections section', e); }
+    }
+
+    async function refreshProductsSection() {
+        const section = document.getElementById('productsSection');
+        try {
+            const res = await fetch('{{ route("marketing.planner.api.media.products.top") }}');
+            const { products } = await res.json();
+            const list = (products || []).slice(0, 20);
+
+            list.forEach(p => {
+                const label = p.code ? (p.code + (p.name ? ' ' + p.name : '')) : ('#' + p.id);
+                productLabelCache.set(Number(p.id), label);
+            });
+
+            if (!list.length) {
+                section.innerHTML = '<div class="folder-divider"></div><div class="ml-sidebar-heading">Products</div><div class="text-[11px] text-slate-400 px-3 py-1">Ende asnjë.</div>';
+                return;
+            }
+
+            const html = '<div class="folder-divider"></div><div class="ml-sidebar-heading">Products</div><ul style="list-style:none;padding:0;margin:0;">' +
+                list.map(p => {
+                    const id = Number(p.id);
+                    const code = p.code || ('#' + id);
+                    const name = p.name || '';
+                    const count = Number(p.count) || 0;
+                    const active = currentProduct === id;
+                    return `<li><button type="button" onclick="selectProduct(${id})" class="folder-item ${active ? 'active' : ''}" data-product-id="${id}" title="${escHtml(name)}">
+                        <span class="folder-icon">📦</span>
+                        <span class="folder-label" style="font-size:11px;">${escHtml(code)}</span>
+                        <span class="folder-count">${count}</span>
+                    </button></li>`;
+                }).join('') + '</ul>';
+            section.innerHTML = html;
+        } catch (e) { console.error('products section', e); }
+    }
+
+    function selectCollection(id) {
+        currentCollection = currentCollection === id ? null : id;
+        const url = new URL(window.location);
+        if (currentCollection) url.searchParams.set('collection', currentCollection);
+        else url.searchParams.delete('collection');
+        window.history.replaceState({}, '', url);
+        currentPage = 1;
+        refreshMedia();
+        refreshCollectionsSection();
+    }
+
+    function selectProduct(id) {
+        currentProduct = currentProduct === id ? null : id;
+        const url = new URL(window.location);
+        if (currentProduct) url.searchParams.set('product', currentProduct);
+        else url.searchParams.delete('product');
+        window.history.replaceState({}, '', url);
+        currentPage = 1;
+        refreshMedia();
+        refreshProductsSection();
     }
 
     // ── Stage filter ──
@@ -835,6 +1282,6 @@
             else closePreview();
         }
     });
-    document.addEventListener('DOMContentLoaded', () => { renderStageFilter(); refreshFolders(); refreshMedia(); });
+    document.addEventListener('DOMContentLoaded', () => { renderStageFilter(); refreshFolders(); refreshMedia(); renderUploadProductsPills(); refreshCollectionsSection(); refreshProductsSection(); });
 </script>
 @endsection

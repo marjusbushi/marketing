@@ -10,6 +10,7 @@ use App\Models\DailyBasketPost;
 use App\Models\DailyBasketPostMedia;
 use App\Models\Content\ContentMedia;
 use App\Models\Marketing\CreativeBrief;
+use App\Services\ContentPlanner\ContentMediaService;
 use App\Services\ContentPlanner\ContentPostService;
 use App\Services\DisApiClient;
 use Carbon\Carbon;
@@ -997,6 +998,7 @@ class DailyBasketController extends Controller
 
         $nextOrder = (int) ($post->media()->max('sort_order') ?? -1) + 1;
         $created = [];
+        $attachedContentMedia = [];
 
         $contentMedia = ContentMedia::whereIn('id', $validated['media_ids'])->get()->keyBy('id');
 
@@ -1017,9 +1019,38 @@ class DailyBasketController extends Controller
             ]);
 
             $created[] = $this->serializeMedia($media);
+            $attachedContentMedia[] = $cm;
 
             // For non-carousel, stop after first (replace semantics).
             if (! $isCarousel) break;
+        }
+
+        // Auto-link transitive: inherit the post's products and the basket's
+        // collection (distribution_week_id) onto each linked ContentMedia. The
+        // user manually linked these once (or not at all) — doing it here keeps
+        // the media library filters in sync with basket usage.
+        if (! empty($attachedContentMedia)) {
+            $mediaService = app(ContentMediaService::class);
+
+            $postProductIds = DB::table('daily_basket_post_products')
+                ->where('daily_basket_post_id', $post->id)
+                ->pluck('item_group_id')
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all();
+
+            $weekId = optional($post->basket()->first())->distribution_week_id;
+            $weekIds = $weekId ? [(int) $weekId] : [];
+
+            foreach ($attachedContentMedia as $cm) {
+                if (! empty($postProductIds)) {
+                    $mediaService->linkProducts($cm, $postProductIds, false);
+                }
+                if (! empty($weekIds)) {
+                    $mediaService->linkCollections($cm, $weekIds, false);
+                }
+            }
         }
 
         return response()->json(['media' => $created], 201);

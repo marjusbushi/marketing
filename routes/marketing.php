@@ -118,6 +118,26 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/api/media/{id}/used-by', [ContentPlannerApiController::class, 'mediaUsedByPosts'])
             ->name('api.media.used-by');
 
+        // API: Media ↔ Products / Collections (Media Library v3)
+        Route::get('/api/media/products/search', [ContentPlannerApiController::class, 'searchProducts'])
+            ->name('api.media.products.search');
+        Route::get('/api/media/collections/recent', [ContentPlannerApiController::class, 'listRecentCollections'])
+            ->name('api.media.collections.recent');
+        Route::get('/api/media/products/top', [ContentPlannerApiController::class, 'listTopProducts'])
+            ->name('api.media.products.top');
+        Route::patch('/api/media/{id}/products', [ContentPlannerApiController::class, 'linkMediaProducts'])
+            ->name('api.media.products.update')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::patch('/api/media/{id}/collections', [ContentPlannerApiController::class, 'linkMediaCollections'])
+            ->name('api.media.collections.update')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::post('/api/media/bulk-products', [ContentPlannerApiController::class, 'bulkLinkProducts'])
+            ->name('api.media.bulk-products')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::post('/api/media/bulk-collections', [ContentPlannerApiController::class, 'bulkLinkCollections'])
+            ->name('api.media.bulk-collections')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+
         // API: Comments (edit permission for create/resolve, delete for remove)
         Route::post('/api/comments', [ContentPlannerApiController::class, 'storeComment'])
             ->name('api.comments.store')
