@@ -236,16 +236,26 @@
         <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
             <iconify-icon icon="heroicons-outline:chat-bubble-left-right" width="18" class="text-slate-400"></iconify-icon>
             <h3 class="text-sm font-semibold text-slate-800">Instagram DMs</h3>
+            <div class="relative ml-1 group">
+                <iconify-icon icon="heroicons-outline:information-circle" width="16" class="text-slate-400 cursor-help"></iconify-icon>
+                <div class="hidden group-hover:block absolute left-0 top-6 z-10 w-[360px] p-3 rounded-lg bg-slate-900 text-white text-[11px] leading-relaxed shadow-xl">
+                    <b>Si llogaritet:</b><br>
+                    &bull; <b>Organike</b> &mdash; Biseda te reja ne IG DM inbox (Meta Conversations API). Eshte nje <b>sample</b>: Meta Business Suite numeron me gjere, ne mund te humbim ~50-70% te bisedave te reja qe Meta i sheh ne brendesi.<br>
+                    &bull; <b>Paid</b> &mdash; Biseda te nisura nga reklamat (Meta Ads API, metric: messaging_conversation_started_7d). Perputhet me Meta Business Suite.<br><br>
+                    Per numer ekzakt te <i>Messaging conversations started</i>, shih <b>Meta Business Suite &gt; Insights &gt; Messaging</b>.
+                </div>
+            </div>
         </div>
         <div class="p-5">
             <div class="flex items-center justify-center gap-6 mb-4" id="messagingSection">
-                <div class="px-6 py-4 rounded-lg bg-pink-50 border border-pink-200 text-center">
+                <div class="px-6 py-4 rounded-lg bg-pink-50 border border-pink-200 text-center min-w-[200px]">
                     <iconify-icon icon="heroicons-outline:chat-bubble-left-right" width="28" class="text-pink-800"></iconify-icon>
-                    <div id="msg-conversations" class="text-2xl font-bold text-pink-800 mt-2">&mdash;</div>
-                    <div class="text-xs text-slate-500">Kontakte Aktive</div>
+                    <div id="msg-conversations" class="text-2xl font-bold text-pink-800 mt-2 tabular-nums">&mdash;</div>
+                    <div class="text-xs text-slate-500">Kontakte (sample + paid)</div>
+                    <div id="msg-breakdown" class="text-[10px] text-slate-400 mt-1.5 tabular-nums">&mdash;</div>
                 </div>
-                <div class="text-[13px] text-slate-500 leading-relaxed">
-                    Aktiviteti ditor i bisedave n&euml; Instagram DM (organike + ads).
+                <div class="text-[13px] text-slate-500 leading-relaxed max-w-[500px]">
+                    Biseda te nisura ne IG DM &mdash; organike (sample nga Conversations API) + ads (Meta Ads). Nje pjese e organikes humbet per shkak te kufizimeve te API-se publike; per numer te sakte shiko Meta Business Suite.
                 </div>
             </div>
             <div class="relative w-full h-[280px]">
@@ -977,6 +987,12 @@
         if (gen !== null && gen !== loadGeneration) return;
 
         document.getElementById('msg-conversations').textContent = fmtNum(data.totals.conversations);
+        const breakdownEl = document.getElementById('msg-breakdown');
+        if (breakdownEl) {
+            const org = data.totals.organic ?? 0;
+            const paid = data.totals.paid ?? 0;
+            breakdownEl.textContent = `${fmtNum(org)} organike + ${fmtNum(paid)} ads`;
+        }
 
         // DM activity chart — single line showing daily contacts
         if (data.daily && data.daily.length > 0) {

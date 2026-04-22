@@ -181,7 +181,11 @@ class MetaAdsSyncService
                     'add_to_cart' => $actions['add_to_cart'] ?? ($actions['offsite_conversion.fb_pixel_add_to_cart'] ?? 0),
                     'initiate_checkout' => $actions['initiate_checkout'] ?? ($actions['offsite_conversion.fb_pixel_initiate_checkout'] ?? 0),
                     'leads' => $actions['lead'] ?? ($actions['offsite_conversion.fb_pixel_lead'] ?? 0),
-                    'messaging_conversations' => $actions['onsite_conversion.total_messaging_connection'] ?? $actions['onsite_conversion.messaging_conversation_started_7d'] ?? 0,
+                    // Match Meta Business Suite's "Messaging conversations started"
+                    // chart exactly. total_messaging_connection is broader
+                    // (includes re-engagement events) and overcounted paid by
+                    // ~22% on the IG dashboard vs the Meta BS number.
+                    'messaging_conversations' => $actions['onsite_conversion.messaging_conversation_started_7d'] ?? $actions['onsite_conversion.total_messaging_connection'] ?? 0,
                     'messaging_conversations_replied' => $actions['onsite_conversion.messaging_conversation_replied_7d'] ?? 0,
                     'synced_at' => now(),
                 ]
@@ -350,10 +354,11 @@ class MetaAdsSyncService
                             (float) ($actions['initiate_checkout'] ?? ($actions['offsite_conversion.fb_pixel_initiate_checkout'] ?? 0));
                         $grouped[$key][$breakdownValue]['leads'] +=
                             (float) ($actions['lead'] ?? ($actions['offsite_conversion.fb_pixel_lead'] ?? 0));
-                        // Prefer total_messaging_connection (broader, matches Meta Business Suite)
-                        // over messaging_conversation_started_7d (7-day attribution window only).
+                        // Match Meta Business Suite's "Messaging conversations started"
+                        // chart. total_messaging_connection is broader (includes
+                        // re-engagement events) — overcounts paid by ~22% vs BS.
                         $grouped[$key][$breakdownValue]['messaging_conversations'] +=
-                            (float) ($actions['onsite_conversion.total_messaging_connection'] ?? $actions['onsite_conversion.messaging_conversation_started_7d'] ?? 0);
+                            (float) ($actions['onsite_conversion.messaging_conversation_started_7d'] ?? $actions['onsite_conversion.total_messaging_connection'] ?? 0);
                         $grouped[$key][$breakdownValue]['messaging_conversations_replied'] +=
                             (float) ($actions['onsite_conversion.messaging_conversation_replied_7d'] ?? 0);
                     }

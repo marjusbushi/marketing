@@ -551,13 +551,21 @@ class MetaMarketingV2ChannelService
                 $daily = $this->resolver->resolveMessagingDaily('instagram', $from, $to);
                 $paidDaily = $this->getAdsPlatformMessagingDaily($from, $to, 'instagram');
 
-                $totals = ['conversations' => 0, 'received' => 0, 'sent' => 0];
+                // Keep organic and paid split in totals so the UI can show
+                // the breakdown honestly — organic is a sample from the
+                // Conversations API and typically undercounts Meta BS.
+                $totals = ['conversations' => 0, 'organic' => 0, 'paid' => 0, 'received' => 0, 'sent' => 0];
                 foreach ($daily as &$row) {
                     $date = $row['date'] ?? '';
+                    $organic = (int) ($row['new_conversations'] ?? $row['conversations'] ?? 0);
                     $paid = (int) ($paidDaily[$date] ?? 0);
-                    $row['new_conversations'] = (int) ($row['new_conversations'] ?? $row['conversations'] ?? 0) + $paid;
+                    $row['organic'] = $organic;
+                    $row['paid'] = $paid;
+                    $row['new_conversations'] = $organic + $paid;
                     $row['total_messages_received'] = (int) ($row['total_messages_received'] ?? $row['messages_received'] ?? 0) + $paid;
                     $row['total_messages_sent'] = (int) ($row['total_messages_sent'] ?? $row['messages_sent'] ?? 0);
+                    $totals['organic'] += $organic;
+                    $totals['paid'] += $paid;
                     $totals['conversations'] += $row['new_conversations'];
                     $totals['received'] += $row['total_messages_received'];
                     $totals['sent'] += $row['total_messages_sent'];
