@@ -39,6 +39,9 @@ class DailyBasketPost extends Model
         'production_brief',
         'caption',
         'hashtags',
+        'lokacioni',
+        'modelet',
+        'audienca',
         'target_platforms',
         'scheduled_for',
         'content_post_id',
@@ -59,6 +62,7 @@ class DailyBasketPost extends Model
         'thumbnail_url',
         'first_media_url',
         'is_video',
+        'reference_host',
     ];
 
     // ── Relationships ───────────────────────────────────────
@@ -158,6 +162,28 @@ class DailyBasketPost extends Model
         }
 
         return (bool) $this->media->first()?->is_video;
+    }
+
+    /**
+     * Host extracted from reference_url (without "www.") — used by the Post
+     * Detail reference chip to render a favicon + readable source label
+     * (e.g. "rocket.chat", "pinterest.com", "instagram.com").
+     *
+     * Returns null when the URL is empty or unparseable so the UI can fall
+     * back to a generic link icon without special-casing empty strings.
+     */
+    public function getReferenceHostAttribute(): ?string
+    {
+        if (empty($this->reference_url)) {
+            return null;
+        }
+
+        $host = parse_url($this->reference_url, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        return preg_replace('/^www\./i', '', $host);
     }
 
     // ── Scopes ──────────────────────────────────────────────

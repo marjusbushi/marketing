@@ -60,7 +60,8 @@
         0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
         50%      { box-shadow: 0 0 0 6px rgba(245,158,11,0.4); }
     }
-    .db-card.deeplink-flash { outline: 3px solid #f59e0b; outline-offset: 2px; animation: db-flash-pulse 0.8s ease-in-out 2; }
+    .db-card.deeplink-flash,
+    .db-post.deeplink-flash { outline: 3px solid #f59e0b; outline-offset: 2px; animation: db-flash-pulse 0.8s ease-in-out 2; }
     .db-card-type { font-size: 10px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin-bottom: 6px; }
     .db-card-title { font-size: 13px; font-weight: 500; line-height: 1.35; margin-bottom: 10px; }
     .db-card-products { display: flex; gap: 3px; margin-bottom: 10px; }
@@ -83,9 +84,22 @@
     .db-sheet-head { padding: 20px 24px; border-bottom: 1px solid var(--db-border); }
     .db-sheet-crumb { font-size: 11px; color: var(--db-text-3); margin-bottom: 4px; }
     .db-sheet-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+    .db-sheet-close {
+        font-size: 11px; color: var(--db-text-2);
+        background: var(--db-accent-soft); border: none;
+        padding: 5px 11px; border-radius: 5px; cursor: pointer;
+        flex-shrink: 0;
+    }
+    .db-sheet-close:hover { background: var(--db-border); color: var(--db-text); }
 
     .db-track { display: flex; padding: 16px 24px; background: #fafafa; border-bottom: 1px solid var(--db-border); gap: 4px; }
-    .db-track-step { flex: 1; padding: 4px 0; }
+    .db-track-step {
+        flex: 1; padding: 4px 0;
+        transition: opacity 0.12s;
+    }
+    .db-track-step.todo:hover,
+    .db-track-step.done:hover { opacity: 0.75; }
+    .db-track-step:focus-visible { outline: 2px solid var(--db-text); outline-offset: 2px; border-radius: 3px; }
     .db-track-line { height: 2px; background: var(--db-border); border-radius: 1px; margin-bottom: 6px; }
     .db-track-step.done .db-track-line { background: #22c55e; }
     .db-track-step.current .db-track-line { background: var(--db-text); }
@@ -231,36 +245,6 @@
         border-color: #60a5fa;
     }
 
-    /* Quick-post butoni ne karten e panoramen */
-    .db-pano-quick-post {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: var(--db-text);
-        color: #fff;
-        border: none;
-        border-radius: 14px;
-        padding: 4px 10px;
-        font-size: 10px;
-        font-weight: 600;
-        cursor: pointer;
-        opacity: 0;
-        transform: translateY(-2px);
-        transition: opacity 0.15s, transform 0.15s;
-        white-space: nowrap;
-    }
-    .db-pano-card { position: relative; }
-    .db-pano-card:hover .db-pano-quick-post,
-    .db-pano-card:focus-within .db-pano-quick-post {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    .db-pano-quick-post:hover { background: #27272a; }
-    /* On touch devices we can't hover — show button always */
-    @media (hover: none) {
-        .db-pano-quick-post { opacity: 1; transform: translateY(0); }
-    }
-
     /* Collection picker (dropdown in the collection row) */
     .db-coll-picker { position: relative; }
     .db-coll-trigger {
@@ -378,78 +362,284 @@
     .db-inline-input:focus { outline: none; border-color: var(--db-text); }
     .db-inline-hint { font-size: 10px; color: var(--db-text-3); margin-top: 4px; }
 
-    /* ─── Panorama sidebar (orientim per produktet e dites) ────── */
-    .db-pano-btn {
-        background: #eef2ff; color: #4338ca;
-        border: 1px solid #c7d2fe; border-radius: 6px;
-        padding: 7px 12px; font-size: 12px; font-weight: 500;
-        cursor: pointer; margin-right: 8px;
+    /* ─── Shporta v2: Summary strip + Main (canvas + rail) ─────── */
+    .db-summary {
+        display: flex; align-items: center; gap: 14px;
+        padding: 10px 14px; margin-top: 6px;
+        background: #fff; border: 1px solid var(--db-border);
+        border-radius: 8px;
     }
-    .db-pano-btn:hover:not(:disabled) { background: #e0e7ff; }
-    .db-pano-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .db-pano {
-        display: none;
-        position: fixed; top: 0; right: 0; bottom: 0;
-        width: 420px; z-index: 9985;
-        background: #fff; border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 24px rgba(0,0,0,0.08);
-        font-family: Inter, system-ui, sans-serif;
-        flex-direction: column; overflow: hidden;
+    .db-summary-title {
+        font-size: 10px; font-weight: 700; color: var(--db-text-3);
+        text-transform: uppercase; letter-spacing: 0.06em;
+        padding-right: 12px; border-right: 1px solid var(--db-border);
     }
-    .db-pano.open { display: flex; }
+    .db-summary-counts, .db-summary-stats { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .db-summary-stats { margin-left: auto; }
+    .db-summary-sep { width: 1px; height: 22px; background: var(--db-border); }
+    .db-summary-item { display: flex; align-items: baseline; gap: 4px; font-size: 12px; }
+    .db-summary-item .num { font-size: 14px; font-weight: 700; color: var(--db-text); }
+    .db-summary-item .lbl { font-size: 11px; color: var(--db-text-3); }
+    .db-summary-type { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--db-text-2); }
+    .db-summary-type .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .db-summary-type[data-type="reel"] .dot     { background: #db2777; }
+    .db-summary-type[data-type="photo"] .dot    { background: #2563eb; }
+    .db-summary-type[data-type="story"] .dot    { background: #7c3aed; }
+    .db-summary-type[data-type="carousel"] .dot { background: #0891b2; }
+    .db-summary-type[data-type="video"] .dot    { background: #64748b; }
+    .db-summary-cov {
+        font-size: 11px; font-weight: 600; color: var(--db-text-2);
+        background: var(--db-accent-soft); padding: 4px 8px; border-radius: 4px;
+    }
+    .db-summary-cov.warn { background: #fef3c7; color: #92400e; }
+    .db-summary-cov.ok   { background: #dcfce7; color: #166534; }
 
-    .db-pano-head { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .db-pano-head-title { font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.3; }
-    .db-pano-head-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-    .db-pano-close { width: 28px; height: 28px; border: none; background: none; cursor: pointer; border-radius: 6px; font-size: 16px; color: #94a3b8; flex-shrink: 0; }
-    .db-pano-close:hover { background: #f1f5f9; color: #0f172a; }
+    /* Two-column layout: canvas (posts) + persistent product rail */
+    .db-main {
+        display: grid; grid-template-columns: 1fr 280px; gap: 14px;
+        margin-top: 10px;
+    }
+    .db-canvas { min-width: 0; }
+    .db-rail {
+        background: #fff; border: 1px solid var(--db-border); border-radius: 8px;
+        display: flex; flex-direction: column; max-height: calc(100vh - 220px);
+        position: sticky; top: 12px; align-self: flex-start;
+    }
+    .db-rail-hdr { padding: 12px 14px; border-bottom: 1px solid var(--db-border); flex-shrink: 0; }
+    .db-rail-hdr-top {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px;
+    }
+    .db-rail-hdr-title { font-size: 13px; font-weight: 700; color: var(--db-text); }
+    .db-rail-hdr-sub { font-size: 11px; color: var(--db-text-3); margin-top: 3px; }
+    .db-rail-filter {
+        font-size: 10px; padding: 3px 6px; border-radius: 4px;
+        border: 1px solid var(--db-border); background: var(--db-accent-soft);
+        color: var(--db-text-2); cursor: pointer; max-width: 120px;
+    }
+    .db-rail-filter:focus { outline: none; border-color: var(--db-text); }
 
-    .db-pano-body { flex: 1; overflow-y: auto; }
+    /* Rail product card */
+    .db-p-card {
+        display: flex; align-items: center; gap: 8px;
+        padding: 7px 12px; margin: 2px 6px; border-radius: 7px;
+        cursor: pointer; position: relative;
+        transition: background 0.1s;
+    }
+    .db-p-card:hover { background: #f5f5f4; }
+    .db-p-card.selected { background: rgba(99, 102, 241, 0.10); }
+    .db-p-card.selected::before {
+        content: ''; position: absolute; left: 3px; top: 6px; bottom: 6px;
+        width: 3px; background: #6366f1; border-radius: 2px;
+    }
+    .db-p-card.dragging { opacity: 0.55; }
+    .db-p-thumb {
+        width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 600; font-size: 13px; overflow: hidden;
+        background: var(--db-accent-soft);
+    }
+    .db-p-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .db-p-body { flex: 1; min-width: 0; }
+    .db-p-name {
+        font-size: 12px; font-weight: 600; color: var(--db-text);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .db-p-meta {
+        font-size: 10px; color: var(--db-text-3);
+        display: flex; gap: 6px; margin-top: 1px;
+    }
+    .db-cov-badge {
+        width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+        font-size: 10px; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .db-cov-0 { background: #fee2e2; color: #991b1b; }
+    .db-cov-1 { background: #fef3c7; color: #92400e; }
+    .db-cov-2 { background: #dcfce7; color: #166534; }
 
-    .db-pano-strip { display: flex; padding: 10px 16px; gap: 4px; border-bottom: 1px solid #f1f5f9; }
-    .db-pano-day { flex: 1; text-align: center; padding: 6px 4px; border-radius: 5px; font-size: 9px; color: #94a3b8; cursor: pointer; }
-    .db-pano-day:hover:not(.active) { background: #f8fafc; color: #475569; }
-    .db-pano-day.active { background: #18181b; color: #fff; font-weight: 600; }
-    .db-pano-day .num { font-size: 11px; font-weight: 700; margin-top: 2px; }
-    .db-pano-day .cnt { font-size: 9px; margin-top: 2px; opacity: 0.85; }
+    /* Drop-target state on a post during rail drag */
+    .db-post.dragover {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+    }
+    .db-rail-cov-bar {
+        padding: 8px 14px; font-size: 11px; color: var(--db-text-2);
+        background: var(--db-accent-soft); border-bottom: 1px solid var(--db-border);
+        flex-shrink: 0;
+    }
+    .db-rail-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .db-rail-empty { padding: 24px 16px; text-align: center; font-size: 11px; color: var(--db-text-3); line-height: 1.5; }
 
-    .db-pano-stats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 14px 16px; border-bottom: 1px solid #f1f5f9; gap: 4px; }
-    .db-pano-stat { text-align: center; }
-    .db-pano-stat-val { font-size: 15px; font-weight: 700; color: #0f172a; }
-    .db-pano-stat-lbl { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+    @media (max-width: 1024px) {
+        .db-main { grid-template-columns: 1fr; }
+        .db-rail { position: static; max-height: 360px; }
+    }
 
-    .db-pano-filters { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 8px; }
-    .db-pano-filters-title { font-size: 13px; font-weight: 600; color: #0f172a; }
-    .db-pano-filters-btns { display: flex; gap: 3px; flex-wrap: wrap; }
-    .db-pano-filter-btn { padding: 3px 8px; font-size: 10px; border-radius: 4px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; }
-    .db-pano-filter-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
-    .db-pano-filter-btn:hover:not(.active) { background: #f8fafc; }
+    /* ─── Post card v2 (#1323) — flat grid inside .db-canvas ──── */
+    .db-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 14px;
+        padding: 14px;
+        background: #fff;
+        border: 1px solid var(--db-border);
+        border-radius: 8px;
+        min-height: 300px;
+    }
+    .db-grid-empty {
+        grid-column: 1 / -1;
+        padding: 40px 20px;
+        text-align: center;
+        color: var(--db-text-3);
+        font-size: 12px;
+    }
 
-    .db-pano-card { display: flex; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #f8fafc; }
-    .db-pano-card:hover { background: #fafbfc; }
-    .db-pano-img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #f1f5f9; }
-    .db-pano-img-ph { width: 56px; height: 56px; border-radius: 8px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; color: #cbd5e1; }
-    .db-pano-card-info { flex: 1; min-width: 0; }
-    .db-pano-card-name { font-size: 12px; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .db-pano-card-meta { font-size: 10px; color: #94a3b8; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .db-pano-card-badges { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
-    .db-pano-badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
-    .db-pano-b-best_seller { background: #fef3c7; color: #92400e; }
-    .db-pano-b-karrem { background: #d1fae5; color: #065f46; }
-    .db-pano-b-fashion { background: #fce7f3; color: #9d174d; }
-    .db-pano-b-plotesues { background: #e0e7ff; color: #3730a3; }
-    .db-pano-b-rem { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
-    .db-pano-b-used { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
-    .db-pano-b-unused { background: #f8fafc; color: #94a3b8; border: 1px dashed #cbd5e1; }
-    .db-pano-card-right { text-align: right; flex-shrink: 0; min-width: 70px; }
-    .db-pano-card-price { font-size: 13px; font-weight: 700; color: #0f172a; line-height: 1.2; }
-    .db-pano-card-stock { font-size: 10px; color: #64748b; margin-top: 2px; }
-    .db-pano-card-value { font-size: 10px; color: #16a34a; font-weight: 600; margin-top: 1px; }
+    .db-post {
+        background: #fff; border: 1px solid var(--db-border);
+        border-radius: 10px; overflow: hidden;
+        display: flex; flex-direction: column;
+        cursor: pointer;
+        transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+        min-width: 0;
+    }
+    .db-post:hover { border-color: var(--db-border-strong); }
+    .db-post.highlighted {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.18);
+    }
+    .db-post.selected {
+        border-color: var(--db-text);
+        box-shadow: 0 0 0 2px var(--db-accent-soft);
+    }
 
-    .db-pano-empty { padding: 30px 20px; text-align: center; color: #94a3b8; font-size: 12px; line-height: 1.6; }
-    .db-pano-empty strong { color: #475569; display: block; margin-bottom: 6px; }
-    .db-pano-fallback-hint { padding: 12px 16px; background: #fffbeb; border-top: 1px dashed #fde68a; font-size: 11px; color: #92400e; line-height: 1.5; text-align: center; }
+    .db-post-top {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 10px; border-bottom: 1px solid var(--db-border);
+    }
+    .db-post-type {
+        display: inline-flex; align-items: center;
+        padding: 3px 8px; border-radius: 999px;
+        font-size: 9px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        color: #fff; flex-shrink: 0;
+    }
+    .db-post-type[data-type="reel"]     { background: #db2777; }
+    .db-post-type[data-type="photo"]    { background: #2563eb; }
+    .db-post-type[data-type="story"]    { background: #7c3aed; }
+    .db-post-type[data-type="carousel"] { background: #0891b2; }
+    .db-post-type[data-type="video"]    { background: #64748b; }
+
+    .db-post-num {
+        font-size: 10px; color: var(--db-text-3); font-weight: 500;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        min-width: 0; flex: 1;
+    }
+    .db-post-stage {
+        font-size: 10px; color: var(--db-text-3);
+        display: inline-flex; align-items: center; gap: 4px;
+        flex-shrink: 0;
+    }
+    .db-stage-dot { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; }
+    .db-stage-dot[data-stage="planning"]   { background: #9ca3af; }
+    .db-stage-dot[data-stage="production"] { background: #f59e0b; }
+    .db-stage-dot[data-stage="editing"]    { background: #2563eb; }
+    .db-stage-dot[data-stage="scheduling"] { background: #7c3aed; }
+    .db-stage-dot[data-stage="published"]  { background: #22c55e; }
+
+    /* Material thumbnail */
+    .db-mat {
+        aspect-ratio: 1 / 1;
+        background: var(--db-accent-soft);
+        position: relative;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+        border-bottom: 1px solid var(--db-border);
+    }
+    .db-mat img, .db-mat video {
+        width: 100%; height: 100%;
+        object-fit: cover; display: block;
+    }
+    .db-mat-empty {
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
+        color: var(--db-text-3); font-size: 11px; padding: 16px; text-align: center;
+    }
+    .db-mat-empty .icon { font-size: 22px; }
+    .db-mat-url-overlay {
+        position: absolute; bottom: 6px; left: 6px; right: 6px;
+        background: rgba(0,0,0,0.72); color: #fff;
+        padding: 3px 7px; border-radius: 4px;
+        font-size: 10px; display: flex; align-items: center; gap: 4px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .db-post-body {
+        padding: 9px 11px;
+        display: flex; flex-direction: column; gap: 7px;
+    }
+    .db-post-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .db-post-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 7px 2px 2px; border-radius: 10px;
+        background: var(--db-accent-soft); font-size: 10px;
+        color: var(--db-text-2); font-weight: 500;
+        max-width: 100%;
+    }
+    .db-post-chip-thumb {
+        width: 16px; height: 16px; border-radius: 50%;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 700; font-size: 8px;
+        flex-shrink: 0; object-fit: cover;
+    }
+    .db-post-chip-name {
+        max-width: 80px; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .db-post-ref-compact {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 7px; background: var(--db-accent-soft);
+        border-radius: 5px; font-size: 10px; color: var(--db-text-2);
+        text-decoration: none; align-self: flex-start;
+        max-width: 100%;
+    }
+    .db-post-ref-compact .fav {
+        width: 12px; height: 12px; border-radius: 2px;
+        display: inline-flex; align-items: center; justify-content: center;
+        color: #fff; font-weight: 700; font-size: 7px; flex-shrink: 0;
+    }
+    .db-post-ref-compact .host {
+        max-width: 130px; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .db-post-ref-compact:hover { background: var(--db-border); color: var(--db-text); }
+
+    /* Empty / "+ Post i ri" card */
+    .db-post-empty {
+        border-style: dashed; border-color: var(--db-border-strong);
+        background: #fafafa;
+        min-height: 280px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 10px; cursor: pointer;
+        padding: 14px;
+    }
+    .db-post-empty:hover { border-color: var(--db-text); background: var(--db-accent-soft); }
+    .db-post-empty .plus {
+        width: 40px; height: 40px; border-radius: 50%;
+        background: var(--db-accent-soft); color: var(--db-text-2);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 22px; font-weight: 300;
+    }
+    .db-post-empty .lbl { font-size: 12px; color: var(--db-text-2); font-weight: 500; }
+    .db-post-empty .sub { font-size: 10px; color: var(--db-text-3); }
+    .db-post-empty .type-row { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+    .db-post-empty .type-pick {
+        padding: 3px 8px; border-radius: 999px;
+        font-size: 9px; font-weight: 600; text-transform: uppercase;
+        border: 1px solid var(--db-border-strong); background: #fff;
+        color: var(--db-text-3); cursor: pointer;
+    }
+    .db-post-empty .type-pick:hover { background: var(--db-accent-soft); color: var(--db-text-2); border-color: var(--db-text); }
 
     /* ─── Inline 3-column edit panel ─────────────────────────────── */
     .db-sheet-body-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
@@ -490,48 +680,10 @@
         100% { background: #fff; }
     }
 
-    /* ─── Kanban / Plan mode switch ──────────────────────────── */
-    .db-mode-switch { display: inline-flex; gap: 2px; background: var(--db-accent-soft); padding: 3px; border-radius: 7px; }
-    .db-mode-btn {
-        padding: 6px 12px; font-size: 12px; border-radius: 5px;
-        border: none; background: transparent; cursor: pointer;
-        color: var(--db-text-2); font-weight: 500;
-    }
-    .db-mode-btn.active { background: #fff; color: var(--db-text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-    .db-mode-btn:hover:not(.active) { color: var(--db-text); }
-
-    /* ─── Plan grid (3×3) ─────────────────────────────────────── */
-    .db-plan-wrap { margin-top: 4px; }
-    .db-plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-    .db-plan-cell {
-        background: var(--db-surface);
-        border: 1px solid var(--db-border);
-        border-radius: 10px;
-        padding: 12px;
-        min-height: 260px;
-        display: flex; flex-direction: column; gap: 10px;
-        min-width: 0;
-        transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .db-plan-cell.selected { border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.06); }
-    .db-plan-cell.empty {
-        border-style: dashed; cursor: pointer;
-        justify-content: center; align-items: center;
-        color: var(--db-text-3);
-    }
-    .db-plan-cell.empty:hover { border-color: var(--db-text); background: var(--db-accent-soft); color: var(--db-text-2); }
-    .db-plan-cell-num {
-        font-size: 10px; font-weight: 600; color: var(--db-text-3);
-        text-transform: uppercase; letter-spacing: 0.08em;
-        display: flex; justify-content: space-between; align-items: center;
-    }
-    .db-plan-stage-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--db-text-3); }
-    .db-plan-stage-dot[data-stage="production"] { background: #f59e0b; }
-    .db-plan-stage-dot[data-stage="editing"]    { background: #8b5cf6; }
-    .db-plan-stage-dot[data-stage="scheduling"] { background: #3b82f6; }
-    .db-plan-stage-dot[data-stage="published"]  { background: #22c55e; }
-    .db-plan-empty-icon { font-size: 28px; line-height: 1; }
-    .db-plan-empty-txt { font-size: 11px; margin-top: 4px; }
+    /* Post card v2 (#1323) inherits stage-dot + post-type colours; the
+       helper classes below are kept for the inline detail panel reusing
+       them via `.db-plan-field*`, `.db-plan-chips`, `.db-plan-media`,
+       `.db-plan-pop*`, `.db-plan-ref`. */
 
     .db-plan-field { display: flex; flex-direction: column; gap: 4px; }
     .db-plan-field-lbl {
@@ -647,32 +799,6 @@
     .db-plan-ref img { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
     .db-plan-ref span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .db-plan-empty-note { padding: 24px; text-align: center; color: var(--db-text-3); font-size: 12px; }
-
-    /* Delete button on a filled plan cell */
-    .db-plan-cell-del {
-        width: 18px; height: 18px; border: none; background: transparent;
-        color: var(--db-text-3); cursor: pointer; border-radius: 50%;
-        font-size: 14px; line-height: 1;
-        display: flex; align-items: center; justify-content: center;
-        margin-left: 4px;
-    }
-    .db-plan-cell-del:hover { background: #fee2e2; color: #dc2626; }
-
-    /* Edit-in-Studio button on each filled cell — opens the Studio inline
-       in an iframe modal so the user never leaves daily-basket (#1247). */
-    .db-plan-cell-edit {
-        border: 1px solid var(--db-border);
-        background: #fff;
-        color: var(--db-text-2);
-        cursor: pointer;
-        font-size: 11px;
-        padding: 1px 6px;
-        border-radius: 4px;
-        line-height: 1.4;
-    }
-    .db-plan-cell-edit:hover { border-color: var(--db-text); background: var(--db-accent-soft); color: var(--db-text); }
-
     /* Full-featured editor modal — larger than the create-post modal because
        it hosts the Studio SPA in an iframe. 80vw × 85vh per spec §1247. */
     .db-studio-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9995; display: none; align-items: center; justify-content: center; }
@@ -713,17 +839,6 @@
     .db-caption-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .db-caption-ai-status { font-size: 11px; color: var(--db-text-2); }
     .db-caption-ai-status.err { color: #dc2626; }
-
-    /* "+ Shto post" button under the plan grid */
-    .db-plan-add-row { margin-top: 14px; display: flex; justify-content: center; }
-    .db-plan-add-btn {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 8px 16px; font-size: 12px; font-weight: 500;
-        background: var(--db-surface); color: var(--db-text-2);
-        border: 1px dashed var(--db-border-strong); border-radius: 20px;
-        cursor: pointer;
-    }
-    .db-plan-add-btn:hover { border-color: var(--db-text); color: var(--db-text); background: var(--db-accent-soft); }
 
     /* Smart URL preview (favicon + short domain, clickable) */
     .db-url-preview { margin-top: 6px; font-size: 11px; color: var(--db-text-3); min-height: 18px; }
@@ -812,26 +927,7 @@
             <div class="db-meta" id="dbCurrentDate">—</div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-            <div class="db-mode-switch" id="dbModeSwitch">
-                <button class="db-mode-btn active" data-mode="kanban">Kanban</button>
-                <button class="db-mode-btn" data-mode="plan">📋 Plan</button>
-            </div>
-            <button class="db-pano-btn" id="dbBtnPano" disabled>📦 Panorama</button>
             <button class="db-btn db-btn-primary" id="dbBtnNewPost" disabled>+ Post i ri</button>
-        </div>
-    </div>
-
-    <!-- Panorama sidebar — orientim per produktet e dites -->
-    <div class="db-pano" id="dbPano">
-        <div class="db-pano-head">
-            <div style="flex:1; min-width:0;">
-                <div class="db-pano-head-title" id="dbPanoTitle">Panorama</div>
-                <div class="db-pano-head-sub" id="dbPanoSub">—</div>
-            </div>
-            <button class="db-pano-close" id="dbPanoClose" aria-label="Mbyll">×</button>
-        </div>
-        <div class="db-pano-body" id="dbPanoBody">
-            <div class="db-pano-empty">Po ngarkohet…</div>
         </div>
     </div>
 
@@ -929,25 +1025,42 @@
 
     <div id="dbErrors"></div>
 
-    <div class="db-board" id="dbBoard">
-        @foreach (['planning' => 'Planifikim', 'production' => 'Prodhim', 'editing' => 'Editim', 'scheduling' => 'Skedulim', 'published' => 'Publikuar'] as $key => $label)
-            <div class="db-col" data-stage="{{ $key }}">
-                <div class="db-col-head">
-                    <div class="db-col-title"><span class="db-col-dot"></span>{{ $label }}</div>
-                    <div class="db-col-count" data-count="{{ $key }}">0</div>
-                </div>
-                <div class="db-col-body" data-column="{{ $key }}">
-                    <div class="db-empty">—</div>
-                </div>
-            </div>
-        @endforeach
+    {{-- Shporta Ditore v2: summary strip (counts + stock + vlere) --}}
+    <div class="db-summary" id="dbSummary" hidden>
+        <div class="db-summary-title">Posts sot</div>
+        <div class="db-summary-counts" id="dbSummaryCounts"></div>
+        <div class="db-summary-sep"></div>
+        <div class="db-summary-stats" id="dbSummaryStats"></div>
     </div>
 
-    <div class="db-plan-wrap" id="dbPlanWrap" hidden>
-        <div class="db-plan-grid" id="dbPlanGrid"></div>
-        <div class="db-plan-add-row">
-            <button type="button" class="db-plan-add-btn" id="dbPlanAddBtn">+ Shto post</button>
+    {{-- Two-column canvas + rail. Canvas: flat post-card grid (#1323).
+         Rail: persistent product panel fed by /coverage (#1324). --}}
+    <div class="db-main">
+        <div class="db-canvas">
+            <div class="db-grid" id="dbGrid">
+                <div class="db-grid-empty">Zgjidh një ditë për të parë postet.</div>
+            </div>
         </div>
+        <aside class="db-rail" id="dbRail">
+            <div class="db-rail-hdr">
+                <div class="db-rail-hdr-top">
+                    <div class="db-rail-hdr-title">📦 Shporta e ditës</div>
+                    <select class="db-rail-filter" id="dbRailFilter" aria-label="Filtro produktet">
+                        <option value="all">Të gjitha</option>
+                        <option value="uncovered">Të pambuluara</option>
+                        <option value="karrem">Karrem</option>
+                        <option value="fashion">Fashion</option>
+                        <option value="plotesues">Plotesues</option>
+                        <option value="best_seller">Best Seller</option>
+                    </select>
+                </div>
+                <div class="db-rail-hdr-sub" id="dbRailSub">—</div>
+            </div>
+            <div class="db-rail-cov-bar" id="dbRailCovBar">—</div>
+            <div class="db-rail-list" id="dbRailList">
+                <div class="db-rail-empty">Zgjidh një ditë për të parë produktet.</div>
+            </div>
+        </aside>
     </div>
 
     <div class="db-sheet-label">Posti i zgjedhur</div>
@@ -1001,7 +1114,7 @@
         selectedPostId: null,
         kanban: null,
         availableProducts: [],
-        viewMode: (typeof localStorage !== 'undefined' && localStorage.getItem('dbViewMode')) || 'kanban',
+        coverage: null, // populated by /coverage endpoint after selectDay
         // Create-post modal state (edits happen inline in the panel).
         modal: {
             title: '',
@@ -1340,16 +1453,33 @@
             renderBoard(data);
             renderSheet(null);
 
-            // Enable "+ Post i ri" + Panorama now that we have a basket
+            // Enable "+ Post i ri" now that we have a basket.
             document.getElementById('dbBtnNewPost').disabled = false;
-            document.getElementById('dbBtnPano').disabled = false;
-            renderPanorama();
+
+            // Coverage rollup for summary strip + rail (#1321 endpoint).
+            // Fire-and-forget: board renders immediately, summary/rail
+            // populate when the request completes.
+            loadCoverage(num(data.basket?.id)).catch((e) => {
+                console.warn('Coverage load failed:', e);
+            });
+
+            // Re-open the previously selected post if the user left this
+            // basket with one open. Deep-linked post param overrides (below).
+            const remembered = readPersistedSelectedPostId(num(data.basket?.id));
+            if (remembered && findPostById(remembered)) {
+                selectPost(remembered);
+            }
 
             // Deep-link from grid: scroll to + flash the requested post, then
             // consume the URL params so subsequent navigation stays clean.
             const deepPostId = getInitialPostIdFromUrl();
             if (deepPostId) {
-                const card = document.querySelector(`.db-card[data-post-id="${deepPostId}"]`);
+                // #1323 swapped .db-card (kanban columns) for .db-post
+                // (flat grid). Keep .db-card as a fallback so a lingering
+                // deploy with both classes still scrolls+flashes.
+                const card = document.querySelector(
+                    `.db-post[data-post-id="${deepPostId}"], .db-card[data-post-id="${deepPostId}"]`
+                );
                 if (card) {
                     selectPost(deepPostId);
                     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1363,326 +1493,325 @@
         }
     }
 
-    // ── Panorama: orientim per produktet e dites ──────────────
-    const panoState = { filter: 'all' };
-
-    function openPanorama() {
-        if (!state.kanban) return;
-        document.getElementById('dbPano').classList.add('open');
-        renderPanorama();
-    }
-    function closePanorama() {
-        document.getElementById('dbPano').classList.remove('open');
-    }
-
-    function renderPanorama() {
-        if (!document.getElementById('dbPano').classList.contains('open')) return;
-
-        const dt = state.selectedDate ? new Date(state.selectedDate) : null;
-        const collName = state.week?.name || '—';
-        document.getElementById('dbPanoTitle').textContent = dt
-            ? DAY_NAMES[dt.getDay()] + ' · ' + String(dt.getDate()).padStart(2, '0') + ' ' + MONTH_NAMES[dt.getMonth()] + ' ' + dt.getFullYear()
-            : 'Panorama';
-        document.getElementById('dbPanoSub').textContent = collName +
-            (state.week ? ' · ' + state.week.week_start + ' → ' + state.week.week_end : '');
-
-        const all = state.availableProducts || [];
-        const noAssignmentsAtAll = all.length > 0 && all.every(p => !(p.assigned_dates && p.assigned_dates.length));
-
-        let products;
-        let isFallback = false;
-        if (noAssignmentsAtAll) {
-            products = all;
-            isFallback = true;
-        } else {
-            products = all.filter(p => (p.assigned_dates || []).some(a => a.date === state.selectedDate));
+    // ── Coverage rollup (#1321 API): drives the summary strip above the
+    //    canvas and the product rail on the right. Refetched whenever the
+    //    user attaches/detaches a product or creates/deletes a post.
+    //
+    // Race guard: if the user switches days while a previous coverage
+    // fetch is in flight, the stale response could land last and clobber
+    // the current day's rail. We capture the basketId at call time and
+    // bail on mismatch after the promise resolves.
+    async function loadCoverage(basketId) {
+        if (!basketId) return;
+        const pendingBasketId = num(basketId);
+        try {
+            const data = await apiGet('/marketing/daily-basket/api/baskets/' + pendingBasketId + '/coverage');
+            if (num(state.kanban?.basket?.id) !== pendingBasketId) return; // stale
+            state.coverage = data;
+            renderSummary(data);
+            renderRail(data);
+        } catch (e) {
+            if (num(state.kanban?.basket?.id) !== pendingBasketId) return; // stale
+            // Non-fatal — keep the board usable even if coverage fails.
+            console.warn('Coverage fetch failed:', e);
+            renderSummary(null);
+            renderRail(null);
         }
+    }
 
-        // Compute per-product flags for the selected day.
-        const postProductIds = new Map();
-        if (state.kanban) {
-            state.kanban.columns.forEach(col => {
-                col.posts.forEach(post => {
-                    (post.products || []).forEach(p => {
-                        postProductIds.set(p.item_group_id, (postProductIds.get(p.item_group_id) || 0) + 1);
-                    });
-                });
-            });
+    function renderSummary(coverage) {
+        const el = document.getElementById('dbSummary');
+        if (!coverage || !coverage.summary) {
+            el.hidden = true;
+            return;
         }
-        products = products.map(p => {
-            const todayAssignment = (p.assigned_dates || []).find(a => a.date === state.selectedDate);
-            return Object.assign({}, p, {
-                _is_remarketing: todayAssignment ? !todayAssignment.is_primary : false,
-                _post_count: postProductIds.get(p.id) || 0,
-            });
+        el.hidden = false;
+
+        const s = coverage.summary;
+        const countsWrap = document.getElementById('dbSummaryCounts');
+        const statsWrap = document.getElementById('dbSummaryStats');
+        countsWrap.textContent = '';
+        statsWrap.textContent = '';
+
+        // Total posts + per-type dots
+        const total = document.createElement('div');
+        total.className = 'db-summary-item';
+        const totalNum = document.createElement('span');
+        totalNum.className = 'num';
+        totalNum.textContent = String(s.posts_total || 0);
+        const totalLbl = document.createElement('span');
+        totalLbl.className = 'lbl';
+        totalLbl.textContent = 'poste';
+        total.append(totalNum, totalLbl);
+        countsWrap.appendChild(total);
+
+        const typeOrder = [['reel', 'Reels'], ['photo', 'Photo'], ['story', 'Story'], ['carousel', 'Carousel']];
+        typeOrder.forEach(([key, label]) => {
+            const c = (s.posts_by_type && s.posts_by_type[key]) || 0;
+            if (c === 0) return;
+            const pill = document.createElement('span');
+            pill.className = 'db-summary-type';
+            pill.dataset.type = key;
+            const dot = document.createElement('span');
+            dot.className = 'dot';
+            pill.appendChild(dot);
+            pill.appendChild(document.createTextNode(c + ' ' + label));
+            countsWrap.appendChild(pill);
         });
 
-        const filtered = panoState.filter === 'all'
-            ? products
-            : products.filter(p => (p.classification || 'plotesues') === panoState.filter);
+        // Coverage chip
+        const cov = document.createElement('span');
+        const uncovered = s.products_uncovered || 0;
+        cov.className = 'db-summary-cov' + (uncovered === 0 ? ' ok' : (s.products_covered > 0 ? ' warn' : ''));
+        cov.textContent = (s.products_covered || 0) + '/' + (s.products_total || 0) + ' produkte me post';
+        countsWrap.appendChild(cov);
 
-        const body = document.getElementById('dbPanoBody');
-        body.textContent = '';
+        // Right-side stats: stock + value
+        const mkStat = (num, lbl) => {
+            const d = document.createElement('div');
+            d.className = 'db-summary-item';
+            const n = document.createElement('span');
+            n.className = 'num';
+            n.textContent = num;
+            const l = document.createElement('span');
+            l.className = 'lbl';
+            l.textContent = lbl;
+            d.append(n, l);
+            return d;
+        };
+        statsWrap.appendChild(mkStat((s.stok_total || 0).toLocaleString('sq-AL'), 'stok'));
+        statsWrap.appendChild(mkStat(Math.round(s.vlere_total || 0).toLocaleString('sq-AL') + ' L', 'vlerë'));
+    }
 
-        body.appendChild(buildPanoStrip());
-        body.appendChild(buildPanoStats(filtered));
-        body.appendChild(buildPanoFilters(products));
+    // Rail UI state — filter + highlighted product for cross-grid selection.
+    const railState = {
+        filter: 'all',              // all | uncovered | karrem | fashion | plotesues | best_seller
+        highlightedProductId: null, // click-to-highlight: mirrors .selected on the p-card
+    };
+
+    function renderRail(coverage) {
+        const subEl = document.getElementById('dbRailSub');
+        const covBar = document.getElementById('dbRailCovBar');
+        const list = document.getElementById('dbRailList');
+
+        if (!coverage || !coverage.products) {
+            subEl.textContent = '—';
+            covBar.textContent = '—';
+            list.textContent = '';
+            const empty = document.createElement('div');
+            empty.className = 'db-rail-empty';
+            empty.textContent = 'Zgjidh një ditë për të parë produktet.';
+            list.appendChild(empty);
+            return;
+        }
+
+        const dt = coverage.basket_date ? new Date(coverage.basket_date) : null;
+        subEl.textContent = dt
+            ? DAY_NAMES[dt.getDay()] + ' · ' + String(dt.getDate()).padStart(2, '0') + ' ' + MONTH_NAMES[dt.getMonth()]
+            : '—';
+
+        const s = coverage.summary || {};
+        covBar.textContent = (s.products_covered || 0) + '/' + (s.products_total || 0) + ' mbuluar · '
+            + (s.products_uncovered || 0) + ' pa post';
+
+        list.textContent = '';
+
+        // Apply filter BEFORE rendering. "uncovered" uses the posts_count
+        // field; classification filters use the first tag.
+        const filtered = (coverage.products || []).filter(p => {
+            if (railState.filter === 'all') return true;
+            if (railState.filter === 'uncovered') return (p.posts_count || 0) === 0;
+            return (p.tags || []).includes(railState.filter);
+        });
 
         if (filtered.length === 0) {
             const empty = document.createElement('div');
-            empty.className = 'db-pano-empty';
-            const heading = document.createElement('strong');
-            heading.textContent = 'Asnje produkt per kete dite';
-            empty.appendChild(heading);
-            empty.appendChild(document.createTextNode('Hap nje dite tjeter ose krijo poste me cdo produkt te kolekcionit (modali i postit nuk kufizohet).'));
-            body.appendChild(empty);
-        } else {
-            filtered.forEach(p => body.appendChild(buildPanoCard(p)));
+            empty.className = 'db-rail-empty';
+            if (coverage.products.length === 0) {
+                const heading = document.createElement('strong');
+                heading.style.cssText = 'display:block; margin-bottom:6px; color:var(--db-text-2);';
+                heading.textContent = 'Asnjë produkt i caktuar';
+                empty.appendChild(heading);
+                empty.appendChild(document.createTextNode('Cakto produkte për këtë ditë në DIS Merch Calendar.'));
+            } else {
+                empty.textContent = 'Asnjë produkt nuk përputhet me filtrin.';
+            }
+            list.appendChild(empty);
+            return;
         }
 
-        if (isFallback) {
-            const hint = document.createElement('div');
-            hint.className = 'db-pano-fallback-hint';
-            hint.textContent = 'Caktimi behet ne DIS · Po shfaqim te gjithe kolekcionin (fallback per kolekcionet pa caktime).';
-            body.appendChild(hint);
-        }
+        filtered.forEach(p => list.appendChild(buildRailCard(p)));
     }
 
-    function buildPanoStrip() {
-        const wrap = document.createElement('div');
-        wrap.className = 'db-pano-strip';
-        (state.days || []).forEach(d => {
-            const dt = new Date(d.date);
-            const cell = document.createElement('div');
-            cell.className = 'db-pano-day' + (d.date === state.selectedDate ? ' active' : '');
-            const lbl = document.createElement('div');
-            lbl.textContent = DAY_NAMES[dt.getDay()].toUpperCase();
-            const num = document.createElement('div');
-            num.className = 'num';
-            num.textContent = String(dt.getDate()).padStart(2, '0');
-            const cnt = document.createElement('div');
-            cnt.className = 'cnt';
-            cnt.textContent = (d.posts_total || 0) + ' p';
-            cell.append(lbl, num, cnt);
-            cell.addEventListener('click', () => selectDay(d.date));
-            wrap.appendChild(cell);
-        });
-        return wrap;
-    }
-
-    function buildPanoStats(products) {
-        const wrap = document.createElement('div');
-        wrap.className = 'db-pano-stats';
-        const totalStock = products.reduce((s, p) => s + (Number(p.total_stock) || 0), 0);
-        const totalValue = products.reduce((s, p) => s + (Number(p.total_stock) || 0) * (Number(p.avg_price) || 0), 0);
-        const usedCount = products.filter(p => p._post_count > 0).length;
-
-        const stats = [
-            { val: products.length, lbl: 'Caktuar' },
-            { val: totalStock.toLocaleString('sq-AL'), lbl: 'Stok' },
-            { val: Math.round(totalValue).toLocaleString('sq-AL') + ' L', lbl: 'Vlere' },
-            { val: usedCount + '/' + products.length, lbl: 'Posts' },
-        ];
-        stats.forEach(s => {
-            const cell = document.createElement('div');
-            cell.className = 'db-pano-stat';
-            const v = document.createElement('div');
-            v.className = 'db-pano-stat-val';
-            v.textContent = String(s.val);
-            const l = document.createElement('div');
-            l.className = 'db-pano-stat-lbl';
-            l.textContent = s.lbl;
-            cell.append(v, l);
-            wrap.appendChild(cell);
-        });
-        return wrap;
-    }
-
-    function buildPanoFilters(products) {
-        const wrap = document.createElement('div');
-        wrap.className = 'db-pano-filters';
-        const title = document.createElement('span');
-        title.className = 'db-pano-filters-title';
-        title.textContent = 'Produkte (' + products.length + ')';
-        wrap.appendChild(title);
-
-        const counts = {};
-        products.forEach(p => {
-            const c = p.classification || 'plotesues';
-            counts[c] = (counts[c] || 0) + 1;
-        });
-
-        const btns = document.createElement('div');
-        btns.className = 'db-pano-filters-btns';
-        const tabs = [['all', 'Te gjitha'], ['best_seller', 'Best'], ['karrem', 'Karrem'], ['fashion', 'Fashion'], ['plotesues', 'Plotes']];
-        tabs.forEach(([key, label]) => {
-            if (key !== 'all' && !counts[key]) return;
-            const b = document.createElement('button');
-            b.className = 'db-pano-filter-btn' + (panoState.filter === key ? ' active' : '');
-            b.textContent = key === 'all' ? label : `${label} (${counts[key]})`;
-            b.addEventListener('click', () => { panoState.filter = key; renderPanorama(); });
-            btns.appendChild(b);
-        });
-        wrap.appendChild(btns);
-        return wrap;
-    }
-
-    function buildPanoCard(p) {
+    function buildRailCard(p) {
         const card = document.createElement('div');
-        card.className = 'db-pano-card';
-
-        // Quick-post button (visible on hover/touch) — ngec kartes context per
-        // te krijuar nje post me kete produkt pre-selected ne modal.
-        if (state.kanban) {
-            const quick = document.createElement('button');
-            quick.type = 'button';
-            quick.className = 'db-pano-quick-post';
-            quick.textContent = '+ Post';
-            quick.title = 'Krijo post me kete produkt';
-            quick.addEventListener('click', (e) => {
-                e.stopPropagation();
-                closePanorama();
-                openNewPostModal(num(p.id));
-            });
-            card.appendChild(quick);
+        card.className = 'db-p-card';
+        card.dataset.productId = p.item_group_id;
+        card.draggable = true;
+        card.tabIndex = 0; // keyboard reachable for ↑/↓ navigation
+        card.title = 'Tërhiq mbi një post për ta shtuar atje';
+        if (railState.highlightedProductId === p.item_group_id) {
+            card.classList.add('selected');
         }
 
-        if (p.image_url) {
+        // Thumb (image if available, otherwise colored initial)
+        const thumb = document.createElement('div');
+        thumb.className = 'db-p-thumb';
+        if (p.thumbnail_url) {
             const img = document.createElement('img');
-            img.className = 'db-pano-img';
-            img.src = p.image_url;
+            img.src = p.thumbnail_url;
             img.alt = '';
-            img.onerror = () => { img.replaceWith(makePanoPlaceholder()); };
-            card.appendChild(img);
+            img.loading = 'lazy';
+            img.onerror = () => {
+                img.remove();
+                thumb.style.background = 'hsl(' + hueFor(p.name || p.item_group_id) + ', 55%, 55%)';
+                thumb.textContent = (p.name || '?').charAt(0).toUpperCase();
+            };
+            thumb.appendChild(img);
         } else {
-            card.appendChild(makePanoPlaceholder());
+            thumb.style.background = 'hsl(' + hueFor(p.name || p.item_group_id) + ', 55%, 55%)';
+            thumb.textContent = (p.name || '?').charAt(0).toUpperCase();
         }
+        card.appendChild(thumb);
 
-        const info = document.createElement('div');
-        info.className = 'db-pano-card-info';
+        const body = document.createElement('div');
+        body.className = 'db-p-body';
         const name = document.createElement('div');
-        name.className = 'db-pano-card-name';
+        name.className = 'db-p-name';
         name.textContent = p.name || '—';
         const meta = document.createElement('div');
-        meta.className = 'db-pano-card-meta';
-        meta.textContent = p.code || '';
-        info.append(name, meta);
+        meta.className = 'db-p-meta';
+        const metaParts = [];
+        if (p.sku) metaParts.push(p.sku);
+        if (p.price) metaParts.push(Math.round(p.price).toLocaleString('sq-AL') + ' L');
+        metaParts.push((p.stock || 0) + ' pcs');
+        meta.textContent = metaParts.join(' · ');
+        body.append(name, meta);
+        card.appendChild(body);
 
-        const badges = document.createElement('div');
-        badges.className = 'db-pano-card-badges';
-        const cls = p.classification || 'plotesues';
-        const clsBadge = document.createElement('span');
-        clsBadge.className = 'db-pano-badge db-pano-b-' + cls;
-        clsBadge.textContent = cls.replace('_', ' ');
-        badges.appendChild(clsBadge);
+        const cov = document.createElement('span');
+        const c = p.posts_count || 0;
+        const badgeClass = c === 0 ? 'db-cov-0' : (c === 1 ? 'db-cov-1' : 'db-cov-2');
+        cov.className = 'db-cov-badge ' + badgeClass;
+        cov.textContent = String(c);
+        cov.title = c + ' post' + (c === 1 ? '' : 'e');
+        card.appendChild(cov);
 
-        if (p._is_remarketing) {
-            const b = document.createElement('span');
-            b.className = 'db-pano-badge db-pano-b-rem';
-            b.textContent = '🔁 Ri-marketim';
-            badges.appendChild(b);
-        }
-        if (p._post_count > 0) {
-            const b = document.createElement('span');
-            b.className = 'db-pano-badge db-pano-b-used';
-            b.textContent = '✓ Ne ' + p._post_count + ' post' + (p._post_count > 1 ? 'e' : '');
-            badges.appendChild(b);
-        } else {
-            const b = document.createElement('span');
-            b.className = 'db-pano-badge db-pano-b-unused';
-            b.textContent = 'Pa post ende';
-            badges.appendChild(b);
-        }
-        info.appendChild(badges);
-        card.appendChild(info);
+        // Click → toggle highlight of posts that contain this product.
+        card.addEventListener('click', () => toggleProductHighlight(num(p.item_group_id)));
 
-        const right = document.createElement('div');
-        right.className = 'db-pano-card-right';
-        const price = document.createElement('div');
-        price.className = 'db-pano-card-price';
-        price.textContent = p.avg_price != null ? Math.round(+p.avg_price).toLocaleString('sq-AL') + ' L' : '—';
-        const stock = document.createElement('div');
-        stock.className = 'db-pano-card-stock';
-        stock.textContent = (p.total_stock || 0) + ' pcs';
-        right.append(price, stock);
+        // Drag → attach product onto a post on drop (wired in `wirePostDropTargets`).
+        card.addEventListener('dragstart', (e) => {
+            card.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', 'product:' + p.item_group_id);
+        });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
 
-        // Stock value (price × stock) — e njejta metrike si "Vlere stoku"
-        // per te gjithe diten, por per cdo produkt ne karte.
-        if (p.avg_price != null && (p.total_stock || 0) > 0) {
-            const value = document.createElement('div');
-            value.className = 'db-pano-card-value';
-            const stockValue = Math.round((+p.avg_price) * p.total_stock);
-            value.textContent = stockValue.toLocaleString('sq-AL') + ' L';
-            right.appendChild(value);
-        }
-
-        card.appendChild(right);
         return card;
     }
 
-    function makePanoPlaceholder() {
-        const ph = document.createElement('div');
-        ph.className = 'db-pano-img-ph';
-        ph.textContent = '📦';
-        return ph;
+    // Click-to-highlight: marks the rail card as .selected and adds
+    // .highlighted to every post card whose data-product-ids CSV contains
+    // that id. Re-click (or click a different product) clears the prior
+    // highlight first.
+    function toggleProductHighlight(productId) {
+        const same = railState.highlightedProductId === productId;
+        railState.highlightedProductId = same ? null : productId;
+
+        document.querySelectorAll('.db-p-card').forEach(c => {
+            c.classList.toggle('selected', num(c.dataset.productId) === railState.highlightedProductId);
+        });
+
+        document.querySelectorAll('.db-post[data-post-id]').forEach(card => {
+            const ids = (card.dataset.productIds || '').split(',').map(s => parseInt(s, 10));
+            card.classList.toggle(
+                'highlighted',
+                railState.highlightedProductId != null && ids.includes(railState.highlightedProductId),
+            );
+        });
     }
 
-    function renderBoard(data) {
-        // Apply the current view mode (kanban visible, plan hidden — or vice versa).
-        applyViewMode();
+    // Drag-drop: rail cards → post cards. Endpoint is SYNC semantics, so
+    // we assemble the FULL product list from data-product-ids + the new id
+    // before PUT'ing. Re-fetches coverage + redraws so the cov-badge
+    // increments immediately.
+    function wirePostDropTargets() {
+        const grid = document.getElementById('dbGrid');
+        if (!grid || grid.dataset.dropWired === '1') return;
+        grid.dataset.dropWired = '1';
 
-        // Kanban render (always runs so it's ready when user toggles back).
-        data.columns.forEach(col => {
-            const body = document.querySelector('.db-col-body[data-column="' + col.key + '"]');
-            const count = document.querySelector('.db-col-count[data-count="' + col.key + '"]');
-            count.textContent = col.count;
+        grid.addEventListener('dragover', (e) => {
+            const post = e.target.closest('.db-post[data-post-id]');
+            if (!post) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            post.classList.add('dragover');
+        });
+        grid.addEventListener('dragleave', (e) => {
+            const post = e.target.closest('.db-post[data-post-id]');
+            if (post) post.classList.remove('dragover');
+        });
+        grid.addEventListener('drop', async (e) => {
+            const post = e.target.closest('.db-post[data-post-id]');
+            if (!post) return;
+            e.preventDefault();
+            post.classList.remove('dragover');
 
-            body.textContent = '';
+            const payload = (e.dataTransfer.getData('text/plain') || '').trim();
+            if (!payload.startsWith('product:')) return;
+            const newProductId = num(payload.slice('product:'.length));
+            if (!newProductId) return;
 
-            if (col.posts.length === 0) {
-                const empty = document.createElement('div');
-                empty.className = 'db-empty';
-                empty.textContent = '—';
-                body.appendChild(empty);
+            const postId = num(post.dataset.postId);
+            const existing = (post.dataset.productIds || '')
+                .split(',').map(s => parseInt(s, 10)).filter(Boolean);
+            if (existing.includes(newProductId)) {
+                showInfo('Produkti ishte tashmë i bashkangjitur.');
                 return;
             }
+            const fullList = existing.concat([newProductId]);
 
-            col.posts.forEach(post => body.appendChild(buildPostCard(post)));
-        });
-
-        if (state.viewMode === 'plan') {
-            renderPlanView(data);
-        }
-    }
-
-    function applyViewMode() {
-        const board = document.getElementById('dbBoard');
-        const plan = document.getElementById('dbPlanWrap');
-        board.hidden = state.viewMode !== 'kanban';
-        plan.hidden = state.viewMode !== 'plan';
-
-        document.querySelectorAll('#dbModeSwitch .db-mode-btn').forEach(b => {
-            b.classList.toggle('active', b.dataset.mode === state.viewMode);
+            try {
+                await apiPutJson(
+                    '/marketing/daily-basket/api/posts/' + num(postId) + '/products',
+                    { product_ids: fullList },
+                );
+                await selectDay(state.selectedDate);
+                showSuccess('U shtua produkti te posti.');
+            } catch (err) {
+                showError('Shtimi dështoi: ' + err.message);
+            }
         });
     }
 
-    function setViewMode(mode) {
-        if (mode !== 'kanban' && mode !== 'plan') return;
-        state.viewMode = mode;
-        try { localStorage.setItem('dbViewMode', mode); } catch (_) {}
-        applyViewMode();
-        if (state.kanban) {
-            if (mode === 'plan') renderPlanView(state.kanban);
-            else renderBoard(state.kanban);
+    // ── Post card v2 (#1323) — flat grid, stage-agnostic ────────
+    function renderBoard(data) {
+        const grid = document.getElementById('dbGrid');
+        grid.textContent = '';
+
+        const posts = flattenPosts(data);
+
+        posts.forEach(post => grid.appendChild(buildPostCardV2(post)));
+        grid.appendChild(buildEmptyPostCard(posts.length));
+
+        // Register drop targets once — delegation handles future re-renders.
+        wirePostDropTargets();
+
+        // If the user had a product highlighted before this re-render, the
+        // new post cards are missing the .highlighted class — re-apply.
+        if (railState.highlightedProductId != null) {
+            const pid = railState.highlightedProductId;
+            document.querySelectorAll('.db-post[data-post-id]').forEach(card => {
+                const ids = (card.dataset.productIds || '').split(',').map(s => parseInt(s, 10));
+                if (ids.includes(pid)) card.classList.add('highlighted');
+            });
         }
     }
 
-    // ── Plan view (3×3 grid — cells create posts immediately) ────
-    function allPostsOrderedForPlan(data) {
-        // The plan grid is stage-agnostic — posts from every column are
-        // flattened into one list, ordered by sort_order then id.
+    function flattenPosts(data) {
         const flat = [];
-        data.columns.forEach(col => col.posts.forEach(p => flat.push(p)));
+        (data.columns || []).forEach(col => (col.posts || []).forEach(p => flat.push(p)));
         flat.sort((a, b) => {
             const ao = a.sort_order ?? 0, bo = b.sort_order ?? 0;
             if (ao !== bo) return ao - bo;
@@ -1691,61 +1820,289 @@
         return flat;
     }
 
-    function renderPlanView(data) {
-        const grid = document.getElementById('dbPlanGrid');
-        grid.textContent = '';
+    // Stage-value → dot colour is CSS-driven via [data-stage]; this table is
+    // only for the human-readable label next to the dot.
+    const STAGE_SHORT = {
+        planning: 'Planifikim',
+        production: 'Prodhim',
+        editing: 'Editim',
+        scheduling: 'Skedulim',
+        published: 'Publikuar',
+    };
 
-        const basketId = data.basket?.id;
-        if (!basketId) {
-            const msg = document.createElement('div');
-            msg.className = 'db-plan-empty-note';
-            msg.textContent = 'Zgjidh nje dite ne kalendar per te filluar planin.';
-            grid.appendChild(msg);
-            return;
-        }
-
-        const posts = allPostsOrderedForPlan(data);
-        const slotCount = Math.max(9, Math.ceil(posts.length / 3) * 3); // always multiple of 3, min 9
-
-        for (let i = 0; i < slotCount; i++) {
-            const post = posts[i];
-            grid.appendChild(post ? buildPlanCellFilled(post, i + 1) : buildPlanCellEmpty(i + 1));
-        }
+    // Deterministic hue from a free-text key — used for the 16px product
+    // chip thumbs when a product has no image and we have to paint an
+    // initial on a gradient. Keeps the same product looking the same every
+    // render without shipping a colour table.
+    function hueFor(key) {
+        const s = String(key || '');
+        let h = 0;
+        for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+        return Math.abs(h) % 360;
     }
 
-    function buildPlanCellEmpty(slotNumber) {
-        const cell = document.createElement('div');
-        cell.className = 'db-plan-cell empty';
-        cell.tabIndex = 0;
-
-        const ic = document.createElement('div');
-        ic.className = 'db-plan-empty-icon';
-        ic.textContent = '+';
-        const tx = document.createElement('div');
-        tx.className = 'db-plan-empty-txt';
-        tx.textContent = 'Post ' + slotNumber;
-        cell.append(ic, tx);
-
-        const trigger = () => openPostTypePicker(cell, (pt) => createPostForSlot(slotNumber, pt));
-        cell.addEventListener('click', trigger);
-        cell.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); trigger(); }
+    function buildPostCardV2(post) {
+        const card = document.createElement('div');
+        card.className = 'db-post';
+        card.dataset.postId = post.id;
+        // Comma-separated — matches #1324 / #1326 click-to-highlight lookups.
+        card.dataset.productIds = (post.products || []).map(p => p.item_group_id).join(',');
+        if (post.id === state.selectedPostId) card.classList.add('selected');
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('button, a, input, textarea, .db-post-chip-x')) return;
+            selectPost(num(post.id));
         });
-        return cell;
+
+        card.appendChild(buildPostTop(post));
+        card.appendChild(buildPostMat(post));
+        card.appendChild(buildPostBody(post));
+        return card;
     }
 
-    async function createPostForSlot(slotNumber, postType) {
+    function buildPostTop(post) {
+        const top = document.createElement('div');
+        top.className = 'db-post-top';
+
+        const type = document.createElement('span');
+        type.className = 'db-post-type';
+        type.dataset.type = post.post_type || 'photo';
+        type.textContent = post.post_type_label || (post.post_type || '').toUpperCase();
+        top.appendChild(type);
+
+        const numEl = document.createElement('span');
+        numEl.className = 'db-post-num';
+        numEl.textContent = post.title || ('Post #' + post.id);
+        top.appendChild(numEl);
+
+        const stage = document.createElement('span');
+        stage.className = 'db-post-stage';
+        const dot = document.createElement('span');
+        dot.className = 'db-stage-dot';
+        dot.dataset.stage = post.stage || 'planning';
+        stage.appendChild(dot);
+        stage.appendChild(document.createTextNode(STAGE_SHORT[post.stage] || post.stage_label || ''));
+        top.appendChild(stage);
+
+        return top;
+    }
+
+    function buildPostMat(post) {
+        const mat = document.createElement('div');
+        mat.className = 'db-mat';
+
+        const media = (post.media && post.media[0]) || null;
+        if (media && media.thumbnail_url) {
+            const img = document.createElement('img');
+            img.src = media.thumbnail_url;
+            img.alt = '';
+            img.loading = 'lazy';
+            img.onerror = () => { img.remove(); mat.appendChild(buildMatEmpty()); };
+            mat.appendChild(img);
+        } else if (media && media.url && media.is_video) {
+            // Video without a poster — render the element itself paused on
+            // the first frame. Muted + no controls so it stays decorative.
+            const v = document.createElement('video');
+            v.src = media.url;
+            v.muted = true;
+            v.playsInline = true;
+            v.preload = 'metadata';
+            mat.appendChild(v);
+        } else if (media && media.url) {
+            const img = document.createElement('img');
+            img.src = media.url;
+            img.alt = '';
+            img.loading = 'lazy';
+            img.onerror = () => { img.remove(); mat.appendChild(buildMatEmpty()); };
+            mat.appendChild(img);
+        } else {
+            mat.appendChild(buildMatEmpty());
+        }
+
+        // URL overlay — filename (when we have media) OR reference host
+        // (when we don't). Gives the user a "what am I basing this on" cue
+        // without having to open the detail view.
+        const overlayText = media && media.original_filename
+            ? media.original_filename
+            : (post.reference_host ? 'Reference: ' + post.reference_host : null);
+        if (overlayText) {
+            const ov = document.createElement('div');
+            ov.className = 'db-mat-url-overlay';
+            ov.textContent = overlayText;
+            mat.appendChild(ov);
+        }
+
+        return mat;
+    }
+
+    function buildMatEmpty() {
+        const e = document.createElement('div');
+        e.className = 'db-mat-empty';
+        const ic = document.createElement('div');
+        ic.className = 'icon';
+        ic.textContent = '🖼️';
+        const tx = document.createElement('div');
+        tx.textContent = 'Pa material ende';
+        e.append(ic, tx);
+        return e;
+    }
+
+    function buildPostBody(post) {
+        const body = document.createElement('div');
+        body.className = 'db-post-body';
+
+        if (post.products && post.products.length) {
+            const chips = document.createElement('div');
+            chips.className = 'db-post-chips';
+            post.products.slice(0, 4).forEach(p => chips.appendChild(buildPostChip(p)));
+            if (post.products.length > 4) {
+                const more = document.createElement('span');
+                more.className = 'db-post-chip';
+                more.style.paddingLeft = '7px';
+                more.textContent = '+' + (post.products.length - 4);
+                chips.appendChild(more);
+            }
+            body.appendChild(chips);
+        }
+
+        // Reference chip (favicon + host) — renders only when there's a URL.
+        if (post.reference_url) {
+            const ref = document.createElement('a');
+            ref.className = 'db-post-ref-compact';
+            ref.href = post.reference_url;
+            ref.target = '_blank';
+            ref.rel = 'noopener noreferrer';
+            ref.addEventListener('click', (e) => e.stopPropagation());
+
+            const host = post.reference_host || (() => {
+                try { return new URL(post.reference_url).hostname.replace(/^www\./, ''); }
+                catch (_) { return 'link'; }
+            })();
+
+            const fav = document.createElement('span');
+            fav.className = 'fav';
+            fav.style.background = 'hsl(' + hueFor(host) + ', 55%, 45%)';
+            fav.textContent = host.charAt(0).toUpperCase();
+            // Use Google's favicon service for a real icon when available.
+            const favImg = document.createElement('img');
+            favImg.src = 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(host) + '&sz=32';
+            favImg.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:2px;';
+            favImg.onload = () => { fav.textContent = ''; fav.style.background = '#fff'; fav.appendChild(favImg); };
+            favImg.onerror = () => { /* keep initial fallback */ };
+            ref.appendChild(fav);
+
+            const hostSpan = document.createElement('span');
+            hostSpan.className = 'host';
+            hostSpan.textContent = host;
+            ref.appendChild(hostSpan);
+
+            const arrow = document.createElement('span');
+            arrow.textContent = '↗';
+            arrow.style.cssText = 'color:var(--db-text-3); font-size:11px;';
+            ref.appendChild(arrow);
+
+            body.appendChild(ref);
+        }
+
+        return body;
+    }
+
+    function buildPostChip(p) {
+        const chip = document.createElement('span');
+        chip.className = 'db-post-chip';
+        chip.title = p.name || '';
+
+        const thumbHost = document.createElement('span');
+        thumbHost.className = 'db-post-chip-thumb';
+        if (p.image_url) {
+            const img = document.createElement('img');
+            img.src = p.image_url;
+            img.alt = '';
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+            img.onerror = () => {
+                img.remove();
+                thumbHost.style.background = 'hsl(' + hueFor(p.name || p.item_group_id) + ', 55%, 55%)';
+                thumbHost.textContent = (p.name || '?').charAt(0).toUpperCase();
+            };
+            thumbHost.appendChild(img);
+        } else {
+            thumbHost.style.background = 'hsl(' + hueFor(p.name || p.item_group_id) + ', 55%, 55%)';
+            thumbHost.textContent = (p.name || '?').charAt(0).toUpperCase();
+        }
+        chip.appendChild(thumbHost);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'db-post-chip-name';
+        nameSpan.textContent = p.name || '—';
+        chip.appendChild(nameSpan);
+
+        return chip;
+    }
+
+    // "+ Post i ri" tile at the end of the grid — click → inline type picker,
+    // then POST /baskets/{id}/posts with the chosen type.
+    function buildEmptyPostCard(existingCount) {
+        const card = document.createElement('div');
+        card.className = 'db-post db-post-empty';
+
+        const plus = document.createElement('div');
+        plus.className = 'plus';
+        plus.textContent = '+';
+        card.appendChild(plus);
+
+        const lbl = document.createElement('div');
+        lbl.className = 'lbl';
+        lbl.textContent = 'Post i ri';
+        card.appendChild(lbl);
+
+        const sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.textContent = 'Zgjidh tipin:';
+        card.appendChild(sub);
+
+        const row = document.createElement('div');
+        row.className = 'type-row';
+        const types = [
+            { v: 'photo', l: 'Photo' },
+            { v: 'reel', l: 'Reel' },
+            { v: 'story', l: 'Story' },
+            { v: 'carousel', l: 'Carousel' },
+            { v: 'video', l: 'Video' },
+        ];
+        types.forEach(t => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'type-pick';
+            b.textContent = t.l;
+            b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                createQuickPost(t.v, existingCount + 1);
+            });
+            row.appendChild(b);
+        });
+        card.appendChild(row);
+
+        // Also clicking the card body (not the buttons) opens the full
+        // modal so the user can pick title + products up front.
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;
+            openNewPostModal();
+        });
+
+        return card;
+    }
+
+    async function createQuickPost(postType, slot) {
         const basketId = state.kanban?.basket?.id;
         if (!basketId) return;
         try {
             await apiPost('/marketing/daily-basket/api/baskets/' + num(basketId) + '/posts', {
-                title: 'Post ' + slotNumber,
+                title: 'Post ' + slot,
                 post_type: postType || 'photo',
                 priority: 'normal',
             });
             await selectDay(state.selectedDate);
         } catch (e) {
-            showError('Krijimi deshtoi: ' + e.message);
+            showError('Krijimi dështoi: ' + e.message);
         }
     }
 
@@ -2411,11 +2768,46 @@
         const post = findPostById(postId);
         if (!post) return;
 
-        document.querySelectorAll('.db-card').forEach(el =>
+        // .db-post selector (v2 cards) — .db-card was the legacy kanban card
+        // removed in #1323 but kept here for safety in case of stale markup.
+        document.querySelectorAll('.db-post[data-post-id], .db-card').forEach(el =>
             el.classList.toggle('selected', parseInt(el.dataset.postId, 10) === postId)
         );
 
         renderSheet(post);
+        persistSelectedPostId(postId);
+
+        // Scroll the newly selected post card into view on touch-primary
+        // contexts. Desktop users already saw the click, so this is a
+        // no-op there (the card was already in viewport).
+        const card = document.querySelector('.db-post[data-post-id="' + postId + '"]');
+        if (card && typeof card.scrollIntoView === 'function') {
+            const rect = card.getBoundingClientRect();
+            if (rect.top < 80 || rect.bottom > window.innerHeight - 40) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }
+
+    // localStorage key is per-basket so one basket's open post doesn't
+    // bleed into another. Set/cleared automatically; best-effort — a
+    // storage exception (private mode) just no-ops.
+    function persistSelectedPostId(postId) {
+        const basketId = state.kanban?.basket?.id;
+        if (!basketId) return;
+        try {
+            const key = 'dbSelectedPostId_' + basketId;
+            if (postId == null) localStorage.removeItem(key);
+            else localStorage.setItem(key, String(postId));
+        } catch (_) { /* storage disabled — fine */ }
+    }
+
+    function readPersistedSelectedPostId(basketId) {
+        if (!basketId) return null;
+        try {
+            const v = parseInt(localStorage.getItem('dbSelectedPostId_' + basketId), 10);
+            return Number.isFinite(v) ? v : null;
+        } catch (_) { return null; }
     }
 
     function findPostById(id) {
@@ -2441,7 +2833,7 @@
 
         const currentIdx = STAGE_ORDER.indexOf(post.stage);
 
-        // Head — just title; Edit button removed (everything editable inline).
+        // Head — title + close button ("Mbyll detajin" — deselects without deleting).
         const head = document.createElement('div');
         head.className = 'db-sheet-head';
 
@@ -2456,15 +2848,48 @@
         headText.append(crumb, title);
         head.appendChild(headText);
 
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'db-sheet-close';
+        closeBtn.textContent = 'Mbyll detajin';
+        closeBtn.title = 'Mbyll (nuk fshin postin)';
+        closeBtn.addEventListener('click', () => {
+            state.selectedPostId = null;
+            document.querySelectorAll('.db-post.selected').forEach(c => c.classList.remove('selected'));
+            renderSheet(null);
+        });
+        head.appendChild(closeBtn);
+
         sheet.appendChild(head);
 
-        // Stepper
+        // Stage bar — 5 clickable stage columns. Forward/back one step at a
+        // time (API enforces the same rule). `done` state is fast-jump-back,
+        // `future` is fast-forward — both go through the existing `transition`
+        // helper so guards (caption required, etc.) still fire.
         const track = document.createElement('div');
         track.className = 'db-track';
         STAGE_ORDER.forEach((s, i) => {
             const step = document.createElement('div');
             const cls = i < currentIdx ? 'done' : (i === currentIdx ? 'current' : 'todo');
             step.className = 'db-track-step ' + cls;
+            step.tabIndex = 0;
+            step.title = 'Kalo te: ' + STAGE_LABELS[s];
+            const delta = i - currentIdx;
+            if (delta === 0) {
+                step.style.cursor = 'default';
+            } else {
+                step.style.cursor = 'pointer';
+                step.addEventListener('click', () => {
+                    if (Math.abs(delta) !== 1) {
+                        showError('Vetëm një hap në një kah — kalo nëpër stage-t një nga një.');
+                        return;
+                    }
+                    transition(post, s);
+                });
+                step.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); step.click(); }
+                });
+            }
             const line = document.createElement('div');
             line.className = 'db-track-line';
             const lbl = document.createElement('div');
@@ -2490,8 +2915,23 @@
         col1.appendChild(labeledField('Reference notes', inlineTextarea({
             value: post.reference_notes,
             rows: 3,
-            placeholder: 'Mood, location, model…',
+            placeholder: 'Mood, shënime shtesë…',
             save: (v) => savePostField(post, { reference_notes: v }),
+        })));
+
+        // Shporta v2 fields (#1321): structured context that used to live
+        // loose in reference_notes. Kept in Burimi because they describe
+        // the real-world setup of the shoot/capture.
+        col1.appendChild(labeledField('Lokacioni', inlineInput({
+            value: post.lokacioni,
+            placeholder: 'P.sh. Dyqani Tirana Center',
+            save: (v) => savePostField(post, { lokacioni: v }),
+        })));
+
+        col1.appendChild(labeledField('Modelet', inlineInput({
+            value: post.modelet,
+            placeholder: 'P.sh. Era, Bora',
+            save: (v) => savePostField(post, { modelet: v }),
         })));
 
         body.appendChild(col1);
@@ -2516,6 +2956,12 @@
             value: post.priority,
             multi: false,
             save: (v) => savePostField(post, { priority: v }),
+        })));
+
+        col2.appendChild(labeledField('Audienca', inlineInput({
+            value: post.audienca,
+            placeholder: 'P.sh. gra 25-34, urbane',
+            save: (v) => savePostField(post, { audienca: v }),
         })));
 
         body.appendChild(col2);
@@ -3574,22 +4020,10 @@
         document.getElementById('dbModalSubmit').addEventListener('click', submitModal);
         wireStudioModal();
 
-        // Panorama
-        document.getElementById('dbBtnPano').addEventListener('click', openPanorama);
-        document.getElementById('dbPanoClose').addEventListener('click', closePanorama);
-
-        // Kanban / Plan mode switch
-        document.querySelectorAll('#dbModeSwitch .db-mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => setViewMode(btn.dataset.mode));
-        });
-
-        // "+ Shto post" in plan view — picks post_type first, then creates.
-        const addBtn = document.getElementById('dbPlanAddBtn');
-        addBtn.addEventListener('click', () => {
-            const nextIndex = state.kanban
-                ? allPostsOrderedForPlan(state.kanban).length + 1
-                : 1;
-            openPostTypePicker(addBtn, (pt) => createPostForSlot(nextIndex, pt));
+        // Rail filter — re-renders immediately; doesn't refetch coverage.
+        document.getElementById('dbRailFilter').addEventListener('change', (e) => {
+            railState.filter = e.target.value;
+            if (state.coverage) renderRail(state.coverage);
         });
 
         // (The legacy #dbFieldPlatforms wiring lived in the edit modal; that
@@ -3627,13 +4061,61 @@
             });
         });
 
-        // Esc closes modal (or panorama if modal not open)
+        // Keyboard shortcuts:
+        //   Esc — close create-post modal → else close detail sheet → else
+        //         clear product highlight. Ordered by user expectation:
+        //         whatever feels "most foreground" dismisses first.
+        //   Arrow keys in rail — jump selection up/down without the mouse.
         document.addEventListener('keydown', (e) => {
-            if (e.key !== 'Escape') return;
-            if (document.getElementById('dbModal').classList.contains('open')) {
-                closeNewPostModal();
-            } else if (document.getElementById('dbPano').classList.contains('open')) {
-                closePanorama();
+            if (e.key === 'Escape') {
+                if (document.getElementById('dbModal').classList.contains('open')) {
+                    closeNewPostModal();
+                    return;
+                }
+                if (state.selectedPostId != null) {
+                    state.selectedPostId = null;
+                    persistSelectedPostId(null);
+                    document.querySelectorAll('.db-post.selected').forEach(c => c.classList.remove('selected'));
+                    renderSheet(null);
+                    return;
+                }
+                if (railState.highlightedProductId != null) {
+                    toggleProductHighlight(railState.highlightedProductId);
+                    return;
+                }
+            }
+
+            // ↑/↓ inside the rail moves the highlight. Ignored when focus is
+            // in an input so typing in the detail panel isn't hijacked.
+            const railEl = document.getElementById('dbRail');
+            const focusedInRail = railEl && railEl.contains(document.activeElement);
+            const inInput = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
+            if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && focusedInRail && !inInput) {
+                e.preventDefault();
+                const cards = Array.from(document.querySelectorAll('#dbRailList .db-p-card'));
+                if (cards.length === 0) return;
+                const currentIdx = cards.findIndex(c => num(c.dataset.productId) === railState.highlightedProductId);
+                const delta = e.key === 'ArrowDown' ? 1 : -1;
+                const nextIdx = currentIdx < 0
+                    ? (delta === 1 ? 0 : cards.length - 1)
+                    : Math.max(0, Math.min(cards.length - 1, currentIdx + delta));
+                const id = num(cards[nextIdx].dataset.productId);
+                if (id !== railState.highlightedProductId) {
+                    if (railState.highlightedProductId != null) toggleProductHighlight(railState.highlightedProductId); // clear old
+                    toggleProductHighlight(id); // set new
+                }
+                cards[nextIdx].scrollIntoView({ block: 'nearest' });
+            }
+        });
+
+        // Click outside rail + grid clears any product highlight. Keeps the
+        // rail feeling like a "mode" rather than a sticky state.
+        document.addEventListener('click', (e) => {
+            if (railState.highlightedProductId == null) return;
+            const inRail = e.target.closest('#dbRail');
+            const inGrid = e.target.closest('#dbGrid .db-post');
+            if (!inRail && !inGrid) {
+                toggleProductHighlight(railState.highlightedProductId);
             }
         });
     }

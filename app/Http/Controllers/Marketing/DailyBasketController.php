@@ -261,8 +261,12 @@ class DailyBasketController extends Controller
                 'assigned_to' => $post->assigned_to,
                 'caption' => $post->caption,
                 'reference_url' => $post->reference_url,
+                'reference_host' => $post->reference_host,
                 'reference_notes' => $post->reference_notes,
                 'hashtags' => $post->hashtags,
+                'lokacioni' => $post->lokacioni,
+                'modelet' => $post->modelet,
+                'audienca' => $post->audienca,
                 'media' => $post->media->map(fn ($m) => $this->serializeMedia($m))->values()->all(),
                 'products' => $rows->map(function ($r) use ($productLookup) {
                     $meta = $productLookup->get($r->item_group_id);
@@ -301,6 +305,137 @@ class DailyBasketController extends Controller
             ),
             'available_products' => $availableProducts,
         ]);
+    }
+
+    /**
+     * Coverage payload for the Shporta Ditore v2 product rail.
+     *
+     * Returns the products assigned to THIS basket's date (primary or
+     * secondary re-marketing assignment) annotated with a per-product
+     * `posts_count` — how many daily_basket_posts in this basket feature
+     * that product. The rail uses this to render the cov-0/1/2 badge, the
+     * filter chip ("të pambuluara") and the click-to-highlight selection.
+     *
+     * The response also carries summary totals the strip above the grid
+     * renders in one glance: products covered/uncovered, posts per type,
+     * total stock and total retail value of the day's basket.
+     *
+     * A single round-trip avoids N+1 queries from the frontend when the
+     * user attaches/detaches products and the rail re-fetches.
+     */
+    public function coverage(DailyBasket $basket): JsonResponse
+    {
+        $basket->load(['posts' => fn ($q) => $q]);
+
+        $collectionProducts = $this->loadCollectionProducts($basket->distribution_week_id);
+
+        $postIds = $basket->posts->pluck('id')->all();
+        $pivotCountByProduct = empty($postIds)
+            ? []
+            : DB::table('daily_basket_post_products')
+                ->whereIn('daily_basket_post_id', $postIds)
+                ->selectRaw('item_group_id, COUNT(DISTINCT daily_basket_post_id) as posts_count')
+                ->groupBy('item_group_id')
+                ->pluck('posts_count', 'item_group_id')
+                ->all();
+
+        $payload = $this->computeCoverageData(
+            basketDate: $basket->date->toDateString(),
+            collectionProducts: $collectionProducts,
+            pivotCountByProduct: $pivotCountByProduct,
+            posts: $basket->posts->all(),
+        );
+
+        return response()->json([
+            'basket_id' => $basket->id,
+            'basket_date' => $basket->date->toDateString(),
+            'products' => $payload['products'],
+            'summary' => $payload['summary'],
+        ]);
+    }
+
+    /**
+     * Pure computation for coverage data — extracted so the unit test can
+     * feed synthetic inputs without spinning up a DIS connection or a DB.
+     *
+     * @param  string  $basketDate                  Y-m-d of the basket
+     * @param  array<int,array<string,mixed>>  $collectionProducts  Shape from loadCollectionProducts()
+     * @param  array<int,int>  $pivotCountByProduct  item_group_id => posts_count
+     * @param  iterable<DailyBasketPost>  $posts
+     * @return array{products: array<int,array<string,mixed>>, summary: array<string,mixed>}
+     */
+    private function computeCoverageData(
+        string $basketDate,
+        array $collectionProducts,
+        array $pivotCountByProduct,
+        iterable $posts,
+    ): array {
+        // Filter collection products down to those assigned to THIS day —
+        // matches Task #1137 convention: primary OR secondary re-marketing
+        // assignment counts; rail shows everything the user planned for today.
+        $basketProducts = array_values(array_filter($collectionProducts, function ($p) use ($basketDate) {
+            foreach ((array) ($p['assigned_dates'] ?? []) as $a) {
+                if (($a['date'] ?? null) === $basketDate) {
+                    return true;
+                }
+            }
+            return false;
+        }));
+
+        $products = array_map(function ($p) use ($pivotCountByProduct) {
+            $id = (int) ($p['id'] ?? 0);
+            $price = (float) ($p['pricelist_price'] ?? $p['avg_price'] ?? 0);
+            $stock = (int) ($p['total_stock'] ?? 0);
+            $postsCount = (int) ($pivotCountByProduct[$id] ?? 0);
+
+            $tags = [];
+            $classification = $p['classification'] ?? null;
+            if (is_string($classification) && $classification !== '') {
+                $tags[] = $classification;
+            }
+
+            return [
+                'item_group_id' => $id,
+                'name' => $p['name'] ?? 'Pa emër',
+                'sku' => $p['code'] ?? null,
+                'thumbnail_url' => $p['image_url'] ?? null,
+                'price' => round($price, 2),
+                'stock' => $stock,
+                'total_value' => round($price * $stock, 2),
+                'tags' => $tags,
+                'posts_count' => $postsCount,
+            ];
+        }, $basketProducts);
+
+        $total = count($products);
+        $covered = 0;
+        foreach ($products as $p) {
+            if ($p['posts_count'] > 0) {
+                $covered++;
+            }
+        }
+
+        $postsByType = ['reel' => 0, 'photo' => 0, 'story' => 0, 'carousel' => 0, 'video' => 0];
+        foreach ($posts as $post) {
+            $type = $post->post_type?->value ?? 'photo';
+            if (! array_key_exists($type, $postsByType)) {
+                $postsByType[$type] = 0;
+            }
+            $postsByType[$type]++;
+        }
+
+        return [
+            'products' => $products,
+            'summary' => [
+                'products_total' => $total,
+                'products_covered' => $covered,
+                'products_uncovered' => $total - $covered,
+                'posts_total' => is_countable($posts) ? count($posts) : iterator_count($posts),
+                'posts_by_type' => $postsByType,
+                'stok_total' => (int) array_sum(array_column($products, 'stock')),
+                'vlere_total' => round((float) array_sum(array_column($products, 'total_value')), 2),
+            ],
+        ];
     }
 
     /**
@@ -417,6 +552,9 @@ class DailyBasketController extends Controller
             'production_brief' => 'nullable|string',
             'caption' => 'nullable|string',
             'hashtags' => 'nullable|string',
+            'lokacioni' => 'nullable|string|max:255',
+            'modelet' => 'nullable|string|max:255',
+            'audienca' => 'nullable|string|max:255',
             'target_platforms' => 'sometimes|array',
             'target_platforms.*' => 'string',
             'scheduled_for' => 'nullable|date',

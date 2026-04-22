@@ -225,6 +225,10 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/api/collections/{distributionWeek}/{date}', [DailyBasketController::class, 'show'])
             ->name('api.day.show');
 
+        // Coverage rollup for the product rail + summary strip (Shporta Ditore v2)
+        Route::get('/api/baskets/{basket}/coverage', [DailyBasketController::class, 'coverage'])
+            ->name('api.baskets.coverage');
+
         // Post CRUD + transitions
         Route::post('/api/baskets/{basketId}/posts', [DailyBasketController::class, 'storePost'])
             ->name('api.posts.store');
