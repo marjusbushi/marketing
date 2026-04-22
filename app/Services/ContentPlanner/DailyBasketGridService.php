@@ -47,8 +47,15 @@ class DailyBasketGridService
             ->get();
 
         if ($platforms !== null && ! empty($platforms)) {
+            // Drafts in early stages often have no target_platforms yet — the
+            // user hasn't decided where to post. Keep those visible under any
+            // filter (they're platform-agnostic until scheduling). Only hide
+            // drafts whose explicit target list doesn't intersect the filter.
             $posts = $posts->filter(function (DailyBasketPost $p) use ($platforms) {
                 $postPlatforms = (array) ($p->target_platforms ?? []);
+                if (empty($postPlatforms)) {
+                    return true;
+                }
                 return ! empty(array_intersect($postPlatforms, $platforms));
             })->values();
         }
