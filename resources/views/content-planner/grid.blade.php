@@ -1024,8 +1024,19 @@
             const el = document.createElement(isVideo ? 'video' : 'img');
             el.src = m.url || m.thumbnail_url || '';
             el.style.cssText = 'max-width:100%;max-height:80vh;object-fit:contain;display:block;' + (isVideo ? '' : 'pointer-events:none;');
-            if (isVideo) { el.muted = true; el.autoplay = true; el.loop = true; el.playsInline = true; }
-            else { el.alt = ''; el.draggable = false; }
+            if (isVideo) {
+                // Autoplay still requires muted (browser policy) — but expose
+                // native controls so the user can unmute / scrub / pause.
+                el.muted = true;
+                el.autoplay = true;
+                el.loop = true;
+                el.playsInline = true;
+                el.controls = true;
+                el.preload = 'metadata';
+            } else {
+                el.alt = '';
+                el.draggable = false;
+            }
             slide.appendChild(el);
             track.appendChild(slide);
         });
