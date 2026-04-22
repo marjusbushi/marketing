@@ -160,7 +160,12 @@ class DailyBasketGridService
         $stage = $post->stage;
         $basket = $post->basket;
         $targetPlatforms = (array) ($post->target_platforms ?? []);
+        // `thumbnail` must be an image URL the <img> tag can render. For
+        // videos without a poster image we fall back to the product thumb
+        // (from DIS) if one exists; otherwise null so the grid renders a
+        // <video> tag via `first_media_url`.
         $thumbnail = $post->thumbnail_url ?? $fallbackThumb;
+        $firstMediaUrl = $post->first_media_url ?? $fallbackThumb;
         $start = $post->scheduled_for
             ?? ($basket ? Carbon::parse($basket->date)->setTime(9, 0, 0) : now());
 
@@ -205,10 +210,10 @@ class DailyBasketGridService
                 'platform'             => $platform,
                 'platform_icons'       => array_values($targetPlatforms),
                 'thumbnail'            => $thumbnail,
-                'first_media_url'      => $thumbnail,
+                'first_media_url'      => $firstMediaUrl,
                 'is_video'             => (bool) $post->is_video,
                 'has_video'            => (bool) $post->is_video,
-                'has_media'            => $thumbnail !== null,
+                'has_media'            => $thumbnail !== null || $firstMediaUrl !== null,
                 'media_count'          => $post->media->count() ?: ($fallbackThumb ? 1 : 0),
                 'media_items'          => $mediaItems,
                 'labels'               => [],

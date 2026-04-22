@@ -554,9 +554,14 @@
 
         if (sortable) sortable.destroy();
         sortable = Sortable.create(container, {
-            animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen', filter: '[data-external]',
+            animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+            // Keep non-reorderable tiles static: external (published) and
+            // basket drafts (not yet handed off to the planner).
+            filter: '[data-external], [data-basket-draft]',
             onEnd: function() {
-                const orderedIds = [...container.querySelectorAll('[data-id]')].map(el => parseInt(el.dataset.id));
+                const orderedIds = [...container.querySelectorAll('[data-id]:not([data-basket-draft]):not([data-external])')]
+                    .map(el => parseInt(el.dataset.id))
+                    .filter(n => Number.isFinite(n));
                 if (orderedIds.length) showReorderConfirm(orderedIds);
             }
         });

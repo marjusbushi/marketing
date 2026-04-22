@@ -57,6 +57,7 @@ class DailyBasketPost extends Model
 
     protected $appends = [
         'thumbnail_url',
+        'first_media_url',
         'is_video',
     ];
 
@@ -109,12 +110,13 @@ class DailyBasketPost extends Model
     // ── Accessors ───────────────────────────────────────────
 
     /**
-     * First media's URL (thumbnail for video, full URL for photo).
+     * Static poster image for the first media — photo URL for images, or the
+     * video's thumbnail poster when available. Videos without a poster path
+     * return null so the caller can render a <video> tag instead of feeding
+     * an .mp4 URL into an <img> (which would 404 and leave a blank tile).
      *
      * Only populated when the `media` relation is eager-loaded — otherwise
-     * returns null rather than firing a per-post query. Service-layer
-     * callers that need a thumbnail must `->with('media')`. Product-image
-     * fallback is the service's job (cross-DB lookup against DIS).
+     * returns null rather than firing a per-post query.
      */
     public function getThumbnailUrlAttribute(): ?string
     {
@@ -127,9 +129,26 @@ class DailyBasketPost extends Model
             return null;
         }
 
-        return $first->is_video
-            ? ($first->thumbnail_url ?? $first->url)
-            : $first->url;
+        if ($first->is_video) {
+            return $first->thumbnail_path
+                ? \Illuminate\Support\Facades\Storage::disk($first->disk ?: 'public')->url($first->thumbnail_path)
+                : null;
+        }
+
+        return $first->url;
+    }
+
+    /**
+     * Raw first-media URL (video file or image) for callers that need the
+     * actual asset — e.g. grid tile rendering which falls back to <video>
+     * when there's no poster.
+     */
+    public function getFirstMediaUrlAttribute(): ?string
+    {
+        if (! $this->relationLoaded('media')) {
+            return null;
+        }
+        return $this->media->first()?->url;
     }
 
     public function getIsVideoAttribute(): bool
