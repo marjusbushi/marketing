@@ -551,10 +551,11 @@
     .db-stage-dot[data-stage="scheduling"] { background: #7c3aed; }
     .db-stage-dot[data-stage="published"]  { background: #22c55e; }
 
-    /* Material thumbnail — aspect ratio matches Instagram per post type:
-       reel/story 9:16 vertical, everything else 1:1 square. object-fit is
-       contain so the whole photo stays visible. Grid column is capped at
-       260px (see .db-grid) so 9:16 reels stay ~460px tall max. */
+    /* Material thumbnail — always 1:1 in the grid (IG profile grid style).
+       User tested 9:16 for reels twice and rejected both times: at any
+       reasonable column width it towers over 1:1 cards and breaks row
+       alignment. The REEL/STORY badge at the top already labels the
+       format. Real 9:16 aspect is still honored inside the detail view. */
     .db-mat {
         aspect-ratio: 1 / 1;
         background: var(--db-accent-soft);
@@ -563,8 +564,6 @@
         overflow: hidden;
         border-bottom: 1px solid var(--db-border);
     }
-    .db-mat[data-type="reel"],
-    .db-mat[data-type="story"]  { aspect-ratio: 9 / 16; }
     .db-mat-slot { position: absolute; inset: 0; display: block; }
     .db-mat-slot img, .db-mat-slot video,
     .db-mat > img, .db-mat > video {
