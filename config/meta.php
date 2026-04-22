@@ -77,7 +77,11 @@ return [
     */
     'max_retries' => 3,
     'retry_delay_seconds' => [1, 4, 16],
-    'pause_between_batches' => 5,
+    // 2s is comfortably below the documented Graph API rate limits for a
+    // single-page account and cuts a full 20-day Rifresko from ~10min to
+    // ~5-6min. Override with META_PAUSE_BETWEEN_BATCHES in .env if a sync
+    // ever hits 403 / rate-limit errors — bumping back to 5 is one env var.
+    'pause_between_batches' => (int) env('META_PAUSE_BETWEEN_BATCHES', 2),
 
     /*
     |--------------------------------------------------------------------------
