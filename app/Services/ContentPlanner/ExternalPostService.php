@@ -19,6 +19,15 @@ class ExternalPostService
      * Falls back to a single synthetic item from `media_url` for posts that
      * were synced before the media-items schema change — keeps the UI working.
      */
+    private function truncate(?string $value, int $limit = 60): string
+    {
+        if ($value === null) return '';
+        $plain = strip_tags($value);
+        return mb_strwidth($plain, 'UTF-8') <= $limit
+            ? $plain
+            : rtrim(mb_strimwidth($plain, 0, $limit, '', 'UTF-8')).'...';
+    }
+
     private function buildMediaItemsFromPost(MetaPostInsight $post): array
     {
         $out = [];
@@ -149,7 +158,7 @@ class ExternalPostService
 
                     $events[] = [
                         'id' => 'ext_meta_' . implode('_', $ids),
-                        'title' => Str_limit_plain($primary->message, 60),
+                        'title' => $this->truncate($primary->message, 60),
                         'start' => $primary->created_at_meta->toIso8601String(),
                         'allDay' => false,
                         'backgroundColor' => $isMulti ? '#F0F0FF' : $this->platformBgColor($platforms[0]),
@@ -201,7 +210,7 @@ class ExternalPostService
             foreach ($tiktokVideos as $video) {
                 $events[] = [
                     'id' => "ext_tiktok_{$video->id}",
-                    'title' => Str_limit_plain($video->title ?: $video->video_description, 60),
+                    'title' => $this->truncate($video->title ?: $video->video_description, 60),
                     'start' => $video->created_at_tiktok->toIso8601String(),
                     'allDay' => false,
                     'backgroundColor' => '#F5F5F5',
