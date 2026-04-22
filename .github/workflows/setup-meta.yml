@@ -76,7 +76,7 @@ jobs:
 
             echo ""
             echo "=== Verify config loaded ==="
-            php artisan tinker --no-interaction --execute='echo "page_token=".(config("meta.page_token") ? "SET (len ".strlen((string) config("meta.page_token")).")" : "EMPTY").PHP_EOL; echo "page_id=".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id=".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL; echo "ad_account_id=".(config("meta.ad_account_id") ?: "EMPTY").PHP_EOL; echo "app_id=".(config("meta.app_id") ?: "EMPTY").PHP_EOL; echo "api_version=".(config("meta.api_version") ?: "EMPTY").PHP_EOL;'
+            php artisan tinker --no-interaction --execute='echo "page_token=".(config("meta.page_token") ? "SET (len ".strlen((string) config("meta.page_token")).")" : "EMPTY").PHP_EOL; echo "page_id=".(config("meta.page_id") ?: "EMPTY").PHP_EOL; echo "ig_account_id=".(config("meta.ig_account_id") ?: "EMPTY").PHP_EOL; echo "ad_account_id=".(config("meta.ad_account_id") ?: "EMPTY").PHP_EOL; echo "app_id=".(config("meta.app_id") ?: "EMPTY").PHP_EOL; echo "api_version=".(config("meta.api_version") ?: "EMPTY").PHP_EOL; echo "app_secret=".(config("meta.app_secret") ? "SET (len ".strlen((string) config("meta.app_secret")).")" : "EMPTY").PHP_EOL; echo "webhook_verify_token=".(config("meta.webhook_verify_token") ? "SET (len ".strlen((string) config("meta.webhook_verify_token")).")" : "EMPTY").PHP_EOL; echo "ig_webhook_start_date=".(config("meta.ig_webhook_start_date") ?: "EMPTY").PHP_EOL; echo "ig_conversation_gap_minutes=".(config("meta.ig_conversation_gap_minutes") ?: "EMPTY").PHP_EOL;'
 
             echo ""
             echo "=== Live test: Graph API ping (validates token) ==="
