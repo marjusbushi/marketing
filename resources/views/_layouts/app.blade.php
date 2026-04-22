@@ -144,13 +144,19 @@
             </div>
         </div>
 
-        {{-- Toggle button — invisible until hover on sidebar edge --}}
-        <button id="sidebar-toggle" class="absolute top-1/2 -translate-y-1/2 -right-[7px] w-[14px] h-[28px] rounded-sm bg-slate-200/80 flex items-center justify-center text-slate-400 opacity-0 hover:opacity-100 transition-all duration-150 z-50 cursor-pointer border-none" style="backdrop-filter:blur(2px);">
-            <svg id="toggle-icon" class="w-2.5 h-2.5 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-        </button>
     </aside>
+
+    {{-- Floating sidebar toggle — always visible, slides with sidebar width.
+         Fixed position + transition mirrors the sidebar's own animation. --}}
+    <button id="sidebar-toggle"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar (⌘/Ctrl+B)"
+            class="fixed top-3 z-[60] w-9 h-9 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm flex items-center justify-center transition-all duration-200 cursor-pointer"
+            style="left: 260px;">
+        <svg id="toggle-icon" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+    </button>
 
     {{-- Main area --}}
     <div id="main-area" class="pl-64 min-h-full transition-all duration-200">
@@ -229,8 +235,12 @@
             const sidebar = document.getElementById('sidebar');
             const mainArea = document.getElementById('main-area');
             const toggleBtn = document.getElementById('sidebar-toggle');
-            const toggleIcon = document.getElementById('toggle-icon');
             const labels = sidebar.querySelectorAll('.sidebar-label');
+
+            // Left offsets must stay in sync with the sidebar widths (w-64 = 256px,
+            // w-[68px] = 68px). The extra 4px keeps the button clear of the border.
+            const OFFSET_EXPANDED = 260;
+            const OFFSET_COLLAPSED = 72;
 
             // Restore from localStorage
             const collapsed = localStorage.getItem('sidebar_collapsed') === 'true';
@@ -241,13 +251,23 @@
                 if (isExpanded) collapse(true); else expand(true);
             });
 
+            // Keyboard shortcut: Cmd/Ctrl+B toggles the sidebar.
+            document.addEventListener('keydown', function(e) {
+                if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
+                    const tag = (e.target.tagName || '').toLowerCase();
+                    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+                    e.preventDefault();
+                    toggleBtn.click();
+                }
+            });
+
             function collapse(animate) {
                 sidebar.dataset.expanded = 'false';
                 sidebar.classList.remove('w-64');
                 sidebar.classList.add('w-[68px]');
                 mainArea.classList.remove('pl-64');
                 mainArea.classList.add('pl-[68px]');
-                toggleIcon.style.transform = 'rotate(180deg)';
+                toggleBtn.style.left = OFFSET_COLLAPSED + 'px';
                 labels.forEach(el => {
                     el.style.opacity = '0';
                     el.style.width = '0';
@@ -262,7 +282,7 @@
                 sidebar.classList.add('w-64');
                 mainArea.classList.remove('pl-[68px]');
                 mainArea.classList.add('pl-64');
-                toggleIcon.style.transform = 'rotate(0deg)';
+                toggleBtn.style.left = OFFSET_EXPANDED + 'px';
                 labels.forEach(el => {
                     el.style.opacity = '1';
                     el.style.width = '';
