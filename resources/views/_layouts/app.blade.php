@@ -146,23 +146,20 @@
 
     </aside>
 
-    {{-- Floating sidebar toggle — always visible, slides with sidebar width.
-         Fixed position + transition mirrors the sidebar's own animation. --}}
-    <button id="sidebar-toggle"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar (⌘/Ctrl+B)"
-            class="fixed top-3 z-[60] w-9 h-9 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-sm flex items-center justify-center transition-all duration-200 cursor-pointer"
-            style="left: 260px;">
-        <svg id="toggle-icon" class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-        </svg>
-    </button>
-
     {{-- Main area --}}
     <div id="main-area" class="pl-64 min-h-full transition-all duration-200">
         {{-- Header --}}
         <header class="sticky top-0 z-40 h-14 bg-white/80 backdrop-blur-md border-b border-slate-200/60 flex items-center justify-between px-6">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3">
+                <button id="sidebar-toggle"
+                        type="button"
+                        aria-label="Toggle sidebar"
+                        title="Toggle sidebar (⌘/Ctrl+B)"
+                        class="w-8 h-8 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center transition-colors duration-150 cursor-pointer shrink-0">
+                    <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                </button>
                 <h1 class="text-[15px] font-semibold text-slate-900">{{ $pageTitle ?? $title ?? 'Marketing' }}</h1>
 
                 {{-- View switcher dropdown (only on Content Planner pages) --}}
@@ -237,11 +234,6 @@
             const toggleBtn = document.getElementById('sidebar-toggle');
             const labels = sidebar.querySelectorAll('.sidebar-label');
 
-            // Left offsets must stay in sync with the sidebar widths (w-64 = 256px,
-            // w-[68px] = 68px). The extra 4px keeps the button clear of the border.
-            const OFFSET_EXPANDED = 260;
-            const OFFSET_COLLAPSED = 72;
-
             // Restore from localStorage
             const collapsed = localStorage.getItem('sidebar_collapsed') === 'true';
             if (collapsed) collapse(false);
@@ -267,7 +259,6 @@
                 sidebar.classList.add('w-[68px]');
                 mainArea.classList.remove('pl-64');
                 mainArea.classList.add('pl-[68px]');
-                toggleBtn.style.left = OFFSET_COLLAPSED + 'px';
                 labels.forEach(el => {
                     el.style.opacity = '0';
                     el.style.width = '0';
@@ -282,7 +273,6 @@
                 sidebar.classList.add('w-64');
                 mainArea.classList.remove('pl-[68px]');
                 mainArea.classList.add('pl-64');
-                toggleBtn.style.left = OFFSET_EXPANDED + 'px';
                 labels.forEach(el => {
                     el.style.opacity = '1';
                     el.style.width = '';
