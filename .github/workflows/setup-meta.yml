@@ -38,12 +38,11 @@ jobs:
             upsert() {
               local key="$1"
               local value="$2"
-              # Strip ALL whitespace (CR, LF, tab, space) anywhere in value.
-              # GitHub Secrets UI sometimes pastes trailing whitespace that's
-              # invisible; a single extra space made webhook tokens compare
-              # unequal server-side. Safe for all our META_* values which are
-              # single-token strings with no legitimate whitespace.
-              value="$(printf '%s' "$value" | tr -d '[:space:]')"
+              # Strip control chars AND whitespace. Using a character-class
+              # whitelist would be safer but META_IG_WEBHOOK_START_DATE may
+              # contain '-' and values like api_version contain '.', so we
+              # can't filter by hex/alnum alone.
+              value="$(printf '%s' "$value" | tr -d '[:cntrl:][:space:]')"
               if grep -q "^${key}=" .env; then
                 sed -i "s|^${key}=.*|${key}=${value}|" .env
                 echo "updated ${key}"
@@ -70,6 +69,10 @@ jobs:
             echo ""
             echo "=== Masked grep ==="
             grep '^META_' .env | sed 's|=.*|=***|'
+
+            echo ""
+            echo "=== Diag: hex dump of last 3 bytes of META_WEBHOOK_VERIFY_TOKEN in .env ==="
+            grep '^META_WEBHOOK_VERIFY_TOKEN=' .env | cut -d= -f2- | tail -c 4 | xxd | head -1 || true
 
             echo ""
             echo "=== Rebuild config cache ==="
