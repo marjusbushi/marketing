@@ -236,13 +236,15 @@
         <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
             <iconify-icon icon="heroicons-outline:chat-bubble-left-right" width="18" class="text-slate-400"></iconify-icon>
             <h3 class="text-sm font-semibold text-slate-800">Instagram DMs</h3>
+            <span id="msg-source-badge" class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full"></span>
             <div class="relative ml-1 group">
                 <iconify-icon icon="heroicons-outline:information-circle" width="16" class="text-slate-400 cursor-help"></iconify-icon>
-                <div class="hidden group-hover:block absolute left-0 top-6 z-10 w-[360px] p-3 rounded-lg bg-slate-900 text-white text-[11px] leading-relaxed shadow-xl">
+                <div class="hidden group-hover:block absolute left-0 top-6 z-10 w-[380px] p-3 rounded-lg bg-slate-900 text-white text-[11px] leading-relaxed shadow-xl">
                     <b>Si llogaritet:</b><br>
-                    &bull; <b>Organike</b> &mdash; Biseda te reja ne IG DM inbox (Meta Conversations API). Eshte nje <b>sample</b>: Meta Business Suite numeron me gjere, ne mund te humbim ~50-70% te bisedave te reja qe Meta i sheh ne brendesi.<br>
-                    &bull; <b>Paid</b> &mdash; Biseda te nisura nga reklamat (Meta Ads API, metric: messaging_conversation_started_7d). Perputhet me Meta Business Suite.<br><br>
-                    Per numer ekzakt te <i>Messaging conversations started</i>, shih <b>Meta Business Suite &gt; Insights &gt; Messaging</b>.
+                    &bull; <b>Organike</b> &mdash; Kapet ne kohe reale nga <b>Meta Webhook</b> (cdo DM ruhet ne DB). Ekzakte per data nga aktivizimi.<br>
+                    &bull; <b>Paid</b> &mdash; Nga Ads API (metric: <code>messaging_conversation_started_7d</code>).<br><br>
+                    Duhet te perputhet me <b>Meta Business Suite &gt; Insights &gt; Messaging</b> brenda &plusmn;2%.<br><br>
+                    Per data <b>para aktivizimit te webhook-ut</b>, organike vjen nga Conversations API sample (me gap historike).
                 </div>
             </div>
         </div>
@@ -251,11 +253,8 @@
                 <div class="px-6 py-4 rounded-lg bg-pink-50 border border-pink-200 text-center min-w-[200px]">
                     <iconify-icon icon="heroicons-outline:chat-bubble-left-right" width="28" class="text-pink-800"></iconify-icon>
                     <div id="msg-conversations" class="text-2xl font-bold text-pink-800 mt-2 tabular-nums">&mdash;</div>
-                    <div class="text-xs text-slate-500">Kontakte (sample + paid)</div>
+                    <div class="text-xs text-slate-500">Messaging conversations started</div>
                     <div id="msg-breakdown" class="text-[10px] text-slate-400 mt-1.5 tabular-nums">&mdash;</div>
-                </div>
-                <div class="text-[13px] text-slate-500 leading-relaxed max-w-[500px]">
-                    Biseda te nisura ne IG DM &mdash; organike (sample nga Conversations API) + ads (Meta Ads). Nje pjese e organikes humbet per shkak te kufizimeve te API-se publike; per numer te sakte shiko Meta Business Suite.
                 </div>
             </div>
             <div class="relative w-full h-[280px]">
@@ -992,6 +991,26 @@
             const org = data.totals.organic ?? 0;
             const paid = data.totals.paid ?? 0;
             breakdownEl.textContent = `${fmtNum(org)} organike + ${fmtNum(paid)} ads`;
+        }
+
+        // Source badge — reflects whether organic count comes from webhook (exact)
+        // or sample (pre-activation dates). Mixed range shows a neutral "mixed" chip.
+        const sourceBadge = document.getElementById('msg-source-badge');
+        if (sourceBadge) {
+            const sources = new Set((data.daily || []).map(d => d.source).filter(Boolean));
+            sourceBadge.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-700', 'bg-amber-100', 'text-amber-700', 'bg-slate-100', 'text-slate-600');
+            if (sources.size === 0) {
+                sourceBadge.classList.add('hidden');
+            } else if (sources.size === 1 && sources.has('webhook')) {
+                sourceBadge.textContent = 'webhook (ekzakt)';
+                sourceBadge.classList.add('bg-emerald-100', 'text-emerald-700');
+            } else if (sources.size === 1 && sources.has('sample')) {
+                sourceBadge.textContent = 'sample (historike)';
+                sourceBadge.classList.add('bg-amber-100', 'text-amber-700');
+            } else {
+                sourceBadge.textContent = 'miks (webhook + sample)';
+                sourceBadge.classList.add('bg-slate-100', 'text-slate-600');
+            }
         }
 
         // DM activity chart — single line showing daily contacts

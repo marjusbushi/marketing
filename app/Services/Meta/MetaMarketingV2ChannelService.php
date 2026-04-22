@@ -406,7 +406,7 @@ class MetaMarketingV2ChannelService
 
     public function igKpis(string $from, string $to, bool $noCache = false): array
     {
-        return $this->remember("meta_v2_ig_kpis:{$from}:{$to}", $noCache, function () use ($from, $to) {
+        return $this->remember("meta_v2_ig_kpis:{$from}:{$to}", $noCache, function () use ($from, $to, $noCache) {
             if ($this->isDbFirst()) {
                 $adsIg = $this->resolver->resolveAdsPlatformTotals($from, $to, 'instagram');
                 $adsFb = $this->resolver->resolveAdsPlatformTotals($from, $to, 'facebook');
@@ -414,8 +414,12 @@ class MetaMarketingV2ChannelService
 
                 $paidThreads = (int) ($adsIg['messaging_conversations'] ?? 0);
 
-                // DM Kontakte: sum facebook + instagram paid messaging connections (matches Meta Business Suite)
-                $dmKontakte = (int) ($adsIg['messaging_conversations'] ?? 0) + (int) ($adsFb['messaging_conversations'] ?? 0);
+                // DM Kontakte: IG organic (webhook-era exact, sample for pre-activation) + IG paid.
+                // Delegates to igMessaging() so the top card always matches the detail card on
+                // the same page — previously the top was cross-platform paid-only (IG+FB ads),
+                // which confused users on the IG-specific dashboard.
+                $igMessaging = $this->igMessaging($from, $to, $noCache);
+                $dmKontakte = (int) ($igMessaging['totals']['conversations'] ?? 0);
 
                 return [
                     'reach' => ['value' => (int) $ig['reach'], 'change' => null],
