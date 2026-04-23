@@ -2804,12 +2804,20 @@
                 v.addEventListener('loadedmetadata', () => {
                     v.play().catch(() => { /* blocked by policy, ignore */ });
                 });
+                v.addEventListener('playing', () => wrap.classList.add('is-playing'));
+                v.addEventListener('pause', () => wrap.classList.remove('is-playing'));
                 v.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (v.paused) v.play().catch(() => {});
                 });
                 v.load();
                 wrap.appendChild(v);
+                // Visual fallback — if autoplay is blocked, the user still
+                // sees a "this is a video" cue instead of an empty grey box.
+                const overlay = document.createElement('div');
+                overlay.className = 'db-video-overlay';
+                overlay.textContent = '▶';
+                wrap.appendChild(overlay);
             } else {
                 const img = document.createElement('img');
                 img.src = first.thumbnail_url || first.url;
