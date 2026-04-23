@@ -2023,6 +2023,15 @@
                 v.addEventListener('loadedmetadata', () => {
                     v.play().catch(() => { /* blocked by policy */ });
                 });
+                // When this video starts playing, pause every other grid
+                // video so two card previews aren't yelling over each other.
+                // Uses a shared `db-grid-video` class so we can query siblings.
+                v.classList.add('db-grid-video');
+                v.addEventListener('play', () => {
+                    document.querySelectorAll('video.db-grid-video').forEach(other => {
+                        if (other !== v && !other.paused) other.pause();
+                    });
+                });
                 v.addEventListener('playing', () => slot.classList.add('is-playing'));
                 v.addEventListener('pause', () => slot.classList.remove('is-playing'));
                 v.addEventListener('click', (e) => {

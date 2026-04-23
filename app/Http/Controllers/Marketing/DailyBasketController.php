@@ -1095,11 +1095,32 @@ class DailyBasketController extends Controller
     private function deleteMediaFiles(DailyBasketPostMedia $media): void
     {
         try {
+            // Attach-from-library can produce multiple DailyBasketPostMedia
+            // rows pointing to the same underlying path (same ContentMedia
+            // referenced by different posts). Deleting the file blindly
+            // would break every other post that shares it.
+            //
+            // Reference count across DailyBasketPostMedia AND ContentMedia;
+            // only unlink the physical file when no other record remains.
             if ($media->path) {
-                Storage::disk($media->disk ?: 'public')->delete($media->path);
+                $sharedInBasket = DailyBasketPostMedia::where('path', $media->path)
+                    ->where('id', '!=', $media->id)
+                    ->exists();
+                $sharedInLibrary = \App\Models\Content\ContentMedia::where('path', $media->path)->exists();
+
+                if (! $sharedInBasket && ! $sharedInLibrary) {
+                    Storage::disk($media->disk ?: 'public')->delete($media->path);
+                }
             }
             if ($media->thumbnail_path) {
-                Storage::disk($media->disk ?: 'public')->delete($media->thumbnail_path);
+                $thumbShared = DailyBasketPostMedia::where('thumbnail_path', $media->thumbnail_path)
+                    ->where('id', '!=', $media->id)
+                    ->exists();
+                $thumbInLibrary = \App\Models\Content\ContentMedia::where('thumbnail_path', $media->thumbnail_path)->exists();
+
+                if (! $thumbShared && ! $thumbInLibrary) {
+                    Storage::disk($media->disk ?: 'public')->delete($media->thumbnail_path);
+                }
             }
         } catch (\Throwable $e) {
             // Storage unlink failures shouldn't block DB cleanup; orphan
