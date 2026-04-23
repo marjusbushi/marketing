@@ -285,6 +285,7 @@ class ContentPlannerApiController extends Controller
     public function syncFromMeta(Request $request): JsonResponse
     {
         $postSyncService = app(\App\Services\Meta\MetaPostSyncService::class);
+        $feedImport = app(ContentFeedImportService::class);
 
         // Manual sync button pulls the full available history by default —
         // the grid is meant to show everything. Automated cron jobs keep the
@@ -307,6 +308,8 @@ class ContentPlannerApiController extends Controller
             $issues[] = 'META_IG_ACCOUNT_ID mungon (auto-discover do provohet)';
         }
 
+        // Layer 1: insights + metrics (MetaPostInsight records feed the
+        // external column of the grid).
         try {
             $fbCount = $postSyncService->syncFacebookPosts($sinceDays, $maxPages);
             $igCount = $postSyncService->syncInstagramPosts($sinceDays, $maxPages);
@@ -320,11 +323,23 @@ class ContentPlannerApiController extends Controller
             ], 500);
         }
 
-        $total = $fbCount + $igCount;
+        // Layer 2: import published posts as ContentPost records (with media
+        // carousels downloaded to local storage). Redundant but resilient —
+        // if Layer 1 tabela lexohet ndryshe, kjo siguron qe UI vazhdon.
+        $importCounts = ['facebook' => 0, 'instagram' => 0];
+        try {
+            $since = Carbon::now()->subDays($sinceDays ?? (int) config('content-planner.import_days_back', 90))->toDateString();
+            $importCounts['facebook']  = $feedImport->importFacebookPosts($since);
+            $importCounts['instagram'] = $feedImport->importInstagramPosts($since);
+        } catch (\Throwable $e) {
+            // Non-fatal — Layer 1 already succeeded.
+            $issues[] = 'ContentFeedImport partial: ' . $e->getMessage();
+        }
 
-        // Kur total=0 dhe ka issue konfigurimi, tregoji user-it — ben debug
-        // te menjehershme ne vend te "mos del asgje".
-        if ($total === 0 && ! empty($issues)) {
+        $totalInsights = $fbCount + $igCount;
+        $totalContentPosts = $importCounts['facebook'] + $importCounts['instagram'];
+
+        if ($totalInsights === 0 && $totalContentPosts === 0 && ! empty($issues)) {
             return response()->json([
                 'message'  => 'Sync ran por 0 poste u importuan. Arsye te mundshme ↓',
                 'facebook' => 0,
@@ -335,11 +350,12 @@ class ContentPlannerApiController extends Controller
         }
 
         return response()->json([
-            'message'   => "Synced {$total} posts from Meta.",
-            'facebook'  => $fbCount,
-            'instagram' => $igCount,
-            'full'      => $fullHistory,
-            'issues'    => $issues,
+            'message'         => "Synced {$totalInsights} post insights + imported {$totalContentPosts} as planner posts.",
+            'facebook'        => $fbCount,
+            'instagram'       => $igCount,
+            'content_posts'   => $importCounts,
+            'full'            => $fullHistory,
+            'issues'          => $issues,
         ]);
     }
 

@@ -18,3 +18,11 @@ Schedule::command('meta:sync', ['--type' => 'posts'])
     ->hourly()
     ->withoutOverlapping(60) // 60-min lock TTL
     ->runInBackground();
+
+// Auto-import IG/FB posts as ContentPost records (planner layer) every hour
+// staggered 15 min after meta:sync to reuse fresh token cache. Without this,
+// published posts appear only in analytics but not as planner posts.
+Schedule::command('content-planner:import-feed')
+    ->hourlyAt(15)
+    ->withoutOverlapping(60)
+    ->runInBackground();
