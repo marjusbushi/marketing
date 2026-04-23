@@ -570,6 +570,8 @@
         width: 100%; height: 100%;
         object-fit: contain; display: block;
     }
+    .db-mat-slot .db-video-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; color: rgba(255,255,255,0.92); font-size: 40px; text-shadow: 0 2px 10px rgba(0,0,0,0.6); transition: opacity 0.2s; z-index: 2; }
+    .db-mat-slot.is-playing .db-video-overlay { opacity: 0; }
     .db-mat-empty {
         display: flex; flex-direction: column; align-items: center; gap: 4px;
         color: var(--db-text-3); font-size: 11px; padding: 16px; text-align: center;
@@ -2001,16 +2003,39 @@
         let idx = 0;
         const renderSlot = () => {
             slot.textContent = '';
+            slot.classList.remove('is-playing');
             const m = all[idx];
             if (!m) return;
             if (m.is_video) {
                 const v = document.createElement('video');
-                v.src = m.url;
+                // Attributes before src so Safari honors them on first load.
                 v.muted = true;
+                v.autoplay = true;
+                v.loop = true;
                 v.playsInline = true;
-                v.preload = 'metadata';
+                v.preload = 'auto';
+                v.setAttribute('muted', '');
+                v.setAttribute('autoplay', '');
+                v.setAttribute('loop', '');
+                v.setAttribute('playsinline', '');
                 if (m.thumbnail_url) v.poster = m.thumbnail_url;
+                v.src = m.url;
+                v.addEventListener('loadedmetadata', () => {
+                    v.play().catch(() => { /* blocked by policy */ });
+                });
+                v.addEventListener('playing', () => slot.classList.add('is-playing'));
+                v.addEventListener('pause', () => slot.classList.remove('is-playing'));
+                v.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (v.paused) v.play().catch(() => {});
+                });
+                v.load();
                 slot.appendChild(v);
+                // Play-icon overlay as a visual cue when autoplay is blocked.
+                const overlay = document.createElement('div');
+                overlay.className = 'db-video-overlay';
+                overlay.textContent = '▶';
+                slot.appendChild(overlay);
             } else {
                 const img = document.createElement('img');
                 img.src = m.thumbnail_url || m.url;
