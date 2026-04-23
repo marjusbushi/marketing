@@ -829,6 +829,8 @@
     .db-plan-media.has-media { border-style: solid; cursor: default; background: #f4f4f5; }
     .db-plan-media.is-dragover { border-color: var(--db-text); background: #eef2ff; }
     .db-plan-media img, .db-plan-media video { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .db-plan-media .db-video-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; color: rgba(255,255,255,0.92); font-size: 32px; text-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: opacity 0.2s; }
+    .db-plan-media.is-playing .db-video-overlay { opacity: 0; }
 
     /* Small hint under the media showing the target aspect */
     .db-plan-media-hint {
@@ -2784,10 +2786,8 @@
             wrap.classList.add('has-media');
             if (first.is_video) {
                 const v = document.createElement('video');
-                v.src = first.url;
-                // Autoplay muted loop = silent IG-style preview on the card.
-                // Browsers refuse autoplay with sound, so muted stays true here
-                // (audio is enabled in the detail view where `controls` lives).
+                // Attributes must be set BEFORE src assignment so the browser
+                // honors them on first load (Safari quirk).
                 v.muted = true;
                 v.autoplay = true;
                 v.loop = true;
@@ -2797,6 +2797,18 @@
                 v.setAttribute('autoplay', '');
                 v.setAttribute('loop', '');
                 v.setAttribute('playsinline', '');
+                v.src = first.url;
+                // Dynamically created <video> elements sometimes ignore the
+                // autoplay attribute. Force the kick explicitly on load; if
+                // policy blocks, the user can click to play.
+                v.addEventListener('loadedmetadata', () => {
+                    v.play().catch(() => { /* blocked by policy, ignore */ });
+                });
+                v.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (v.paused) v.play().catch(() => {});
+                });
+                v.load();
                 wrap.appendChild(v);
             } else {
                 const img = document.createElement('img');
