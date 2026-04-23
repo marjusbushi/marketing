@@ -243,33 +243,27 @@ class ContentMediaService
     }
 
     /**
-     * Infer a single "active" collection for a set of products.
+     * Find every distribution_week that contains any of the given products.
      *
-     * Strategy (in order):
-     *   1. Look at Daily Basket posts in za-marketing — if a product is
-     *      actively planned in a post and that post lives in one basket/week,
-     *      that's the best signal.
-     *   2. Fall back to DIS merch_calendar: query the
-     *      distribution_week_item_group_dates pivot cross-DB. Products that
-     *      haven't been scheduled in a basket yet still have a week in DIS
-     *      where marketing assigned them — that's the "campaign".
+     * Union of two sources:
+     *   1. Daily Basket posts (local) — weeks where marketing actively planned
+     *      a post featuring the product.
+     *   2. DIS Merch Calendar (cross-DB) — the authoritative source of "which
+     *      weeks is this product part of". Looked up via
+     *      distribution_week_item_group_dates pivot.
      *
-     * Returns the distribution_week_id IFF exactly one week covers the given
-     * products. Returns null when zero or multiple matches exist.
-     *
-     * Rationale: in ~90% of cases a product sits in one active collection.
-     * Linking media to a product can then auto-apply the collection, saving
-     * a click. Ambiguous cases stay silent to avoid polluting filters.
+     * Returns all unique week ids. Callers decide whether to link singularly
+     * (for back-compat) or to link all of them.
      */
-    public function inferCollectionForProducts(array $productIds): ?int
+    public function findCollectionsForProducts(array $productIds): array
     {
         $ids = array_values(array_unique(array_map('intval', array_filter($productIds))));
         if (empty($ids)) {
-            return null;
+            return [];
         }
 
-        // Step 1: basket posts (local, fastest, most explicit marketing intent)
-        $weekIds = \Illuminate\Support\Facades\DB::table('daily_baskets')
+        // Local basket posts
+        $fromBasket = \Illuminate\Support\Facades\DB::table('daily_baskets')
             ->join('daily_basket_posts', 'daily_basket_posts.daily_basket_id', '=', 'daily_baskets.id')
             ->join('daily_basket_post_products', 'daily_basket_post_products.daily_basket_post_id', '=', 'daily_basket_posts.id')
             ->whereIn('daily_basket_post_products.item_group_id', $ids)
@@ -279,58 +273,73 @@ class ContentMediaService
             ->pluck('daily_baskets.distribution_week_id')
             ->map(fn ($id) => (int) $id)
             ->filter()
-            ->values()
             ->all();
 
-        if (count($weekIds) === 1) {
-            return $weekIds[0];
-        }
-        if (count($weekIds) > 1) {
-            return null; // ambiguous in basket — don't let DIS override
-        }
-
-        // Step 2: DIS fallback — the product hasn't been planned into a basket
-        // yet, but merch calendar has already assigned it to a week. Use that.
+        // DIS merch calendar (authoritative assignment)
+        $fromDis = [];
         try {
-            $disWeekIds = \Illuminate\Support\Facades\DB::connection('dis')
+            $fromDis = \Illuminate\Support\Facades\DB::connection('dis')
                 ->table('distribution_week_item_group_dates')
                 ->whereIn('item_group_id', $ids)
                 ->distinct()
                 ->pluck('distribution_week_id')
                 ->map(fn ($id) => (int) $id)
                 ->filter()
-                ->values()
                 ->all();
-
-            return count($disWeekIds) === 1 ? $disWeekIds[0] : null;
         } catch (\Throwable $e) {
-            // DIS unavailable or connection misconfigured — don't block the
-            // primary flow. Logged but not rethrown.
             report($e);
-
-            return null;
         }
+
+        return array_values(array_unique(array_merge($fromBasket, $fromDis)));
     }
 
     /**
-     * If the product set points to a single collection and the media does
-     * not already have that collection linked, attach it. Returns the week
-     * id that was auto-linked, or null if no auto-link happened.
+     * Back-compat: return a single inferred week when there's exactly one
+     * candidate. Null otherwise. Prefer findCollectionsForProducts() for full
+     * results + autoLinkCollectionsFromProducts() for multi-link behavior.
+     */
+    public function inferCollectionForProducts(array $productIds): ?int
+    {
+        $weekIds = $this->findCollectionsForProducts($productIds);
+
+        return count($weekIds) === 1 ? $weekIds[0] : null;
+    }
+
+    /**
+     * Link ALL weeks that contain any of the given products. User tuned the
+     * policy: always link — a product that lives in 3 campaigns should make
+     * the media discoverable under each of those 3 collections' filter.
+     *
+     * Returns the list of week ids that were newly linked (i.e. excluding
+     * those already linked to the media). Empty array means nothing changed.
+     */
+    public function autoLinkCollectionsFromProducts(ContentMedia $media, array $productIds): array
+    {
+        $weekIds = $this->findCollectionsForProducts($productIds);
+        if (empty($weekIds)) {
+            return [];
+        }
+
+        $already = $media->distribution_week_ids;
+        $toLink = array_values(array_diff($weekIds, $already));
+        if (empty($toLink)) {
+            return [];
+        }
+
+        $this->linkCollections($media, $toLink, false);
+
+        return $toLink;
+    }
+
+    /**
+     * Deprecated alias for back-compat with the earlier single-match flow.
+     * Returns the first newly-linked week id, or null if no new link was made.
      */
     public function autoLinkCollectionFromProducts(ContentMedia $media, array $productIds): ?int
     {
-        $weekId = $this->inferCollectionForProducts($productIds);
-        if ($weekId === null) {
-            return null;
-        }
+        $linked = $this->autoLinkCollectionsFromProducts($media, $productIds);
 
-        if (in_array($weekId, $media->distribution_week_ids, true)) {
-            return null; // already linked, nothing to do
-        }
-
-        $this->linkCollections($media, [$weekId], false);
-
-        return $weekId;
+        return $linked[0] ?? null;
     }
 
     public function bulkLinkCollections(array $mediaIds, array $weekIds): int

@@ -435,6 +435,71 @@ class ContentMediaServiceTest extends TestCase
         $this->assertNull($result, 'Already linked — should return null');
     }
 
+    public function test_auto_link_collections_links_all_matching_weeks(): void
+    {
+        // Seed: product 700 is in TWO basket weeks (11 and 22)
+        foreach ([11, 22] as $weekId) {
+            $basketId = \Illuminate\Support\Facades\DB::table('daily_baskets')->insertGetId([
+                'distribution_week_id' => $weekId,
+                'date' => now()->subDays($weekId)->toDateString(),
+                'status' => 'active',
+            ]);
+            $postId = \Illuminate\Support\Facades\DB::table('daily_basket_posts')->insertGetId([
+                'daily_basket_id' => $basketId,
+                'title' => 'Test',
+                'post_type' => 'photo',
+                'stage' => 'idea',
+                'priority' => 'medium',
+                'target_platforms' => json_encode(['instagram']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            \Illuminate\Support\Facades\DB::table('daily_basket_post_products')->insert([
+                'daily_basket_post_id' => $postId,
+                'item_group_id' => 700,
+                'sort_order' => 0,
+                'is_hero' => 1,
+            ]);
+        }
+
+        $media = ContentMedia::create($this->mediaAttrs());
+        $linked = $this->service->autoLinkCollectionsFromProducts($media, [700]);
+
+        $this->assertEqualsCanonicalizing([11, 22], $linked);
+        $this->assertEqualsCanonicalizing([11, 22], $media->fresh()->distribution_week_ids);
+    }
+
+    public function test_find_collections_for_products_unions_basket_and_dis(): void
+    {
+        // Only basket source is testable here — DIS connection is the default
+        // sqlite in tests and has no distribution_week_item_group_dates table,
+        // so the cross-DB query throws and is swallowed. We verify the basket
+        // side contributes.
+        $basketId = \Illuminate\Support\Facades\DB::table('daily_baskets')->insertGetId([
+            'distribution_week_id' => 55,
+            'date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+        $postId = \Illuminate\Support\Facades\DB::table('daily_basket_posts')->insertGetId([
+            'daily_basket_id' => $basketId,
+            'title' => 'Test',
+            'post_type' => 'photo',
+            'stage' => 'idea',
+            'priority' => 'medium',
+            'target_platforms' => json_encode(['instagram']),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('daily_basket_post_products')->insert([
+            'daily_basket_post_id' => $postId,
+            'item_group_id' => 555,
+            'sort_order' => 0,
+            'is_hero' => 1,
+        ]);
+
+        $this->assertEqualsCanonicalizing([55], $this->service->findCollectionsForProducts([555]));
+    }
+
     // ── Existing tests continue below ──
 
     public function test_list_excludes_meta_imports_unless_imported_folder_or_all(): void

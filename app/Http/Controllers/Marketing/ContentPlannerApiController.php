@@ -378,7 +378,7 @@ class ContentPlannerApiController extends Controller
         } elseif (is_array($productIds) && ! empty($productIds)) {
             // User picked product(s) but no explicit collection — if all those
             // products live in a single campaign week, auto-link to it.
-            $this->mediaService->autoLinkCollectionFromProducts($media, $productIds);
+            $this->mediaService->autoLinkCollectionsFromProducts($media, $productIds);
         }
 
         $data = $media->toArray();
@@ -627,13 +627,13 @@ class ContentPlannerApiController extends Controller
             (bool) $request->input('replace', false),
         );
 
-        // Smart auto-link: if the products all belong to one active campaign,
-        // apply that collection without user effort.
-        $autoLinkedWeekId = $this->mediaService->autoLinkCollectionFromProducts($media->fresh(), $productIds);
+        // Auto-link EVERY collection that carries these products (from basket
+        // + DIS merch calendar union). User asked: always link.
+        $autoLinkedWeekIds = $this->mediaService->autoLinkCollectionsFromProducts($media->fresh(), $productIds);
 
         return response()->json([
             'media' => $media->fresh(),
-            'auto_linked_collection_id' => $autoLinkedWeekId,
+            'auto_linked_collection_ids' => $autoLinkedWeekIds,
         ]);
     }
 
@@ -669,13 +669,12 @@ class ContentPlannerApiController extends Controller
 
         $count = $this->mediaService->bulkLinkProducts($mediaIds, $productIds);
 
-        // Smart auto-link per media: if a product set points to a single
-        // active campaign, carry the collection along for each touched media.
+        // Auto-link EVERY collection (union basket + DIS merch) for each media.
         $autoLinkedWeekIds = [];
         foreach (ContentMedia::whereIn('id', $mediaIds)->get() as $m) {
-            $weekId = $this->mediaService->autoLinkCollectionFromProducts($m, $productIds);
-            if ($weekId !== null) {
-                $autoLinkedWeekIds[(int) $m->id] = $weekId;
+            $linked = $this->mediaService->autoLinkCollectionsFromProducts($m, $productIds);
+            if (! empty($linked)) {
+                $autoLinkedWeekIds[(int) $m->id] = $linked;
             }
         }
 
