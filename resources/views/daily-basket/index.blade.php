@@ -970,7 +970,10 @@
     .db-media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .db-media-grid .db-media-slot { aspect-ratio: 1/1; }
 
-    .db-media-reel { aspect-ratio: 9/16; max-width: 180px; }
+    /* Single-asset reel/story slot: large enough to feel like a real reel.
+       Inside a carousel grid, tiles stay small (overridden below). */
+    .db-media-reel { aspect-ratio: 9/16; max-width: 340px; margin: 0 auto; }
+    .db-media-grid .db-media-reel { max-width: 140px; margin: 0; }
 
     .db-media-progress {
         position: absolute; inset: 0;
@@ -2782,9 +2785,18 @@
             if (first.is_video) {
                 const v = document.createElement('video');
                 v.src = first.url;
+                // Autoplay muted loop = silent IG-style preview on the card.
+                // Browsers refuse autoplay with sound, so muted stays true here
+                // (audio is enabled in the detail view where `controls` lives).
                 v.muted = true;
+                v.autoplay = true;
+                v.loop = true;
                 v.playsInline = true;
-                v.preload = 'metadata';
+                v.preload = 'auto';
+                v.setAttribute('muted', '');
+                v.setAttribute('autoplay', '');
+                v.setAttribute('loop', '');
+                v.setAttribute('playsinline', '');
                 wrap.appendChild(v);
             } else {
                 const img = document.createElement('img');
@@ -3533,12 +3545,13 @@
             const video = document.createElement('video');
             video.className = 'db-media-video';
             video.src = media.url;
-            video.muted = true;
+            // Detail view — user wants full playback: native controls + audio.
+            // Keep playsInline so it doesn't enter fullscreen on mobile taps.
+            video.controls = true;
             video.playsInline = true;
             video.preload = 'metadata';
-            video.addEventListener('click', () => {
-                if (video.paused) video.play(); else video.pause();
-            });
+            video.setAttribute('controls', '');
+            video.setAttribute('playsinline', '');
             tile.appendChild(video);
         } else {
             const img = document.createElement('img');
