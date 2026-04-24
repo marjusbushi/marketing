@@ -299,7 +299,7 @@
                         <div>
                             <div class="is-profile-name">{{ $influencer->name }}</div>
                             @if($influencer->handle)
-                                <div class="is-profile-handle">@{{ $influencer->handle }}</div>
+                                <div class="is-profile-handle">@{{ ltrim($influencer->handle, '@') }}</div>
                             @endif
                         </div>
                     </div>

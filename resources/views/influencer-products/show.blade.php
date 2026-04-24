@@ -33,7 +33,7 @@
             @if($influencerProduct->influencer)
                 <a href="{{ route('marketing.influencers.show', $influencerProduct->influencer) }}" class="text-blue-500 font-bold text-lg no-underline hover:underline block mt-1">{{ $influencerProduct->influencer->name }}</a>
                 @if($influencerProduct->influencer->handle)
-                    <div class="text-[11px] text-gray-400 mt-0.5">@{{ $influencerProduct->influencer->handle }}</div>
+                    <div class="text-[11px] text-gray-400 mt-0.5">@{{ ltrim($influencerProduct->influencer->handle, '@') }}</div>
                 @endif
             @else
                 <div class="text-lg font-bold text-gray-900 dark:text-gray-100 mt-1">—</div>

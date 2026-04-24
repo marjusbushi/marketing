@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             {
                 data: 'handle', name: 'handle',
-                render: data => data ? `<span class="text-slate-500">@${data}</span>` : '<span class="text-slate-300">—</span>'
+                render: data => data ? `<span class="text-slate-500">@${String(data).replace(/^@+/, '')}</span>` : '<span class="text-slate-300">—</span>'
             },
             {
                 data: 'phone', name: 'phone',

@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         columns: [
             { data:'serial', name:'serial', render: d => `<span class="font-mono text-xs font-semibold text-primary-600">${d}</span>` },
-            { data:null, name:'influencer_name', render: d => { let h = `<span class="font-semibold text-slate-900">${d.influencer_name}</span>`; if(d.influencer_handle && d.influencer_handle!=='-') h += `<br><span class="text-[11px] text-slate-400">@${d.influencer_handle}</span>`; return h; } },
+            { data:null, name:'influencer_name', render: d => { let h = `<span class="font-semibold text-slate-900">${d.influencer_name}</span>`; if(d.influencer_handle && d.influencer_handle!=='-') h += `<br><span class="text-[11px] text-slate-400">@${String(d.influencer_handle).replace(/^@+/, '')}</span>`; return h; } },
             { data:'branch_name', name:'branch_name', render: d => `<span class="text-slate-600">${d}</span>` },
             { data:'items_count', className:'text-center', searchable:false, render: d => `<span class="ip-count">${d}</span>` },
             { data:'total_value_formatted', className:'text-right', searchable:false, render: d => `<span class="font-semibold tabular-nums">${d}</span>` },
