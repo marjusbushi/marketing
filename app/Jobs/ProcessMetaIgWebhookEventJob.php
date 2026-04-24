@@ -14,10 +14,17 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Processes a Meta IG webhook payload asynchronously.
+ * Processes a Meta webhook payload asynchronously — handles both Instagram
+ * DMs AND Facebook Messenger events (both arrive at the same webhook URL when
+ * the app subscribes to multiple products in the App Dashboard).
+ *
+ * Platform is detected from the top-level `object` field:
+ *   - object: "instagram" → platform 'instagram'  (ig_account_id is "self")
+ *   - object: "page"      → platform 'messenger'  (page_id        is "self")
  *
  * Meta delivers batches of messaging events. We iterate entry[].messaging[],
- * idempotently upsert one meta_ig_dm_events row per message (unique by mid),
+ * idempotently upsert one meta_ig_dm_events row per message (unique by mid —
+ * despite the table name, it is multi-platform via the `platform` column),
  * and flag is_first_of_thread when an incoming message starts a new
  * conversation — defined as no prior incoming in the last
  * meta.ig_conversation_gap_minutes (default 1440 = 24h).
@@ -39,16 +46,26 @@ class ProcessMetaIgWebhookEventJob implements ShouldQueue
     {
         $payload = json_decode($this->rawBody, true);
         if (! is_array($payload)) {
-            Log::channel('meta-webhooks')->error('IG webhook body not valid JSON', [
+            Log::channel('meta-webhooks')->error('Meta webhook body not valid JSON', [
                 'bytes' => strlen($this->rawBody),
             ]);
             return;
         }
 
-        $pageId = (string) config('meta.ig_account_id', '');
-        if ($pageId === '') {
+        // Instagram events arrive with object:"instagram"; Messenger events
+        // with object:"page". Both flow through the same queue + table because
+        // the data shape is identical — only the "self" identifier differs.
+        $object = strtolower((string) ($payload['object'] ?? 'instagram'));
+        $platform = $object === 'page' ? 'messenger' : 'instagram';
+
+        $selfId = $platform === 'messenger'
+            ? (string) config('meta.page_id', '')
+            : (string) config('meta.ig_account_id', '');
+
+        if ($selfId === '') {
             Log::channel('meta-webhooks')->warning(
-                'META_IG_ACCOUNT_ID not set — is_from_page detection will be incorrect'
+                "Self-ID not set for platform {$platform} — is_from_page detection will be incorrect",
+                ['platform' => $platform, 'object' => $object]
             );
         }
 
@@ -65,9 +82,10 @@ class ProcessMetaIgWebhookEventJob implements ShouldQueue
 
             foreach ($events as $event) {
                 try {
-                    $this->processEvent($event, $entry, $pageId);
+                    $this->processEvent($event, $entry, $selfId, $platform);
                 } catch (Throwable $e) {
-                    Log::channel('meta-webhooks')->error('IG webhook event processing failed', [
+                    Log::channel('meta-webhooks')->error('Meta webhook event processing failed', [
+                        'platform' => $platform,
                         'error' => $e->getMessage(),
                         'mid' => data_get($event, 'message.mid'),
                     ]);
@@ -80,7 +98,7 @@ class ProcessMetaIgWebhookEventJob implements ShouldQueue
         }
     }
 
-    private function processEvent(array $event, array $entry, string $pageId): void
+    private function processEvent(array $event, array $entry, string $selfId, string $platform): void
     {
         $senderId = (string) data_get($event, 'sender.id', '');
         $recipientId = (string) data_get($event, 'recipient.id', '');
@@ -94,7 +112,7 @@ class ProcessMetaIgWebhookEventJob implements ShouldQueue
             return;
         }
 
-        $isFromPage = ($pageId !== '' && $senderId === $pageId);
+        $isFromPage = ($selfId !== '' && $senderId === $selfId);
         $threadId = $isFromPage ? $recipientId : $senderId;
         $receivedAt = Carbon::createFromTimestampMs($timestampMs);
 
@@ -113,22 +131,23 @@ class ProcessMetaIgWebhookEventJob implements ShouldQueue
             $mid,
             $threadId,
             $senderId,
-            $pageId,
+            $selfId,
             $isFromPage,
             $receivedAt,
             $adId,
-            $sanitizedEntry
+            $sanitizedEntry,
+            $platform
         ) {
             $row = MetaIgDmEvent::updateOrCreate(
                 ['message_id' => $mid],
                 [
                     'thread_id' => $threadId,
                     'from_id' => $senderId,
-                    'page_id' => $pageId,
+                    'page_id' => $selfId,
                     'is_from_page' => $isFromPage,
                     'received_at' => $receivedAt,
                     'ad_id' => $adId !== null ? (string) $adId : null,
-                    'platform' => 'instagram',
+                    'platform' => $platform,
                     'raw_payload' => $sanitizedEntry,
                     'is_first_of_thread' => false,
                 ]
@@ -138,7 +157,11 @@ class ProcessMetaIgWebhookEventJob implements ShouldQueue
                 $gapMinutes = (int) config('meta.ig_conversation_gap_minutes', 1440);
                 $cutoff = $receivedAt->copy()->subMinutes($gapMinutes);
 
-                $priorExists = MetaIgDmEvent::where('thread_id', $threadId)
+                // Gap check is per-platform — same thread_id could exist on
+                // IG and Messenger for different users; we must not bleed
+                // first-of-thread state across platforms.
+                $priorExists = MetaIgDmEvent::where('platform', $platform)
+                    ->where('thread_id', $threadId)
                     ->where('is_from_page', false)
                     ->where('received_at', '>=', $cutoff)
                     ->where('received_at', '<', $receivedAt)

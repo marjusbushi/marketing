@@ -11,10 +11,16 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Meta Instagram DM webhook — public endpoint (auth via X-Hub-Signature-256).
-// CSRF is excluded for this path in bootstrap/app.php.
+// Meta DM webhook — public endpoint (auth via X-Hub-Signature-256). Handles
+// BOTH Instagram DMs and Facebook Messenger events; ProcessMetaIgWebhookEventJob
+// detects platform from the top-level `object` field of each payload. /page is
+// an alias of /instagram so the Meta App Dashboard can use whichever URL reads
+// clearest when subscribing the Page product. CSRF is excluded for both paths
+// in bootstrap/app.php.
 Route::get('/webhooks/meta/instagram', [MetaInstagramWebhookController::class, 'verify']);
 Route::post('/webhooks/meta/instagram', [MetaInstagramWebhookController::class, 'receive']);
+Route::get('/webhooks/meta/page', [MetaInstagramWebhookController::class, 'verify']);
+Route::post('/webhooks/meta/page', [MetaInstagramWebhookController::class, 'receive']);
 
 // Guest routes
 Route::middleware('guest')->group(function () {
