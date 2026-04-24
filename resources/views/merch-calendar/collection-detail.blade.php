@@ -66,6 +66,19 @@
     .cd-view-toggle button { padding: 6px 10px; font-size: 12px; background: #fff; border: none; cursor: pointer; color: #64748b; display: inline-flex; align-items: center; gap: 4px; }
     .cd-view-toggle button:hover:not(.active) { background: #f8fafc; }
     .cd-view-toggle button.active { background: #f1f5f9; color: #0f172a; font-weight: 600; }
+    .cd-page-size { font-size: 12px; color: #64748b; display: inline-flex; align-items: center; gap: 6px; }
+    .cd-page-size select { padding: 5px 8px; font-size: 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #0f172a; cursor: pointer; outline: none; }
+    .cd-page-size select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+
+    /* Pagination */
+    .cd-pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 20px; font-size: 12px; color: #64748b; flex-wrap: wrap; }
+    .cd-pagination.hidden { display: none; }
+    .cd-pg-btn { padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #475569; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.1s; }
+    .cd-pg-btn:hover:not(:disabled):not(.active) { background: #f8fafc; border-color: #cbd5e1; }
+    .cd-pg-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; font-weight: 600; }
+    .cd-pg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .cd-pg-ellipsis { padding: 0 4px; color: #cbd5e1; user-select: none; }
+    .cd-pg-info { color: #64748b; margin: 0 8px; }
 
     /* List view */
     .cd-grid.is-list { display: flex; flex-direction: column; gap: 8px; }
@@ -213,7 +226,15 @@
             {{-- Rendered by JS --}}
         </div>
         <div class="cd-toolbar-right">
-            <span><span id="cdShownCount">0</span> produkte</span>
+            <span id="cdShownLabel">0 produkte</span>
+            <label class="cd-page-size">
+                Shfaq:
+                <select id="cdPageSize">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
             <div class="cd-view-toggle" role="group" aria-label="View mode">
                 <button type="button" id="cdViewGrid" class="active" aria-label="Grid view" title="Grid">
                     <iconify-icon icon="heroicons-outline:squares-2x2" width="14"></iconify-icon>
@@ -230,6 +251,9 @@
         <div class="cd-grid" id="cdGrid">
             <div class="cd-empty">Loading...</div>
         </div>
+        <nav class="cd-pagination hidden" id="cdPagination" aria-label="Pagination">
+            {{-- Rendered by JS --}}
+        </nav>
     </section>
 
 </div>
@@ -255,6 +279,13 @@
         try { return localStorage.getItem('cd-view-mode') === 'list' ? 'list' : 'grid'; }
         catch (_) { return 'grid'; }
     })();
+    let pageSize = (() => {
+        try {
+            const v = parseInt(localStorage.getItem('cd-page-size'), 10);
+            return [25, 50, 100].includes(v) ? v : 25;
+        } catch (_) { return 25; }
+    })();
+    let currentPage = 1;
 
     const classStyles = {
         best_seller: { bg:'#fef3c7', text:'#92400e', label:'Best Seller' },
@@ -419,24 +450,104 @@
             ? allGroups
             : allGroups.filter(g => (g.classification || 'plotesues') === currentFilter);
 
+        const total = groups.length;
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+        // Clamp page (filter or pageSize change can leave currentPage invalid)
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(total, startIdx + pageSize);
+        const pageGroups = groups.slice(startIdx, endIdx);
+
         const grid = document.getElementById('cdGrid');
         clearChildren(grid);
         grid.classList.toggle('is-list', viewMode === 'list');
 
-        document.getElementById('cdShownCount').textContent = groups.length;
+        // Summary label
+        const label = document.getElementById('cdShownLabel');
+        if (total === 0) {
+            label.textContent = '0 produkte';
+        } else if (total <= pageSize) {
+            label.textContent = total + ' produkte';
+        } else {
+            label.textContent = 'Shfaqet ' + (startIdx + 1) + '–' + endIdx + ' nga ' + total;
+        }
 
-        if (!groups.length) {
+        if (!total) {
             const empty = el('div', 'cd-empty',
                 allGroups.length === 0 ? 'Asnjë produkt në këtë koleksion.' : 'Asnjë produkt me këtë klasifikim.');
             grid.appendChild(empty);
+            renderPagination(total, totalPages);
             return;
         }
 
         const realIndexMap = new Map(allGroups.map((g, i) => [g, i]));
 
-        groups.forEach(g => {
+        pageGroups.forEach(g => {
             grid.appendChild(buildCard(g, realIndexMap.get(g) ?? 0));
         });
+
+        renderPagination(total, totalPages);
+    }
+
+    function renderPagination(total, totalPages) {
+        const nav = document.getElementById('cdPagination');
+        clearChildren(nav);
+
+        if (totalPages <= 1) {
+            nav.classList.add('hidden');
+            return;
+        }
+        nav.classList.remove('hidden');
+
+        const makeBtn = (label, targetPage, opts = {}) => {
+            const b = el('button', 'cd-pg-btn' + (opts.active ? ' active' : ''), label);
+            b.type = 'button';
+            if (opts.disabled) b.disabled = true;
+            if (!opts.disabled && !opts.active) {
+                b.addEventListener('click', () => goToPage(targetPage));
+            }
+            if (opts.ariaLabel) b.setAttribute('aria-label', opts.ariaLabel);
+            return b;
+        };
+
+        // Prev
+        nav.appendChild(makeBtn('◄ Para', currentPage - 1, { disabled: currentPage === 1, ariaLabel: 'Previous page' }));
+
+        // Page numbers with truncation: 1 ... p-1 p p+1 ... N
+        const pages = new Set([1, totalPages, currentPage, currentPage - 1, currentPage + 1]);
+        const pageList = [...pages].filter(p => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+
+        let prev = 0;
+        pageList.forEach(p => {
+            if (prev && p - prev > 1) {
+                nav.appendChild(el('span', 'cd-pg-ellipsis', '…'));
+            }
+            nav.appendChild(makeBtn(String(p), p, { active: p === currentPage, ariaLabel: 'Page ' + p }));
+            prev = p;
+        });
+
+        // Next
+        nav.appendChild(makeBtn('Tjetër ►', currentPage + 1, { disabled: currentPage === totalPages, ariaLabel: 'Next page' }));
+
+        nav.appendChild(el('span', 'cd-pg-info', 'Faqja ' + currentPage + ' / ' + totalPages));
+    }
+
+    function goToPage(p) {
+        currentPage = p;
+        renderProducts();
+        // Scroll to top of grid smoothly
+        const grid = document.getElementById('cdGrid');
+        if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function setPageSize(n) {
+        pageSize = Number(n) || 25;
+        currentPage = 1;
+        try { localStorage.setItem('cd-page-size', String(pageSize)); } catch (_) {}
+        renderProducts();
     }
 
     function buildCard(g, realIdx) {
@@ -592,6 +703,7 @@
 
     function filterByClass(key) {
         currentFilter = key;
+        currentPage = 1;
         renderFilterBar();
         renderProducts();
     }
@@ -874,6 +986,11 @@
     // Apply persisted view mode before first product render
     document.getElementById('cdViewGrid').classList.toggle('active', viewMode === 'grid');
     document.getElementById('cdViewList').classList.toggle('active', viewMode === 'list');
+
+    // Page-size selector — seed from persisted value, wire up change
+    const pageSizeSelect = document.getElementById('cdPageSize');
+    pageSizeSelect.value = String(pageSize);
+    pageSizeSelect.addEventListener('change', (e) => setPageSize(e.target.value));
 
     renderNotes();
     renderStats();
