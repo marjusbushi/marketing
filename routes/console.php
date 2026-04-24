@@ -55,3 +55,16 @@ Schedule::command('meta:backfill-ig-media', ['--limit' => 50])
     ->hourlyAt(25)
     ->withoutOverlapping(50)
     ->runInBackground();
+
+// Keep the IG DM webhook subscription healthy. Meta drops subscriptions
+// silently (token rotation, app permission review, Meta-side transient). When
+// that happens meta_ig_dm_events stops receiving rows and the dashboard's
+// organic count quietly decays to zero. Symptom that prompted this (2026-04-24):
+// webhook activated 04-22, last event 04-22 11:46 UTC, 48h of silence before
+// anyone noticed. Hourly at :35 — staggered behind posts (:00), messaging
+// (:05), import-feed (:15), backfill (:25). Idempotent POST to
+// /PAGE_ID/subscribed_apps, so no harm if run while subscription is already OK.
+Schedule::command('meta:ig-webhook-heal')
+    ->hourlyAt(35)
+    ->withoutOverlapping(50)
+    ->runInBackground();
