@@ -19,6 +19,20 @@ Schedule::command('meta:sync', ['--type' => 'posts'])
     ->withoutOverlapping(60) // 60-min lock TTL
     ->runInBackground();
 
+// Sync messaging stats (Messenger + IG DMs) hourly.
+// Root cause of prod "0 organic DMs" bug (Apr 2026): scheduler previously only
+// ran --type=posts, so meta_messaging_stats never got a row for today/yesterday
+// unless user hit "Rifresko". When META_IG_WEBHOOK_START_DATE is unset the
+// dashboard falls back to this table — empty table ⇒ zero organic. Runs 5 min
+// past hour so we stagger behind posts + ads and never lock the API for longer
+// than needed. For IG-webhook-era dates the dashboard still prefers
+// meta_ig_dm_events (exact); this sync provides the pre-webhook + Messenger
+// baseline and a safety net if webhook delivery hiccups.
+Schedule::command('meta:sync', ['--type' => 'messaging'])
+    ->hourlyAt(5)
+    ->withoutOverlapping(60)
+    ->runInBackground();
+
 // Auto-import IG/FB posts as ContentPost records (planner layer) every hour
 // staggered 15 min after meta:sync to reuse fresh token cache. Without this,
 // published posts appear only in analytics but not as planner posts.

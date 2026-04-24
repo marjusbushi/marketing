@@ -2,8 +2,10 @@
 
 namespace App\Services\Meta;
 
+use App\Models\Meta\MetaMessagingStat;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -576,7 +578,9 @@ class MetaMarketingV2ChannelService
                 }
                 unset($row);
 
-                return ['totals' => $totals, 'daily' => array_values($daily)];
+                $meta = $this->buildIgMessagingMeta($daily, $from, $to);
+
+                return ['totals' => $totals, 'daily' => array_values($daily), 'meta' => $meta];
             }
 
             return $this->runWithV2Version(function () use ($from, $to) {
@@ -613,6 +617,99 @@ class MetaMarketingV2ChannelService
                 ];
             });
         });
+    }
+
+    /**
+     * Build diagnostic metadata for the IG Messaging card so the UI can tell
+     * the user — at a glance — which source is driving the organic number
+     * and whether anything looks off. Prior to this, users had to hit
+     * /api/ig-dm-debug manually when Meta BS disagreed with the dashboard.
+     *
+     * mode:
+     *   - 'webhook'  — every row in the range comes from meta_ig_dm_events
+     *                  (exact, ±2% of Meta BS modulo the Pacific vs Tirana
+     *                  timezone shift).
+     *   - 'sample'   — every row comes from MetaMessagingStat (Conversations
+     *                  API sample; known undercount per code history).
+     *   - 'mixed'    — range straddles META_IG_WEBHOOK_START_DATE.
+     *   - 'sample_empty' — sample mode AND every row is zero, meaning the
+     *                  hourly messaging sync either hasn't run or returned
+     *                  zero. Triggers a loud warning in the UI.
+     *
+     * warnings: array of terse codes the UI can localize.
+     */
+    private function buildIgMessagingMeta(array $daily, string $from, string $to): array
+    {
+        $webhookStart = (string) config('meta.ig_webhook_start_date', '');
+        $webhookConfigured = $webhookStart !== '';
+
+        $sources = [];
+        $nonZeroRows = 0;
+        foreach ($daily as $row) {
+            $sources[$row['source'] ?? 'sample'] = true;
+            if ((int) ($row['organic'] ?? 0) > 0) {
+                $nonZeroRows++;
+            }
+        }
+
+        $webhookRows = count(array_filter($daily, fn ($r) => ($r['source'] ?? '') === 'webhook'));
+        $totalRows = max(1, count($daily));
+        $coveragePct = (int) round($webhookRows / $totalRows * 100);
+
+        $mode = match (true) {
+            count($sources) > 1            => 'mixed',
+            isset($sources['webhook'])     => 'webhook',
+            $nonZeroRows === 0             => 'sample_empty',
+            default                        => 'sample',
+        };
+
+        // Last webhook event timestamp — fetched only when configured, since
+        // the DB round-trip is not free. Uses the dis connection (events live
+        // in DIS DB per Decision #17).
+        $lastWebhookEvent = null;
+        if ($webhookConfigured) {
+            try {
+                $lastWebhookEvent = DB::connection('dis')->table('meta_ig_dm_events')
+                    ->where('platform', 'instagram')
+                    ->orderByDesc('received_at')
+                    ->value('received_at');
+            } catch (Throwable $e) {
+                Log::debug('igMessaging meta: last_webhook_event query failed: ' . $e->getMessage());
+            }
+        }
+
+        $lastMessagingSync = MetaMessagingStat::where('platform', 'instagram')
+            ->orderByDesc('synced_at')
+            ->value('synced_at');
+
+        $warnings = [];
+        if ($mode === 'sample_empty') {
+            $warnings[] = 'sample_empty_zero_organic';
+        }
+        if ($webhookConfigured && $lastWebhookEvent) {
+            $ageHours = Carbon::parse($lastWebhookEvent)->diffInHours(now());
+            if ($ageHours >= 24) {
+                $warnings[] = 'webhook_stale_24h';
+            }
+        }
+        if ($webhookConfigured && !$lastWebhookEvent) {
+            $warnings[] = 'webhook_configured_but_no_events';
+        }
+
+        return [
+            'mode' => $mode,
+            'webhook_configured' => $webhookConfigured,
+            'webhook_start_date' => $webhookConfigured ? $webhookStart : null,
+            'webhook_coverage_pct' => $coveragePct,
+            'last_webhook_event' => $lastWebhookEvent ? (string) $lastWebhookEvent : null,
+            'last_messaging_sync' => $lastMessagingSync ? (string) $lastMessagingSync : null,
+            'warnings' => $warnings,
+            'timezone' => [
+                'dashboard' => 'Europe/Tirana',
+                'meta_bs' => 'America/Los_Angeles',
+                'note' => 'Daily totals will drift from Meta BS by ~9-10h because of the TZ difference. Use 7- or 30-day totals for direct comparison.',
+            ],
+        ];
     }
 
     public function fbKpis(string $from, string $to, ?string $preset = null, bool $noCache = false): array

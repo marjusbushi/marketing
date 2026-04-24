@@ -243,10 +243,15 @@
                     <b>Si llogaritet:</b><br>
                     &bull; <b>Organike</b> &mdash; Kapet ne kohe reale nga <b>Meta Webhook</b> (cdo DM ruhet ne DB). Ekzakte per data nga aktivizimi.<br>
                     &bull; <b>Paid</b> &mdash; Nga Ads API (metric: <code>messaging_conversation_started_7d</code>).<br><br>
-                    Duhet te perputhet me <b>Meta Business Suite &gt; Insights &gt; Messaging</b> brenda &plusmn;2%.<br><br>
+                    <b>Kujdes me krahasimin:</b> Meta Business Suite raporton ne Pacific Time, ky dashboard ne Europe/Tirana. Totalet ditore jane te zhvendosura me ~9-10h. Per nje krahasim 1:1 perdor periudha 7 ose 30 ditore, jo nje dite te vetme.<br><br>
                     Per data <b>para aktivizimit te webhook-ut</b>, organike vjen nga Conversations API sample (me gap historike).
                 </div>
             </div>
+            <a id="msg-debug-link" href="#" target="_blank" class="hidden ml-auto text-[10px] text-slate-400 hover:text-slate-700 underline decoration-dotted">Diagnoze JSON</a>
+        </div>
+        <div id="msg-warning" class="hidden px-5 py-3 bg-amber-50 border-b border-amber-200 text-[12px] text-amber-800 flex items-start gap-2">
+            <iconify-icon icon="heroicons-outline:exclamation-triangle" width="16" class="text-amber-600 shrink-0 mt-0.5"></iconify-icon>
+            <div id="msg-warning-text" class="leading-relaxed"></div>
         </div>
         <div class="p-5">
             <div class="flex items-center justify-center gap-6 mb-4" id="messagingSection">
@@ -979,6 +984,85 @@
     }
 
     // Messaging
+    function applyMessagingMeta(meta, daily, from, to) {
+        const sourceBadge = document.getElementById('msg-source-badge');
+        const warnBox = document.getElementById('msg-warning');
+        const warnText = document.getElementById('msg-warning-text');
+        const debugLink = document.getElementById('msg-debug-link');
+
+        // Badge — prefer service-provided mode, fall back to row-level source
+        // for backward compatibility (live-v2 branch does not attach meta).
+        let mode = meta && meta.mode;
+        if (!mode) {
+            const sources = new Set((daily || []).map(d => d.source).filter(Boolean));
+            if (sources.size === 0) mode = null;
+            else if (sources.size === 1 && sources.has('webhook')) mode = 'webhook';
+            else if (sources.size === 1 && sources.has('sample')) mode = 'sample';
+            else mode = 'mixed';
+        }
+
+        if (sourceBadge) {
+            sourceBadge.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-700', 'bg-amber-100', 'text-amber-700', 'bg-slate-100', 'text-slate-600', 'bg-rose-100', 'text-rose-700');
+            if (mode === 'webhook') {
+                sourceBadge.textContent = 'webhook (ekzakt)';
+                sourceBadge.classList.add('bg-emerald-100', 'text-emerald-700');
+            } else if (mode === 'sample') {
+                sourceBadge.textContent = 'sample (historike)';
+                sourceBadge.classList.add('bg-amber-100', 'text-amber-700');
+            } else if (mode === 'sample_empty') {
+                sourceBadge.textContent = 'sample bosh';
+                sourceBadge.classList.add('bg-rose-100', 'text-rose-700');
+            } else if (mode === 'mixed') {
+                sourceBadge.textContent = 'miks (webhook + sample)';
+                sourceBadge.classList.add('bg-slate-100', 'text-slate-600');
+            } else {
+                sourceBadge.classList.add('hidden');
+            }
+        }
+
+        // Warning banner — only shown when meta hints at a problem.
+        // Build DOM with textContent only; never innerHTML (hardcoded copy
+        // today, but this block can be localized later and we do not want a
+        // future translator to accidentally inject HTML).
+        const warnings = (meta && meta.warnings) || [];
+        if (warnBox && warnText) {
+            while (warnText.firstChild) warnText.removeChild(warnText.firstChild);
+            if (warnings.length === 0) {
+                warnBox.classList.add('hidden');
+            } else {
+                const webhookConfigured = !!(meta && meta.webhook_configured);
+                warnings.forEach((w, idx) => {
+                    let text;
+                    switch (w) {
+                        case 'sample_empty_zero_organic':
+                            text = webhookConfigured
+                                ? 'Asnje DM organike per kete periudhe. Kontrollo nese subscription-i i webhook-ut ne Meta App eshte aktiv — backfill-i historike perdor Conversations API i cili boll shpesh kthen 0.'
+                                : 'Asnje DM organike per kete periudhe. Webhook-u nuk eshte aktivizuar (META_IG_WEBHOOK_START_DATE eshte bosh). Pa webhook, dashboard-i perdor Conversations API sample — cili boll shpesh nuk ka te dhena per sot/dje derisa te ekzekutohet sync-u orar i messaging (5 min past hour).';
+                            break;
+                        case 'webhook_stale_24h':
+                            text = 'Webhook-u eshte konfiguruar por nuk ka marre asnje DM ne 24h — subscription-i mund te kete rene ose Meta-ja nuk po dergon. Hap Diagnoze JSON.';
+                            break;
+                        case 'webhook_configured_but_no_events':
+                            text = 'Webhook-u eshte konfiguruar por tabela meta_ig_dm_events eshte bosh. Kontrollo subscription-in ne Meta App Dashboard.';
+                            break;
+                        default:
+                            text = w;
+                    }
+                    if (idx > 0) warnText.appendChild(document.createElement('br'));
+                    warnText.appendChild(document.createTextNode('\u2022 ' + text));
+                });
+                warnBox.classList.remove('hidden');
+            }
+        }
+
+        // Debug link — quick jump to the JSON diagnostic endpoint.
+        if (debugLink) {
+            const params = new URLSearchParams({ from, to });
+            debugLink.href = baseUrl + '/api/ig-dm-debug?' + params.toString();
+            debugLink.classList.remove('hidden');
+        }
+    }
+
     async function loadMessaging(from, to, preset = null, extra = {}, gen = null) {
         const params = { from, to, ...extra };
         if (preset) params.preset = preset;
@@ -993,25 +1077,11 @@
             breakdownEl.textContent = `${fmtNum(org)} organike + ${fmtNum(paid)} ads`;
         }
 
-        // Source badge — reflects whether organic count comes from webhook (exact)
-        // or sample (pre-activation dates). Mixed range shows a neutral "mixed" chip.
-        const sourceBadge = document.getElementById('msg-source-badge');
-        if (sourceBadge) {
-            const sources = new Set((data.daily || []).map(d => d.source).filter(Boolean));
-            sourceBadge.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-700', 'bg-amber-100', 'text-amber-700', 'bg-slate-100', 'text-slate-600');
-            if (sources.size === 0) {
-                sourceBadge.classList.add('hidden');
-            } else if (sources.size === 1 && sources.has('webhook')) {
-                sourceBadge.textContent = 'webhook (ekzakt)';
-                sourceBadge.classList.add('bg-emerald-100', 'text-emerald-700');
-            } else if (sources.size === 1 && sources.has('sample')) {
-                sourceBadge.textContent = 'sample (historike)';
-                sourceBadge.classList.add('bg-amber-100', 'text-amber-700');
-            } else {
-                sourceBadge.textContent = 'miks (webhook + sample)';
-                sourceBadge.classList.add('bg-slate-100', 'text-slate-600');
-            }
-        }
+        // Source badge + warning banner + debug link — driven by the new
+        // meta block on the response. Prior version inferred from row-level
+        // source only, which missed cases where webhook is off AND sample is
+        // empty (user saw a blank badge and no hint why organic was 0).
+        applyMessagingMeta(data.meta || null, data.daily || [], from, to);
 
         // DM activity chart — single line showing daily contacts
         if (data.daily && data.daily.length > 0) {

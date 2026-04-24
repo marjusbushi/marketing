@@ -264,19 +264,22 @@ class MetaMarketingV2ChannelsController extends Controller
                 ->pluck('mc', 'date');
 
             // Webhook-era per-day counts, bucketed by Tirana local date.
+            // Delegates timezone math to MetaDataResolverService::tiranaDayWindowUtc
+            // so this diagnostic endpoint matches the live resolver byte-for-byte
+            // (same DST-aware offset). Prior version hardcoded +01:00 and dropped
+            // ~1h of DMs at day edges during CEST (Apr-Oct).
             $webhookByDate = [];
             if ($webhookActive) {
-                $fromUtc = Carbon::parse($from)->startOfDay()->subHour()->format('Y-m-d H:i:s');
-                $toUtc = Carbon::parse($to)->endOfDay()->subHour()->format('Y-m-d H:i:s');
+                $window = \App\Services\Meta\MetaDataResolverService::tiranaDayWindowUtc($from, $to);
 
                 $webhookRows = DB::connection('dis')->table('meta_ig_dm_events')
-                    ->selectRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00')) as d, COUNT(*) as c")
+                    ->selectRaw("DATE(CONVERT_TZ(received_at, '+00:00', ?)) as d, COUNT(*) as c", [$window['offset']])
                     ->where('platform', 'instagram')
                     ->where('is_from_page', false)
                     ->where('is_first_of_thread', true)
                     ->whereNull('ad_id')
-                    ->whereBetween('received_at', [$fromUtc, $toUtc])
-                    ->groupByRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00'))")
+                    ->whereBetween('received_at', [$window['from_utc'], $window['to_utc']])
+                    ->groupByRaw("DATE(CONVERT_TZ(received_at, '+00:00', ?))", [$window['offset']])
                     ->get();
 
                 foreach ($webhookRows as $r) {
@@ -360,7 +363,7 @@ class MetaMarketingV2ChannelsController extends Controller
                         : 'MetaMessagingStat.new_conversations (from Conversations API, folder=instagram)',
                     'paid_source' => 'meta_ads_insights.platform_breakdown.instagram.messaging_conversations (from Ads API)',
                     'dashboard_formula' => 'combined_total = organic_total + paid_total',
-                    'meta_timezone' => 'Meta Business Suite reports in Pacific Time; our query uses Europe/Tirana (+01:00) local dates. A 1-day offset between displays is expected near midnight.',
+                    'meta_timezone' => 'Meta Business Suite reports in Pacific Time; our query uses Europe/Tirana local dates (CEST/+02:00 in summer, CET/+01:00 in winter, DST-aware). Daily totals will not match Meta BS exactly because the day windows shift by 9-10 hours depending on DST. For a 1:1 check, compare rolling 7/30-day periods instead of single days.',
                 ],
             ]);
         } catch (Throwable $e) {

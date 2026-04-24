@@ -588,6 +588,69 @@ class MetaDataResolverService
     }
 
     /**
+     * Compute the UTC instant window + fixed SQL offset string for a
+     * Tirana-local date range, handling DST. MySQL tz tables are not loaded
+     * on the DIS server (verified 2026-04-24 via CONVERT_TZ('UTC','Europe/Tirana')
+     * returning NULL), so we must use a fixed offset. We resolve the offset
+     * via PHP's DateTimeZone('Europe/Tirana') against the FROM date:
+     *
+     *   - CEST (+02:00) between last Sun of Mar and last Sun of Oct
+     *   - CET  (+01:00) rest of the year
+     *
+     * If a range crosses a DST transition (rare — twice per year), the side
+     * with the minority offset drifts by 1h at day boundaries. Acceptable
+     * given the alternative (loading MySQL tz tables on prod) is outside the
+     * za-marketing scope.
+     *
+     * @return array{from_utc: string, to_utc: string, offset: string, offset_seconds: int}
+     */
+    public static function tiranaDayWindowUtc(string $fromDate, string $toDate): array
+    {
+        $tirana = self::albanianTimezone();
+        $utc = new \DateTimeZone('UTC');
+
+        $fromLocal = new \DateTime($fromDate . ' 00:00:00', $tirana);
+        $toLocal = new \DateTime($toDate . ' 23:59:59', $tirana);
+
+        $fromUtc = (clone $fromLocal)->setTimezone($utc)->format('Y-m-d H:i:s');
+        $toUtc = (clone $toLocal)->setTimezone($utc)->format('Y-m-d H:i:s');
+
+        $offsetSec = $tirana->getOffset($fromLocal);
+        $sign = $offsetSec >= 0 ? '+' : '-';
+        $h = abs(intdiv($offsetSec, 3600));
+        $m = abs(($offsetSec % 3600) / 60);
+        $offset = sprintf('%s%02d:%02d', $sign, $h, $m);
+
+        return [
+            'from_utc' => $fromUtc,
+            'to_utc' => $toUtc,
+            'offset' => $offset,
+            'offset_seconds' => $offsetSec,
+        ];
+    }
+
+    /**
+     * Resolve an Albania-equivalent DateTimeZone across host OS tzdata quirks.
+     * IANA canonical is Europe/Tirane (no trailing 'a'), but some codebases
+     * and docs use Europe/Tirana. PHP's tz lookup is strict: whichever is
+     * missing on the host triggers DateInvalidTimeZoneException. Fall back
+     * through equivalent CET/CEST zones — Albania shares DST rules with all
+     * of them — so the returned offset is identical.
+     */
+    private static function albanianTimezone(): \DateTimeZone
+    {
+        foreach (['Europe/Tirane', 'Europe/Tirana', 'Europe/Belgrade', 'Europe/Berlin'] as $id) {
+            try {
+                return new \DateTimeZone($id);
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+        // Final fallback — should never hit; satisfies static analysis.
+        return new \DateTimeZone('+01:00');
+    }
+
+    /**
      * Dual-source IG messaging daily resolver.
      *
      * webhook_era (dates >= $webhookStart): COUNT(*) of first-of-thread, organic,
@@ -617,21 +680,23 @@ class MetaDataResolverService
         if ($toC->gte($startC)) {
             $webhookFromC = $fromC->gte($startC) ? $fromC : $startC;
 
-            // received_at is stored in UTC. Bucket by Tirana local date (+01:00
-            // fixed offset per task spec). Query span must cover UTC instants
-            // that map to the target local-date range: subtract 1h from both
-            // bounds so the UTC window fully contains the Tirana window.
-            $fromUtc = $webhookFromC->copy()->subHour()->format('Y-m-d H:i:s');
-            $toUtc = $toC->copy()->subHour()->format('Y-m-d H:i:s');
+            // received_at is stored in UTC. Bucket by Tirana local date, DST-aware.
+            // Use the same offset for WHERE bounds and the CONVERT_TZ bucketing so
+            // day edges line up exactly (prior version hardcoded '+01:00' and
+            // dropped ~1h of DMs at the start of each Tirana day during DST).
+            $window = self::tiranaDayWindowUtc(
+                $webhookFromC->toDateString(),
+                $toC->toDateString()
+            );
 
             $rows = DB::connection('dis')->table('meta_ig_dm_events')
-                ->selectRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00')) as d, COUNT(*) as new_conversations")
+                ->selectRaw("DATE(CONVERT_TZ(received_at, '+00:00', ?)) as d, COUNT(*) as new_conversations", [$window['offset']])
                 ->where('platform', 'instagram')
                 ->where('is_from_page', false)
                 ->where('is_first_of_thread', true)
                 ->whereNull('ad_id')
-                ->whereBetween('received_at', [$fromUtc, $toUtc])
-                ->groupByRaw("DATE(CONVERT_TZ(received_at, '+00:00', '+01:00'))")
+                ->whereBetween('received_at', [$window['from_utc'], $window['to_utc']])
+                ->groupByRaw("DATE(CONVERT_TZ(received_at, '+00:00', ?))", [$window['offset']])
                 ->orderBy('d')
                 ->get();
 
