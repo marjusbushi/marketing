@@ -87,10 +87,11 @@
     .cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
     .cd-empty { grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: #94a3b8; font-size: 13px; background: #fff; border: 1px dashed #e5e7eb; border-radius: 12px; }
 
-    .cd-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; transition: all 0.15s; display: flex; flex-direction: column; }
+    .cd-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; transition: all 0.15s; display: flex; flex-direction: column; }
     .cd-card:hover { border-color: #c7d2fe; box-shadow: 0 6px 18px rgba(99,102,241,0.06); }
 
-    .cd-card-img-wrap { position: relative; height: 280px; background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #cbd5e1; cursor: pointer; overflow: hidden; }
+    .cd-card-img-wrap { position: relative; height: 280px; background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #cbd5e1; cursor: pointer; overflow: hidden; border-radius: 12px 12px 0 0; }
+    .cd-grid.is-list .cd-card-img-wrap { border-radius: 12px 0 0 12px; }
     .cd-card-img-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .cd-card-discount { position: absolute; top: 8px; right: 8px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; z-index: 2; }
 
@@ -119,7 +120,7 @@
     .cd-date-add:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
     .cd-date-add.empty-state { width: 100%; text-align: left; padding: 5px 10px; }
 
-    .cd-date-picker { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); padding: 8px; z-index: 60; width: 240px; }
+    .cd-date-picker { position: fixed; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 12px 32px rgba(0,0,0,0.12); padding: 8px; z-index: 9995; width: 240px; }
     .cd-date-picker-title { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 8px 8px; }
     .cd-date-picker-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
     .cd-date-wkd { text-align: center; font-size: 9px; color: #94a3b8; padding: 4px 0; text-transform: uppercase; }
@@ -648,15 +649,42 @@
         });
 
         picker.appendChild(grid);
-        anchorBtn.parentNode.appendChild(picker);
+        document.body.appendChild(picker);
 
-        const closeOnOutside = (e) => {
-            if (!picker.contains(e.target) && e.target !== anchorBtn) {
-                picker.remove();
-                document.removeEventListener('click', closeOnOutside, true);
-            }
+        // Position below the anchor button; flip above when it would overflow the viewport.
+        const btnRect = anchorBtn.getBoundingClientRect();
+        const pickerRect = picker.getBoundingClientRect();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const margin = 6;
+
+        let top = btnRect.bottom + margin;
+        if (top + pickerRect.height > vh) {
+            // Flip above if there's room; otherwise pin to bottom edge.
+            const flipped = btnRect.top - pickerRect.height - margin;
+            top = flipped >= margin ? flipped : Math.max(margin, vh - pickerRect.height - margin);
+        }
+        let left = btnRect.left;
+        if (left + pickerRect.width > vw - margin) left = vw - pickerRect.width - margin;
+        if (left < margin) left = margin;
+
+        picker.style.top = top + 'px';
+        picker.style.left = left + 'px';
+
+        const closePicker = () => {
+            picker.remove();
+            document.removeEventListener('click', closeOnOutside, true);
+            window.removeEventListener('resize', closePicker);
+            window.removeEventListener('scroll', closePicker, true);
         };
-        setTimeout(() => document.addEventListener('click', closeOnOutside, true), 0);
+        const closeOnOutside = (e) => {
+            if (!picker.contains(e.target) && e.target !== anchorBtn) closePicker();
+        };
+        setTimeout(() => {
+            document.addEventListener('click', closeOnOutside, true);
+            window.addEventListener('resize', closePicker);
+            window.addEventListener('scroll', closePicker, true);
+        }, 0);
     };
 
     async function assignDate(groupId, ymd, isPrimary) {
