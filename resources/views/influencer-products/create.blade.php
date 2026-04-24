@@ -287,12 +287,28 @@ $(document).ready(function() {
         const ws = $('#source_warehouse_id');
         ws.html('<option value="">Duke kërkuar...</option>');
         if (!branchId) { ws.html('<option value="">Zgjidh magazinën...</option>'); return; }
-        $.get('{{ route("marketing.influencer-products.warehouses-for-branch") }}', { branch_id: branchId }, function(data) {
-            let opts = '<option value="">Zgjidh magazinën...</option>';
-            data.forEach(wh => opts += `<option value="${wh.id}">${wh.name}</option>`);
-            ws.html(opts);
-        });
+        $.get('{{ route("marketing.influencer-products.warehouses-for-branch") }}', { branch_id: branchId })
+            .done(function(data) {
+                if (!Array.isArray(data) || data.length === 0) {
+                    ws.html('<option value="">Asnjë magazinë për këtë degë</option>');
+                    return;
+                }
+                let opts = '<option value="">Zgjidh magazinën...</option>';
+                data.forEach(wh => opts += `<option value="${wh.id}">${wh.name}</option>`);
+                ws.html(opts);
+            })
+            .fail(function(xhr) {
+                ws.html('<option value="">Gabim në ngarkim</option>');
+                toastr.error('Nuk u ngarkuan dot magazinat (status ' + xhr.status + ')');
+            });
     });
+
+    // Auto-populate warehouses on page load if a branch is pre-selected
+    // (e.g. after validation error with old input). Otherwise the user
+    // has to re-select the branch to trigger the AJAX.
+    if ($('#source_branch_id').val()) {
+        $('#source_branch_id').trigger('change');
+    }
 
     $('#item-search').select2({
         placeholder: 'Kërko artikullin (emri ose SKU)...',
@@ -301,9 +317,21 @@ $(document).ready(function() {
             url: '{{ route("marketing.influencer-products.search-items") }}',
             dataType: 'json', delay: 300,
             data: params => ({ q: params.term }),
-            processResults: data => data,
-            cache: true
-        }
+            processResults: data => ({ results: data.results || [] }),
+            cache: true,
+            error: function (xhr) {
+                toastr.error('Kërkimi i artikujve dështoi (status ' + xhr.status + ')');
+            },
+        },
+        templateResult: function (item) {
+            if (item.loading) return item.text;
+            if (!item.id) return item.text;
+            const thumb = item.thumbnail
+                ? `<img src="${item.thumbnail}" referrerpolicy="no-referrer" style="width:32px;height:32px;border-radius:4px;object-fit:cover;margin-right:8px;vertical-align:middle" onerror="this.style.display='none'">`
+                : '';
+            return $(`<span style="display:inline-flex;align-items:center;gap:6px">${thumb}<span><b>${item.text}</b>${item.sku ? `<br><small style="color:#94a3b8">${item.sku}</small>` : ''}</span></span>`);
+        },
+        templateSelection: function (item) { return item.text || item.id; },
     });
 
     $('#item-search').on('select2:select', function(e) {

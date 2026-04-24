@@ -257,6 +257,33 @@
     <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js"></script>
+
+    {{-- Surface JS errors as toastr so blank-UI bugs stop being invisible.
+         Also sets Select2 defaults to Albanian — used by every Select2
+         instance in the app so we don't repeat ourselves per page. --}}
+    <script>
+        window.addEventListener('error', function (e) {
+            if (typeof toastr === 'undefined') return;
+            const file = (e.filename || '').split('/').pop();
+            toastr.error(`${e.message}${file ? ' (' + file + ':' + e.lineno + ')' : ''}`, 'JS error', { timeOut: 8000 });
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+            if (typeof toastr === 'undefined') return;
+            const msg = (e.reason && e.reason.message) || String(e.reason || 'unknown');
+            toastr.error(msg, 'Async error', { timeOut: 8000 });
+        });
+
+        if (typeof $ !== 'undefined' && $.fn && $.fn.select2) {
+            $.fn.select2.defaults.set('language', {
+                inputTooShort:  function (a) { return 'Shkruaj ' + (a.minimum - a.input.length) + ' karaktere më shumë'; },
+                inputTooLong:   function (a) { return 'Fshij ' + (a.input.length - a.maximum) + ' karaktere'; },
+                searching:      function () { return 'Duke kërkuar...'; },
+                noResults:      function () { return 'Asnjë rezultat'; },
+                loadingMore:    function () { return 'Duke ngarkuar më shumë...'; },
+                errorLoading:   function () { return 'Nuk mund të ngarkohen rezultatet'; },
+            });
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
 
