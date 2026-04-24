@@ -157,7 +157,12 @@ class MetaDataResolverService
                 'page_views' => (int) $row->page_views_total,
                 'page_engagements' => (int) $row->page_reactions_total,
                 'post_engagement' => (int) $row->page_post_engagements,
-                'new_threads' => (int) $row->page_messages_new_threads,
+                // new_threads is sourced from MetaMessagingStat.new_conversations
+                // (page_messages_new_conversations_unique) so the daily table
+                // matches the period KPI card. Previous version read
+                // page_messages_new_threads from MetaPageInsight which is a
+                // DIFFERENT Meta metric and produced 2-vs-16 discrepancies.
+                'new_threads' => $msg ? (int) $msg->new_conversations : 0,
                 'messages_received' => $msg ? (int) $msg->total_messages_received : 0,
                 'messages_sent' => $msg ? (int) $msg->total_messages_sent : 0,
                 'page_fans' => (int) $row->page_fans,

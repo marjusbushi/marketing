@@ -775,11 +775,24 @@ class MetaMarketingV2ChannelService
                 $daily = $this->resolver->resolveFbDaily($from, $to);
                 $paidDaily = $this->getAdsPlatformMessagingDaily($from, $to, 'facebook');
 
+                // page_messages_new_conversations_unique (fed into new_threads by
+                // resolveFbDaily via MetaMessagingStat) is documented by Meta as
+                // "unique conversations" AND includes conversations started from
+                // click-to-message ads. The Ads-API paid number (messaging_conversations
+                // under platform_breakdown.facebook) is reported independently. Under
+                // normal conditions new_threads >= paid; organic = new_threads - paid.
+                // We never add paid to new_threads (double-count). We do NOT pollute
+                // messages_received with paid any more — the UI column previously
+                // labelled "Paid Conversations" was actually messages_received + paid,
+                // which is nonsensical (messages + conversations). The renamed fields
+                // below are what the UI now consumes.
                 foreach ($daily as &$row) {
                     $date = $row['date'] ?? '';
                     $paid = (int) ($paidDaily[$date] ?? 0);
-                    // new_threads from page_messages_new_threads already includes paid — don't double-count
-                    $row['messages_received'] = (int) ($row['messages_received'] ?? 0) + $paid;
+                    $total = (int) ($row['new_threads'] ?? 0);
+                    $row['messaging_paid'] = $paid;
+                    $row['messaging_organic'] = max(0, $total - $paid);
+                    $row['messaging_conversations'] = $total;
                 }
                 unset($row);
 
@@ -847,20 +860,37 @@ class MetaMarketingV2ChannelService
                 $daily = $this->resolver->resolveMessagingDaily('messenger', $from, $to);
                 $paidDaily = $this->getAdsPlatformMessagingDaily($from, $to, 'facebook');
 
-                $totals = ['conversations' => 0, 'received' => 0, 'sent' => 0];
+                // FB Page Insights (page_messages_new_conversations_unique, fed into
+                // MetaMessagingStat.new_conversations by syncMessengerStats) already
+                // includes BOTH organic and paid conversations. Prior version added
+                // paid on top here — double counting — and also added paid to
+                // total_messages_received which mixed messages with conversations.
+                // Now: total = MetaMessagingStat (exact), paid = Ads API, organic
+                // derived so the three always sum correctly.
+                $totals = ['conversations' => 0, 'organic' => 0, 'paid' => 0, 'received' => 0, 'sent' => 0];
                 foreach ($daily as &$row) {
                     $date = $row['date'] ?? '';
+                    $total = (int) ($row['new_conversations'] ?? $row['conversations'] ?? 0);
                     $paid = (int) ($paidDaily[$date] ?? 0);
-                    $row['new_conversations'] = (int) ($row['new_conversations'] ?? $row['conversations'] ?? 0) + $paid;
-                    $row['total_messages_received'] = (int) ($row['total_messages_received'] ?? $row['messages_received'] ?? 0) + $paid;
+                    $organic = max(0, $total - $paid);
+
+                    $row['organic'] = $organic;
+                    $row['paid'] = $paid;
+                    $row['new_conversations'] = $total;
+                    $row['total_messages_received'] = (int) ($row['total_messages_received'] ?? $row['messages_received'] ?? 0);
                     $row['total_messages_sent'] = (int) ($row['total_messages_sent'] ?? $row['messages_sent'] ?? 0);
-                    $totals['conversations'] += $row['new_conversations'];
+
+                    $totals['conversations'] += $total;
+                    $totals['organic'] += $organic;
+                    $totals['paid'] += $paid;
                     $totals['received'] += $row['total_messages_received'];
                     $totals['sent'] += $row['total_messages_sent'];
                 }
                 unset($row);
 
-                return ['totals' => $totals, 'daily' => array_values($daily)];
+                $meta = $this->buildFbMessagingMeta($daily, $from, $to);
+
+                return ['totals' => $totals, 'daily' => array_values($daily), 'meta' => $meta];
             }
 
             return $this->runWithV2Version(function () use ($from, $to) {
@@ -888,6 +918,65 @@ class MetaMarketingV2ChannelService
                 ];
             });
         });
+    }
+
+    /**
+     * FB Messaging diagnostic metadata. Unlike IG (where Conversations API
+     * undercounts and webhook is the only source of truth), FB Page Insights
+     * page_messages_new_conversations_unique is already exact — so the FB
+     * mode is almost always 'page_insights' and the warning system only
+     * fires when the nightly sync has not run. Webhook presence is reported
+     * as an auxiliary signal (real-time coverage, not correctness).
+     */
+    private function buildFbMessagingMeta(array $daily, string $from, string $to): array
+    {
+        $nonZeroRows = 0;
+        foreach ($daily as $row) {
+            if ((int) ($row['new_conversations'] ?? 0) > 0) {
+                $nonZeroRows++;
+            }
+        }
+
+        $lastMessagingSync = MetaMessagingStat::where('platform', 'messenger')
+            ->orderByDesc('synced_at')
+            ->value('synced_at');
+
+        $lastWebhookEvent = null;
+        try {
+            $lastWebhookEvent = DB::connection('dis')->table('meta_ig_dm_events')
+                ->where('platform', 'messenger')
+                ->orderByDesc('received_at')
+                ->value('received_at');
+        } catch (Throwable $e) {
+            Log::debug('fbMessaging meta: last_webhook_event query failed: ' . $e->getMessage());
+        }
+
+        $webhookEverSeen = $lastWebhookEvent !== null;
+        $mode = $webhookEverSeen ? 'page_insights+webhook' : 'page_insights';
+
+        $warnings = [];
+        if ($nonZeroRows === 0 && count($daily) > 0) {
+            $warnings[] = 'sample_empty_zero_conversations';
+        }
+        if ($lastMessagingSync) {
+            $syncAgeHours = Carbon::parse($lastMessagingSync)->diffInHours(now());
+            if ($syncAgeHours >= 24) {
+                $warnings[] = 'messaging_sync_stale_24h';
+            }
+        }
+
+        return [
+            'mode' => $mode,
+            'webhook_ever_seen' => $webhookEverSeen,
+            'last_webhook_event' => $lastWebhookEvent ? (string) $lastWebhookEvent : null,
+            'last_messaging_sync' => $lastMessagingSync ? (string) $lastMessagingSync : null,
+            'warnings' => $warnings,
+            'timezone' => [
+                'dashboard' => 'Europe/Tirana',
+                'meta_bs' => 'America/Los_Angeles',
+                'note' => 'Page Insights is exact for FB (unlike IG) but daily totals still shift vs Meta BS by the Pacific/Tirana offset. Use 7/30-day periods for direct comparison.',
+            ],
+        ];
     }
 
     private function windowTotals(string $from, string $to, ?string $preset = null, bool $noCache = false, bool $dbOnly = false): array

@@ -162,8 +162,31 @@
             <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
                 <iconify-icon icon="heroicons-outline:chat-bubble-left-right" width="18" class="text-slate-400"></iconify-icon>
                 <h3 class="text-sm font-semibold text-slate-800">Messenger</h3>
+                <span id="fb-msg-source-badge" class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full"></span>
+                <div class="relative ml-1 group">
+                    <iconify-icon icon="heroicons-outline:information-circle" width="16" class="text-slate-400 cursor-help"></iconify-icon>
+                    <div class="hidden group-hover:block absolute left-0 top-6 z-10 w-[380px] p-3 rounded-lg bg-slate-900 text-white text-[11px] leading-relaxed shadow-xl">
+                        <b>Si llogaritet:</b><br>
+                        &bull; <b>Total</b> &mdash; Nga Page Insights (<code>page_messages_new_conversations_unique</code>) — EKZAKT, perfshin organic + paid.<br>
+                        &bull; <b>Paid</b> &mdash; Nga Ads API (<code>messaging_conversations</code> per Facebook).<br>
+                        &bull; <b>Organic</b> &mdash; Total &minus; Paid.<br><br>
+                        <b>Kujdes me krahasimin:</b> Meta Business Suite raporton ne Pacific Time, ky dashboard ne Europe/Tirana. Totalet ditore jane te zhvendosura me ~9-10h. Per krahasim 1:1 perdor periudha 7 ose 30 ditore.
+                    </div>
+                </div>
+            </div>
+            <div id="fb-msg-warning" class="hidden px-5 py-3 bg-amber-50 border-b border-amber-200 text-[12px] text-amber-800 flex items-start gap-2">
+                <iconify-icon icon="heroicons-outline:exclamation-triangle" width="16" class="text-amber-600 shrink-0 mt-0.5"></iconify-icon>
+                <div id="fb-msg-warning-text" class="leading-relaxed"></div>
             </div>
             <div class="p-5">
+                <div class="flex items-center justify-center gap-6 mb-4">
+                    <div class="px-6 py-4 rounded-lg bg-pink-50 border border-pink-200 text-center min-w-[200px]">
+                        <iconify-icon icon="heroicons-outline:chat-bubble-left-right" width="28" class="text-pink-800"></iconify-icon>
+                        <div id="fb-msg-conversations" class="text-2xl font-bold text-pink-800 mt-2 tabular-nums">&mdash;</div>
+                        <div class="text-xs text-slate-500">Messaging conversations started</div>
+                        <div id="fb-msg-breakdown" class="text-[10px] text-slate-400 mt-1.5 tabular-nums">&mdash;</div>
+                    </div>
+                </div>
                 <div class="relative w-full h-[280px]">
                     <canvas id="messengerChart"></canvas>
                 </div>
@@ -197,10 +220,10 @@
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
             <iconify-icon icon="heroicons-outline:table-cells" width="18" class="text-slate-400"></iconify-icon>
-            <h3 class="text-sm font-semibold text-slate-800">Daily Breakdown (Views, Reach, Interactions, SMS)</h3>
+            <h3 class="text-sm font-semibold text-slate-800">Daily Breakdown</h3>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm min-w-[940px]">
+            <table class="w-full text-sm min-w-[1040px]">
                 <thead class="bg-slate-50">
                     <tr class="border-b border-slate-200">
                         <th class="text-left px-4 py-3 text-slate-600 font-medium">Data</th>
@@ -209,13 +232,14 @@
                         <th class="text-right px-4 py-3 text-slate-600 font-medium">Page Views</th>
                         <th class="text-right px-4 py-3 text-slate-600 font-medium">Page Engagements</th>
                         <th class="text-right px-4 py-3 text-slate-600 font-medium">Post Engagement</th>
-                        <th class="text-right px-4 py-3 text-slate-600 font-medium">SMS New Threads</th>
-                        <th class="text-right px-4 py-3 text-slate-600 font-medium">Paid Conversations</th>
+                        <th class="text-right px-4 py-3 text-slate-600 font-medium" title="Messaging conversations started (Meta BS naming) — total organic + paid">Messaging Conversations</th>
+                        <th class="text-right px-4 py-3 text-slate-600 font-medium">Organic</th>
+                        <th class="text-right px-4 py-3 text-slate-600 font-medium">Paid</th>
                     </tr>
                 </thead>
                 <tbody id="dailyBreakdownBody">
                     <tr>
-                        <td colspan="8" class="px-5 py-5 text-center text-slate-400">Duke ngarkuar...</td>
+                        <td colspan="9" class="px-5 py-5 text-center text-slate-400">Duke ngarkuar...</td>
                     </tr>
                 </tbody>
             </table>
@@ -451,7 +475,8 @@
         if (thisGen !== loadGeneration) return;
         results.push(await Promise.allSettled([
             loadKPIs(from, to, preset, extra, thisGen),
-            loadTopPosts(from, to, preset, extra, thisGen)
+            loadTopPosts(from, to, preset, extra, thisGen),
+            loadFbMessaging(from, to, preset, extra, thisGen)
         ]));
         applyDailyKpiFallback();
         results.flat().forEach((r, i) => {
@@ -588,8 +613,9 @@
             data: {
                 labels,
                 datasets: [
-                    { label: 'New Threads', data: data.map(d => d.new_threads || 0), borderColor: '#2E7D32', tension: 0.3, fill: false },
-                    { label: 'Paid Conversations', data: data.map(d => d.messages_received || 0), borderColor: '#6A1B9A', tension: 0.3, fill: false },
+                    { label: 'Messaging Conversations', data: data.map(d => Number(d.messaging_conversations ?? d.new_threads ?? 0)), borderColor: '#2E7D32', tension: 0.3, fill: false },
+                    { label: 'Organic', data: data.map(d => Number(d.messaging_organic ?? 0)), borderColor: '#1565C0', tension: 0.3, fill: false, borderDash: [4, 4] },
+                    { label: 'Paid', data: data.map(d => Number(d.messaging_paid ?? 0)), borderColor: '#6A1B9A', tension: 0.3, fill: false, borderDash: [4, 4] },
                 ],
             },
             options: {
@@ -652,6 +678,80 @@
         });
     }
 
+    async function loadFbMessaging(from, to, preset = null, extra = {}, gen = null) {
+        const params = { from, to, ...extra };
+        if (preset) params.preset = preset;
+        let payload;
+        try {
+            const res = await fetchApi('fb-messaging', params);
+            payload = res.data;
+        } catch (e) {
+            console.error('FB messaging load failed:', e);
+            return;
+        }
+        if (gen !== null && gen !== loadGeneration) return;
+        if (!payload) return;
+
+        const totals = payload.totals || {};
+        const meta = payload.meta || null;
+
+        const totalEl = document.getElementById('fb-msg-conversations');
+        const breakdownEl = document.getElementById('fb-msg-breakdown');
+        if (totalEl) totalEl.textContent = fmtNum(totals.conversations ?? 0);
+        if (breakdownEl) {
+            const org = totals.organic ?? 0;
+            const paid = totals.paid ?? 0;
+            breakdownEl.textContent = `${fmtNum(org)} organike + ${fmtNum(paid)} ads`;
+        }
+
+        // Mode badge reflects the FB data architecture: Page Insights is
+        // already exact (unlike IG's Conversations API sample), so the
+        // default mode is "page insights (ekzakt)". When Messenger webhook
+        // events are also flowing we surface that as a supplementary signal.
+        const badge = document.getElementById('fb-msg-source-badge');
+        if (badge) {
+            badge.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-700', 'bg-sky-100', 'text-sky-700', 'bg-amber-100', 'text-amber-700');
+            const mode = meta && meta.mode;
+            if (mode === 'page_insights+webhook') {
+                badge.textContent = 'page insights + webhook';
+                badge.classList.add('bg-sky-100', 'text-sky-700');
+            } else if (mode === 'page_insights') {
+                badge.textContent = 'page insights (ekzakt)';
+                badge.classList.add('bg-emerald-100', 'text-emerald-700');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        // Warning banner — build via DOM API, no innerHTML with dynamic text
+        const warnBox = document.getElementById('fb-msg-warning');
+        const warnText = document.getElementById('fb-msg-warning-text');
+        const warnings = (meta && meta.warnings) || [];
+        if (warnBox && warnText) {
+            while (warnText.firstChild) warnText.removeChild(warnText.firstChild);
+            if (warnings.length === 0) {
+                warnBox.classList.add('hidden');
+            } else {
+                warnings.forEach((w, idx) => {
+                    let text;
+                    switch (w) {
+                        case 'sample_empty_zero_conversations':
+                            text = 'Asnje bisede Messenger per kete periudhe. Kontrollo nese meta:sync --type=messaging po ekzekutohet (scheduler-i e ka hourly ne :05).';
+                            break;
+                        case 'messaging_sync_stale_24h':
+                            text = 'Sync-u i messaging eshte > 24h i vjeter. meta_messaging_stats mund te mos perditesohet — kontrollo cron-in dhe logjet meta:sync.';
+                            break;
+                        default:
+                            text = w;
+                    }
+                    if (idx > 0) warnText.appendChild(document.createElement('br'));
+                    warnText.appendChild(document.createTextNode('\u2022 ' + text));
+                });
+                warnBox.classList.remove('hidden');
+            }
+        }
+    }
+
     function renderDailyBreakdown(data) {
         const tbody = document.getElementById('dailyBreakdownBody');
         if (!tbody) return;
@@ -671,8 +771,9 @@
                     <td class="px-4 py-2.5 text-right text-slate-800 tabular-nums">${fmtNum(row.page_views || 0)}</td>
                     <td class="px-4 py-2.5 text-right text-slate-800 tabular-nums">${fmtNum(row.page_engagements || 0)}</td>
                     <td class="px-4 py-2.5 text-right text-slate-800 tabular-nums">${fmtNum(row.post_engagement || 0)}</td>
-                    <td class="px-4 py-2.5 text-right text-slate-800 tabular-nums">${fmtNum(row.new_threads || 0)}</td>
-                    <td class="px-4 py-2.5 text-right text-slate-800 tabular-nums">${fmtNum(row.messages_received || 0)}</td>
+                    <td class="px-4 py-2.5 text-right font-semibold text-slate-800 tabular-nums">${fmtNum(Number(row.messaging_conversations ?? row.new_threads ?? 0))}</td>
+                    <td class="px-4 py-2.5 text-right text-slate-600 tabular-nums">${fmtNum(Number(row.messaging_organic ?? 0))}</td>
+                    <td class="px-4 py-2.5 text-right text-slate-600 tabular-nums">${fmtNum(Number(row.messaging_paid ?? 0))}</td>
                 </tr>
             `;
         }).join('');
