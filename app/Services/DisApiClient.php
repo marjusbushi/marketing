@@ -25,10 +25,18 @@ class DisApiClient
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(config('services.dis_api.url', ''), '/');
-        $this->apiKey = config('services.dis_api.key', '');
+        $this->baseUrl = rtrim((string) config('services.dis_api.url', ''), '/');
+        $this->apiKey = (string) config('services.dis_api.key', '');
+    }
 
-        if (empty($this->baseUrl) || empty($this->apiKey)) {
+    /**
+     * Lazy config check — runs on first call instead of constructor so the
+     * service container can still resolve the client for dependency injection
+     * (e.g. controller constructors) even when DIS env vars are unset.
+     */
+    protected function ensureConfigured(): void
+    {
+        if ($this->baseUrl === '' || $this->apiKey === '') {
             throw new RuntimeException(
                 'DIS API not configured. Set DIS_API_URL and DIS_INTERNAL_API_KEY in .env'
             );
@@ -296,11 +304,23 @@ class DisApiClient
 
     protected function client(): PendingRequest
     {
+        $this->ensureConfigured();
+
+        $headers = [
+            'X-Internal-Api-Key' => $this->apiKey,
+            'Accept' => 'application/json',
+        ];
+
+        // Pass acting user so DIS can log who triggered the call in its
+        // activity log (used by read-only endpoints that don't carry
+        // acting_user_id in the body).
+        $userId = auth()->id();
+        if ($userId) {
+            $headers['X-Acting-User-Id'] = (string) $userId;
+        }
+
         return Http::baseUrl($this->baseUrl)
-            ->withHeaders([
-                'X-Internal-Api-Key' => $this->apiKey,
-                'Accept' => 'application/json',
-            ])
+            ->withHeaders($headers)
             ->timeout(30);
     }
 

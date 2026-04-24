@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Dis\InfluencerProduct as DisInfluencerProduct;
 use App\Models\Influencer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -29,19 +30,32 @@ class InfluencersController extends Controller
      */
     protected function dataTable(Request $request): JsonResponse
     {
-        $query = Influencer::query()
-            ->with(['createdBy:id,full_name'])
-            ->withCount(['influencerProducts as active_products_count' => function ($q) {
-                $q->whereIn('status', ['active', 'partially_returned']);
-            }]);
+        $query = Influencer::query()->with(['createdBy:id,full_name']);
+
+        if ($request->filled('platform')) {
+            $query->where('platform', $request->input('platform'));
+        }
+
+        if ($request->filled('is_active')) {
+            $query->where('is_active', (bool) $request->input('is_active'));
+        }
+
+        // Active product counts live in DIS — compute them once on the DIS
+        // connection, then attach in PHP. Cross-DB withCount() would try to
+        // subquery influencer_products from the marketing connection.
+        $activeCounts = DisInfluencerProduct::whereIn('status', ['active', 'partially_returned'])
+            ->selectRaw('influencer_id, COUNT(*) as c')
+            ->groupBy('influencer_id')
+            ->pluck('c', 'influencer_id');
 
         return DataTables::eloquent($query)
-            ->addColumn('platform_label', fn(Influencer $i) => $i->platform->label())
-            ->addColumn('platform_icon', fn(Influencer $i) => $i->platform->icon())
-            ->addColumn('created_by_name', fn(Influencer $i) => $i->createdBy?->full_name ?? '-')
-            ->addColumn('created_at_formatted', fn(Influencer $i) => $i->created_at?->format('d/m/Y') ?? '-')
-            ->addColumn('status_badge', fn(Influencer $i) => $i->is_active ? 'success' : 'danger')
-            ->addColumn('actions', fn(Influencer $i) => view('influencers.datatable.actions', ['influencer' => $i])->render())
+            ->addColumn('platform_label', fn (Influencer $i) => $i->platform->label())
+            ->addColumn('platform_icon', fn (Influencer $i) => $i->platform->icon())
+            ->addColumn('active_products_count', fn (Influencer $i) => (int) ($activeCounts[$i->id] ?? 0))
+            ->addColumn('created_by_name', fn (Influencer $i) => $i->createdBy?->full_name ?? '-')
+            ->addColumn('created_at_formatted', fn (Influencer $i) => $i->created_at?->format('d/m/Y') ?? '-')
+            ->addColumn('status_badge', fn (Influencer $i) => $i->is_active ? 'success' : 'danger')
+            ->addColumn('actions', fn (Influencer $i) => view('influencers.datatable.actions', ['influencer' => $i])->render())
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where('name', 'like', "%{$keyword}%")
                     ->orWhere('handle', 'like', "%{$keyword}%");
@@ -93,7 +107,7 @@ class InfluencersController extends Controller
             ]);
         }
 
-        return redirect()->route('management.influencers.index')
+        return redirect()->route('marketing.influencers.index')
             ->with('success', __('influencer.messages.created'));
     }
 
@@ -171,7 +185,7 @@ class InfluencersController extends Controller
             return response()->json(['success' => true]);
         }
 
-        return redirect()->route('management.influencers.show', $influencer)
+        return redirect()->route('marketing.influencers.show', $influencer)
             ->with('success', __('influencer.messages.updated'));
     }
 

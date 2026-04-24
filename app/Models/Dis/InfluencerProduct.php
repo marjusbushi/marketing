@@ -2,6 +2,8 @@
 
 namespace App\Models\Dis;
 
+use App\Enums\InfluencerProductAgreementTypeEnum;
+use App\Enums\InfluencerProductStatusEnum;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,8 +22,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null    $created_by_user_id
  * @property int|null    $source_branch_id
  * @property int|null    $source_warehouse_id
- * @property string      $status
- * @property string|null $agreement_type
+ * @property InfluencerProductStatusEnum        $status
+ * @property InfluencerProductAgreementTypeEnum $agreement_type
  * @property \Carbon\Carbon|null $expected_return_date
  * @property \Carbon\Carbon|null $actual_return_date
  * @property string|null $notes
@@ -64,6 +66,8 @@ class InfluencerProduct extends Model
     ];
 
     protected $casts = [
+        'status'               => InfluencerProductStatusEnum::class,
+        'agreement_type'       => InfluencerProductAgreementTypeEnum::class,
         'expected_return_date' => 'date',
         'actual_return_date'   => 'date',
     ];
@@ -97,6 +101,21 @@ class InfluencerProduct extends Model
         return $this->hasMany(InfluencerProductItem::class, 'influencer_product_id');
     }
 
+    public function transferOrder(): BelongsTo
+    {
+        return $this->belongsTo(DisTransferOrder::class, 'transfer_order_id');
+    }
+
+    public function returnTransferOrder(): BelongsTo
+    {
+        return $this->belongsTo(DisTransferOrder::class, 'return_transfer_order_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(DisInvoice::class, 'invoice_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Accessors                                                          */
     /* ------------------------------------------------------------------ */
@@ -106,9 +125,30 @@ class InfluencerProduct extends Model
      */
     public function getIsOverdueAttribute(): bool
     {
-        return $this->expected_return_date !== null
-            && $this->expected_return_date->lt(now()->startOfDay())
-            && in_array($this->status, ['active', 'partially_returned'], true);
+        if ($this->expected_return_date === null || ! $this->expected_return_date->lt(now()->startOfDay())) {
+            return false;
+        }
+
+        return in_array($this->statusValue(), ['active', 'partially_returned'], true);
+    }
+
+    /**
+     * Percent of the allocation that has been returned. 0-100.
+     * Loads items if not already loaded.
+     */
+    public function getReturnedPercentageAttribute(): float
+    {
+        if (! $this->relationLoaded('items')) {
+            $this->load('items');
+        }
+
+        $totalGiven = (int) $this->items->sum('quantity_given');
+        if ($totalGiven === 0) {
+            return 0.0;
+        }
+
+        $totalReturned = (int) $this->items->sum('quantity_returned');
+        return round(($totalReturned / $totalGiven) * 100, 1);
     }
 
     /* ------------------------------------------------------------------ */
@@ -154,5 +194,67 @@ class InfluencerProduct extends Model
     public function getTotalValueAttribute(): float
     {
         return $this->items->sum(fn ($item) => $item->quantity_given * $item->product_value);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Status helpers (mirror DIS-side InfluencerProduct)                 */
+    /* ------------------------------------------------------------------ */
+
+    public function isDraft(): bool
+    {
+        return $this->statusValue() === 'draft';
+    }
+
+    public function isActive(): bool
+    {
+        return $this->statusValue() === 'active';
+    }
+
+    public function isPartiallyReturned(): bool
+    {
+        return $this->statusValue() === 'partially_returned';
+    }
+
+    public function isReturned(): bool
+    {
+        return $this->statusValue() === 'returned';
+    }
+
+    public function isConverted(): bool
+    {
+        return $this->statusValue() === 'converted';
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->statusValue() === 'cancelled';
+    }
+
+    public function canBeCancelled(): bool
+    {
+        return $this->status instanceof InfluencerProductStatusEnum
+            ? $this->status->canBeCancelled()
+            : in_array($this->statusValue(), ['draft', 'active', 'partially_returned'], true);
+    }
+
+    public function canRegisterReturn(): bool
+    {
+        return $this->status instanceof InfluencerProductStatusEnum
+            ? $this->status->canRegisterReturn()
+            : in_array($this->statusValue(), ['active', 'partially_returned'], true);
+    }
+
+    public function canConvert(): bool
+    {
+        return $this->status instanceof InfluencerProductStatusEnum
+            ? $this->status->canConvert()
+            : in_array($this->statusValue(), ['active', 'partially_returned'], true);
+    }
+
+    protected function statusValue(): string
+    {
+        return $this->status instanceof InfluencerProductStatusEnum
+            ? $this->status->value
+            : (string) $this->status;
     }
 }
