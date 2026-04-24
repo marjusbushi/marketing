@@ -206,6 +206,8 @@ document.addEventListener('DOMContentLoaded', function() {
         processing: true,
         serverSide: true,
         ordering: false,
+        autoWidth: false,
+        scrollX: false,
         ajax: {
             url: '{{ route('marketing.influencer-products.index') }}',
             data: function(d) {
@@ -262,7 +264,22 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#clear-filters').on('click', function() { $('#dt-search').val(''); $('#filter-status, #filter-branch, #filter-agreement').val(''); $('#filter-influencer').val(null).trigger('change'); $('#filter-overdue').prop('checked',false); $('#filter-date-from, #filter-date-to').val(''); table.search('').ajax.reload(); });
     $('#refresh-table').on('click', () => table.ajax.reload());
 
-    // Recompute column widths when the sidebar collapses/expands.
+    // Recompute column widths whenever the main-area width changes
+    // (sidebar toggled, window resized, devtools opened…). Using a
+    // ResizeObserver catches every width change in one place and
+    // doesn't depend on the sidebar firing a custom event first.
+    if (window.ResizeObserver) {
+        const main = document.getElementById('main-area') || document.body;
+        let scheduled = false;
+        new ResizeObserver(() => {
+            if (scheduled) return;
+            scheduled = true;
+            requestAnimationFrame(() => {
+                scheduled = false;
+                table.columns.adjust().draw(false);
+            });
+        }).observe(main);
+    }
     window.addEventListener('sidebar:toggled', () => table.columns.adjust().draw(false));
 });
 </script>
