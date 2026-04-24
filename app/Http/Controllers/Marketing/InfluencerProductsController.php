@@ -114,7 +114,7 @@ class InfluencerProductsController extends Controller
             ->addColumn('created_by_name', fn (InfluencerProduct $ip) => $ip->createdBy?->full_name ?? '-')
             ->addColumn('actions', fn (InfluencerProduct $ip) => view('influencer-products.datatable.actions', ['influencerProduct' => $ip])->render())
             ->filterColumn('influencer_name', function ($query, $keyword) {
-                $ids = Influencer::where('name', 'like', "%{$keyword}%")
+                $ids = DisInfluencer::where('name', 'like', "%{$keyword}%")
                     ->orWhere('handle', 'like', "%{$keyword}%")
                     ->pluck('id');
                 $query->whereIn('influencer_id', $ids);
