@@ -26,3 +26,18 @@ Schedule::command('content-planner:import-feed')
     ->hourlyAt(15)
     ->withoutOverlapping(60)
     ->runInBackground();
+
+// Repair IG posts whose media_url is null, points to an expired raw CDN URL,
+// or references a missing local file. meta:sync downloads media during the
+// initial post fetch, but IG CDN 403s, transient timeouts, or hosts under load
+// all silently leave media_url null — leading to empty thumbnails on the
+// dashboard and Content Planner grid. Staggered 25 min past hour so it runs
+// after meta:sync (:00) and content-planner:import-feed (:15). --limit=50 caps
+// per-run work so we never exhaust rate limits even after a long outage; the
+// loop catches up over successive hours. Decision #24 already switched
+// downloadMedia() to return null on failure instead of persisting a short-TTL
+// CDN URL, so this self-heals going forward without leaking bad rows.
+Schedule::command('meta:backfill-ig-media', ['--limit' => 50])
+    ->hourlyAt(25)
+    ->withoutOverlapping(50)
+    ->runInBackground();

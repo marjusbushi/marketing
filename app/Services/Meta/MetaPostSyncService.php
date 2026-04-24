@@ -59,27 +59,30 @@ class MetaPostSyncService
                 $rawMediaUrl = $attachments['media']['image']['src'] ?? ($attachments['url'] ?? null);
                 $localMediaUrl = $this->downloadMedia($rawMediaUrl, 'fb_' . $postId);
 
-                MetaPostInsight::updateOrCreate(
-                    ['post_id' => $postId],
-                    [
-                        'source' => 'facebook',
-                        'source_id' => $pageId,
-                        'post_type' => $postType,
-                        'message' => mb_substr($post['message'] ?? '', 0, 65000),
-                        'permalink_url' => $post['permalink_url'] ?? null,
-                        'media_url' => $localMediaUrl,
-                        'created_at_meta' => $createdTime,
-                        'impressions' => $insights['impressions'] ?? 0,
-                        'reach' => $insights['reach'] ?? 0,
-                        'likes' => $insights['likes'] ?? 0,
-                        'comments' => $insights['comments'] ?? 0,
-                        'shares' => $insights['shares'] ?? 0,
-                        'saves' => 0, // FB doesn't have saves at post level
-                        'video_views' => $insights['video_views'] ?? 0,
-                        'clicks' => $insights['clicks'] ?? 0,
-                        'synced_at' => now(),
-                    ]
-                );
+                $attrs = [
+                    'source' => 'facebook',
+                    'source_id' => $pageId,
+                    'post_type' => $postType,
+                    'message' => mb_substr($post['message'] ?? '', 0, 65000),
+                    'permalink_url' => $post['permalink_url'] ?? null,
+                    'created_at_meta' => $createdTime,
+                    'impressions' => $insights['impressions'] ?? 0,
+                    'reach' => $insights['reach'] ?? 0,
+                    'likes' => $insights['likes'] ?? 0,
+                    'comments' => $insights['comments'] ?? 0,
+                    'shares' => $insights['shares'] ?? 0,
+                    'saves' => 0, // FB doesn't have saves at post level
+                    'video_views' => $insights['video_views'] ?? 0,
+                    'clicks' => $insights['clicks'] ?? 0,
+                    'synced_at' => now(),
+                ];
+                // Only overwrite media_url when we actually got a local path.
+                // Preserves a previously-downloaded good URL when today's fetch fails.
+                if ($localMediaUrl !== null) {
+                    $attrs['media_url'] = $localMediaUrl;
+                }
+
+                MetaPostInsight::updateOrCreate(['post_id' => $postId], $attrs);
                 $count++;
             }
         } catch (Exception $e) {
@@ -136,32 +139,36 @@ class MetaPostSyncService
                 $rawMediaUrl = $item['thumbnail_url'] ?? ($item['media_url'] ?? null);
                 $localMediaUrl = $this->downloadMedia($rawMediaUrl, 'ig_' . $mediaId);
 
-                $post = MetaPostInsight::updateOrCreate(
-                    ['post_id' => $mediaId],
-                    [
-                        'source' => 'instagram',
-                        'source_id' => $igAccountId,
-                        'post_type' => $postType,
-                        'message' => mb_substr($item['caption'] ?? '', 0, 65000),
-                        'permalink_url' => $item['permalink'] ?? null,
-                        'media_url' => $localMediaUrl,
-                        'created_at_meta' => $createdTime,
-                        'impressions' => $insights['impressions'] ?? 0,
-                        'reach' => $insights['reach'] ?? 0,
-                        'likes' => $item['like_count'] ?? 0,
-                        'comments' => $item['comments_count'] ?? 0,
-                        'shares' => $insights['shares'] ?? 0,
-                        'saves' => $insights['saved'] ?? 0,
-                        'video_views' => $insights['views'] ?? 0,
-                        'clicks' => 0,
-                        'exits' => null,
-                        'replies' => $insights['replies'] ?? null,
-                        'taps_forward' => null,
-                        'taps_back' => null,
-                        'plays' => $insights['views'] ?? null,
-                        'synced_at' => now(),
-                    ]
-                );
+                $attrs = [
+                    'source' => 'instagram',
+                    'source_id' => $igAccountId,
+                    'post_type' => $postType,
+                    'message' => mb_substr($item['caption'] ?? '', 0, 65000),
+                    'permalink_url' => $item['permalink'] ?? null,
+                    'created_at_meta' => $createdTime,
+                    'impressions' => $insights['impressions'] ?? 0,
+                    'reach' => $insights['reach'] ?? 0,
+                    'likes' => $item['like_count'] ?? 0,
+                    'comments' => $item['comments_count'] ?? 0,
+                    'shares' => $insights['shares'] ?? 0,
+                    'saves' => $insights['saved'] ?? 0,
+                    'video_views' => $insights['views'] ?? 0,
+                    'clicks' => 0,
+                    'exits' => null,
+                    'replies' => $insights['replies'] ?? null,
+                    'taps_forward' => null,
+                    'taps_back' => null,
+                    'plays' => $insights['views'] ?? null,
+                    'synced_at' => now(),
+                ];
+                // Preserve existing local media_url when the fresh download fails —
+                // an IG CDN URL stored here would expire within hours and blank out
+                // the grid thumbnails (root cause of the Apr 2026 grid-empty bug).
+                if ($localMediaUrl !== null) {
+                    $attrs['media_url'] = $localMediaUrl;
+                }
+
+                $post = MetaPostInsight::updateOrCreate(['post_id' => $mediaId], $attrs);
 
                 // Sync full media set (carousel children, video + cover, etc).
                 // Failures are logged but non-fatal — existing insights row stays.
@@ -178,6 +185,67 @@ class MetaPostSyncService
         }
 
         return $count;
+    }
+
+    /**
+     * Backfill the media for a single IG post whose `media_url` is either an
+     * expired IG CDN URL or points to a missing local file. Re-fetches the
+     * current `media_url`/`thumbnail_url` from Graph API with the live token
+     * and re-runs the full media sync (`syncIgPostMedia`).
+     *
+     * Returns true on success (DB has a fresh local media_url AND a
+     * meta_post_media row), false if the Graph API or download failed.
+     */
+    public function backfillIgPostMedia(MetaPostInsight $post): bool
+    {
+        if ($post->source !== 'instagram' || !$post->post_id) {
+            return false;
+        }
+        if (!config('meta.page_token')) {
+            Log::warning("backfillIgPostMedia: no page_token configured — aborting for {$post->post_id}");
+            return false;
+        }
+
+        try {
+            // Refresh the Graph object — IG CDN URLs in media_url/thumbnail_url
+            // are regenerated on every read (a new `oe=` token is minted), so
+            // hitting the same endpoint gives us a URL good for another ~6h.
+            $item = $this->api->getWithPageToken($post->post_id, [
+                'fields' => 'id,caption,media_type,media_product_type,permalink,thumbnail_url,media_url,timestamp,like_count,comments_count',
+            ]);
+        } catch (Exception $e) {
+            Log::warning("backfillIgPostMedia: Graph fetch failed for {$post->post_id}: " . $e->getMessage());
+            return false;
+        }
+
+        $rawMediaUrl = $item['thumbnail_url'] ?? ($item['media_url'] ?? null);
+        if (!$rawMediaUrl) {
+            Log::info("backfillIgPostMedia: no media_url/thumbnail_url on Graph response for {$post->post_id}");
+            return false;
+        }
+
+        $localMediaUrl = $this->downloadMedia($rawMediaUrl, 'ig_' . $post->post_id);
+        if ($localMediaUrl === null) {
+            return false;
+        }
+
+        $post->media_url = $localMediaUrl;
+        $post->permalink_url = $item['permalink'] ?? $post->permalink_url;
+        $post->synced_at = now();
+        $post->save();
+
+        // Populate meta_post_media so the grid's primary (non-legacy) path
+        // also works. syncIgPostMedia is carousel-aware — it will fetch
+        // /{id}/children for CAROUSEL_ALBUM posts.
+        try {
+            $this->syncIgPostMedia($post, $item);
+        } catch (Exception $e) {
+            Log::warning("backfillIgPostMedia: syncIgPostMedia failed for {$post->post_id}: " . $e->getMessage());
+            // Legacy media_url is still updated above, so the grid will render
+            // even if carousel children failed. Non-fatal.
+        }
+
+        return true;
     }
 
     /**
@@ -489,14 +557,19 @@ class MetaPostSyncService
 
                 $filename = "meta_media/{$filenamePrefix}.{$ext}";
                 Storage::disk('public')->put($filename, $response->body());
-                
+
                 return "/storage/" . $filename;
             }
+
+            Log::warning("downloadMedia HTTP {$response->status()} for [{$filenamePrefix}] — returning null so we don't persist an expiring IG/FB CDN URL");
         } catch (Exception $e) {
-            Log::debug("Failed to download media [{$filenamePrefix}]: " . $e->getMessage());
+            Log::warning("downloadMedia exception for [{$filenamePrefix}]: " . $e->getMessage());
         }
 
-        // Fallback to original URL if download fails
-        return $url;
+        // Returning null — the caller decides how to handle. Persisting the raw
+        // Meta CDN URL here is a trap: the token in that URL expires in hours,
+        // after which the grid/feed renders broken-image placeholders. Prefer
+        // no media_url over a URL guaranteed to break tomorrow.
+        return null;
     }
 }
