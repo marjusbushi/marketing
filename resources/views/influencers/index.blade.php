@@ -301,6 +301,9 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#clear-filters').on('click', function() { $('#dt-search').val(''); $('#filter-platform, #filter-status').val(''); table.search('').ajax.reload(); });
     $('#refresh-table').on('click', () => table.ajax.reload());
 
+    // Recompute column widths when the sidebar collapses/expands.
+    window.addEventListener('sidebar:toggled', () => table.columns.adjust().draw(false));
+
     // Modal
     const modal = $('#influencer-modal');
     const form = $('#influencer-form');

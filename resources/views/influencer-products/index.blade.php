@@ -261,6 +261,9 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#filter-date-from, #filter-date-to').on('change', () => table.ajax.reload());
     $('#clear-filters').on('click', function() { $('#dt-search').val(''); $('#filter-status, #filter-branch, #filter-agreement').val(''); $('#filter-influencer').val(null).trigger('change'); $('#filter-overdue').prop('checked',false); $('#filter-date-from, #filter-date-to').val(''); table.search('').ajax.reload(); });
     $('#refresh-table').on('click', () => table.ajax.reload());
+
+    // Recompute column widths when the sidebar collapses/expands.
+    window.addEventListener('sidebar:toggled', () => table.columns.adjust().draw(false));
 });
 </script>
 @endpush

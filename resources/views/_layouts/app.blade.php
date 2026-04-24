@@ -338,6 +338,7 @@
                     el.style.overflow = 'hidden';
                 });
                 localStorage.setItem('sidebar_collapsed', 'true');
+                notifyWidthChange(animate);
             }
 
             function expand(animate) {
@@ -352,6 +353,24 @@
                     el.style.overflow = '';
                 });
                 localStorage.setItem('sidebar_collapsed', 'false');
+                notifyWidthChange(animate);
+            }
+
+            // After the sidebar transition runs, fire window.resize so
+            // DataTables (and any other width-cached widget) recomputes
+            // column widths. DataTables natively listens to resize.
+            // Also dispatch a custom sidebar:toggled event so a page
+            // can hook in directly if the generic resize isn't enough.
+            function notifyWidthChange(animate) {
+                const fire = () => {
+                    window.dispatchEvent(new Event('resize'));
+                    window.dispatchEvent(new CustomEvent('sidebar:toggled', {
+                        detail: { expanded: sidebar.dataset.expanded === 'true' }
+                    }));
+                };
+                // CSS transition is 200ms (Tailwind duration-200); wait
+                // just past that so the final layout is settled.
+                if (animate) setTimeout(fire, 220); else fire();
             }
         })();
     </script>
