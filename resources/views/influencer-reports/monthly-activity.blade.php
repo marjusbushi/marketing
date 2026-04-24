@@ -5,6 +5,7 @@
 
 @section('content')
 <div class="mt-4 pb-10">
+    @include('influencer-reports._tabs')
 
     {{-- Header --}}
     <div class="flex items-center justify-between mb-4 flex-wrap gap-2.5">

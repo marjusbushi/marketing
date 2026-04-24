@@ -99,20 +99,62 @@
                 <span class="sidebar-label">Brand Kit</span>
             </a>
 
+            {{-- ───────────── Influencer section ─────────────
+                 Three related pages (Influencers / Products /
+                 Reports) live under one conceptual module. Grouped
+                 with a section header + indented "Reports" children
+                 that auto-expand on active route so navigation is
+                 never more than one click away. --}}
+            @php
+                $isInfluencerSection = request()->routeIs('marketing.influencers.*')
+                    || request()->routeIs('marketing.influencer-products.*')
+                    || request()->routeIs('marketing.influencer-reports.*');
+                $isReportsActive = request()->routeIs('marketing.influencer-reports.*');
+            @endphp
+
+            <div class="pt-3 pb-1 px-3 sidebar-label">
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Influencer</div>
+            </div>
+
             <a href="{{ route('marketing.influencers.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.influencers.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Influencers">
                 <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-                <span class="sidebar-label">Influencers</span>
+                <span class="sidebar-label">Lista</span>
             </a>
 
-            <a href="{{ route('marketing.influencer-products.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-products.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Products">
+            <a href="{{ route('marketing.influencer-products.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-products.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Produkte te dhena influencerave">
                 <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
-                <span class="sidebar-label">Products</span>
+                <span class="sidebar-label">Produkte</span>
             </a>
 
-            <a href="{{ route('marketing.influencer-reports.dashboard') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-reports.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Reports">
+            <a href="{{ route('marketing.influencer-reports.dashboard') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ $isReportsActive ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Raporte Influencer">
                 <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
-                <span class="sidebar-label">Reports</span>
+                <span class="sidebar-label">Raporte</span>
             </a>
+
+            {{-- Reports sub-items — auto-expand when any report page is active. --}}
+            @if($isReportsActive)
+                <div class="sidebar-label ml-6 pl-3 border-l border-slate-200 space-y-0.5 mt-0.5 mb-1">
+                    <a href="{{ route('marketing.influencer-reports.dashboard') }}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-reports.dashboard') ? 'text-sidebar-text-active font-medium bg-sidebar-hover' : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover' }}">
+                        <iconify-icon icon="heroicons-outline:chart-pie" width="14"></iconify-icon>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="{{ route('marketing.influencer-reports.overdue') }}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-reports.overdue') ? 'text-sidebar-text-active font-medium bg-sidebar-hover' : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover' }}">
+                        <iconify-icon icon="heroicons-outline:exclamation-circle" width="14"></iconify-icon>
+                        <span>Te vonuar</span>
+                    </a>
+                    <a href="{{ route('marketing.influencer-reports.value-by-influencer') }}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-reports.value-by-influencer') ? 'text-sidebar-text-active font-medium bg-sidebar-hover' : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover' }}">
+                        <iconify-icon icon="heroicons-outline:banknotes" width="14"></iconify-icon>
+                        <span>Vlera sipas influencerit</span>
+                    </a>
+                    <a href="{{ route('marketing.influencer-reports.monthly') }}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-all duration-150 {{ request()->routeIs('marketing.influencer-reports.monthly') ? 'text-sidebar-text-active font-medium bg-sidebar-hover' : 'text-sidebar-text hover:text-sidebar-text-active hover:bg-sidebar-hover' }}">
+                        <iconify-icon icon="heroicons-outline:calendar-days" width="14"></iconify-icon>
+                        <span>Aktiviteti mujor</span>
+                    </a>
+                </div>
+            @endif
+
+            <div class="h-2"></div>
+            {{-- ───────────── end Influencer section ───────────── --}}
 
             <a href="{{ route('marketing.meta-auth.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.meta-auth.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Meta Auth">
                 <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>

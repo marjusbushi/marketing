@@ -12,6 +12,7 @@
 @endphp
 
 <div class="mt-4 pb-10">
+    @include('influencer-reports._tabs')
 
     {{-- Header --}}
     <div class="flex items-center justify-between flex-wrap gap-2.5 mb-4">
