@@ -3,19 +3,30 @@
 namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Dis\DisInfluencer;
 use App\Models\Dis\InfluencerProduct as DisInfluencerProduct;
-use App\Models\Influencer;
+use App\Services\DisApiClient;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Yajra\DataTables\Facades\DataTables;
 
+/**
+ * Influencer profile CRUD.
+ *
+ * Reads go directly against the 'dis' connection via DisInfluencer.
+ * Writes route through DisApiClient → DIS internal API so that DIS
+ * stays the single source of truth for influencer records (their IDs
+ * are referenced by influencer_products.influencer_id in the same DB).
+ */
 class InfluencersController extends Controller
 {
-    /**
-     * Lista e influencerave
-     */
+    public function __construct(
+        protected DisApiClient $service,
+    ) {}
+
     public function index(Request $request): View|JsonResponse
     {
         if ($request->ajax()) {
@@ -25,12 +36,9 @@ class InfluencersController extends Controller
         return view('influencers.index');
     }
 
-    /**
-     * DataTable AJAX handler
-     */
     protected function dataTable(Request $request): JsonResponse
     {
-        $query = Influencer::query()->with(['createdBy:id,full_name']);
+        $query = DisInfluencer::query()->with(['createdBy:id,full_name']);
 
         if ($request->filled('platform')) {
             $query->where('platform', $request->input('platform'));
@@ -40,22 +48,20 @@ class InfluencersController extends Controller
             $query->where('is_active', (bool) $request->input('is_active'));
         }
 
-        // Active product counts live in DIS — compute them once on the DIS
-        // connection, then attach in PHP. Cross-DB withCount() would try to
-        // subquery influencer_products from the marketing connection.
+        // Active product counts batch-loaded from DIS once per table draw.
         $activeCounts = DisInfluencerProduct::whereIn('status', ['active', 'partially_returned'])
             ->selectRaw('influencer_id, COUNT(*) as c')
             ->groupBy('influencer_id')
             ->pluck('c', 'influencer_id');
 
         return DataTables::eloquent($query)
-            ->addColumn('platform_label', fn (Influencer $i) => $i->platform->label())
-            ->addColumn('platform_icon', fn (Influencer $i) => $i->platform->icon())
-            ->addColumn('active_products_count', fn (Influencer $i) => (int) ($activeCounts[$i->id] ?? 0))
-            ->addColumn('created_by_name', fn (Influencer $i) => $i->createdBy?->full_name ?? '-')
-            ->addColumn('created_at_formatted', fn (Influencer $i) => $i->created_at?->format('d/m/Y') ?? '-')
-            ->addColumn('status_badge', fn (Influencer $i) => $i->is_active ? 'success' : 'danger')
-            ->addColumn('actions', fn (Influencer $i) => view('influencers.datatable.actions', ['influencer' => $i])->render())
+            ->addColumn('platform_label', fn (DisInfluencer $i) => $i->platform->label())
+            ->addColumn('platform_icon', fn (DisInfluencer $i) => $i->platform->icon())
+            ->addColumn('active_products_count', fn (DisInfluencer $i) => (int) ($activeCounts[$i->id] ?? 0))
+            ->addColumn('created_by_name', fn (DisInfluencer $i) => $i->createdBy?->full_name ?? '-')
+            ->addColumn('created_at_formatted', fn (DisInfluencer $i) => $i->created_at?->format('d/m/Y') ?? '-')
+            ->addColumn('status_badge', fn (DisInfluencer $i) => $i->is_active ? 'success' : 'danger')
+            ->addColumn('actions', fn (DisInfluencer $i) => view('influencers.datatable.actions', ['influencer' => $i])->render())
             ->filterColumn('name', function ($query, $keyword) {
                 $query->where('name', 'like', "%{$keyword}%")
                     ->orWhere('handle', 'like', "%{$keyword}%");
@@ -64,79 +70,76 @@ class InfluencersController extends Controller
             ->toJson();
     }
 
-    /**
-     * Krijo influencer te ri
-     */
     public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'name'     => ['required', 'string', 'max:255'],
             'platform' => ['required', 'string', 'in:instagram,tiktok,youtube,other'],
             'handle'   => [
-                'nullable', 
-                'string', 
-                'max:255',
-                // Unique handle per platform (excluding soft deletes)
+                'nullable', 'string', 'max:255',
+                // Fast-feedback client-side check; DIS repeats the check.
                 function ($attribute, $value, $fail) use ($request) {
-                    if (empty($value)) return;
-                    
-                    $exists = Influencer::where('platform', $request->input('platform'))
+                    if (empty($value)) {
+                        return;
+                    }
+                    $exists = DisInfluencer::where('platform', $request->input('platform'))
                         ->where('handle', $value)
                         ->whereNull('deleted_at')
                         ->exists();
-                    
                     if ($exists) {
                         $fail('Ky handle është tashmë i regjistruar për këtë platformë.');
                     }
-                }
+                },
             ],
             'phone'    => ['nullable', 'string', 'max:50'],
             'email'    => ['nullable', 'email', 'max:255'],
             'notes'    => ['nullable', 'string'],
         ]);
 
-        $validated['created_by_user_id'] = auth()->id();
-        $validated['is_active'] = true;
+        try {
+            $result = $this->service->createInfluencer($validated, auth()->id() ?? 0);
 
-        $influencer = Influencer::create($validated);
+            if ($request->ajax()) {
+                return response()->json([
+                    'success'    => true,
+                    'influencer' => $result,
+                ]);
+            }
 
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'influencer' => $influencer,
-            ]);
+            return redirect()->route('marketing.influencers.index')
+                ->with('success', __('influencer.messages.created'));
+        } catch (Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
-
-        return redirect()->route('marketing.influencers.index')
-            ->with('success', __('influencer.messages.created'));
     }
 
-    /**
-     * Shfaq profilin e influencerit me historine e produkteve
-     * Ose kthe JSON per AJAX (edit modal)
-     */
-    public function show(Influencer $influencer): View|JsonResponse
+    public function show(DisInfluencer $influencer): View|JsonResponse
     {
-        // Nese eshte AJAX request, kthe JSON per edit
         if (request()->ajax() || request()->wantsJson()) {
             return response()->json([
                 'influencer' => [
-                    'id' => $influencer->id,
-                    'name' => $influencer->name,
-                    'platform' => $influencer->platform->value,
-                    'handle' => $influencer->handle,
-                    'phone' => $influencer->phone,
-                    'email' => $influencer->email,
-                    'notes' => $influencer->notes,
+                    'id'        => $influencer->id,
+                    'name'      => $influencer->name,
+                    'platform'  => $influencer->platform->value,
+                    'handle'    => $influencer->handle,
+                    'phone'     => $influencer->phone,
+                    'email'     => $influencer->email,
+                    'notes'     => $influencer->notes,
                     'is_active' => $influencer->is_active,
-                    'label' => $influencer->label,
+                    'label'     => $influencer->label,
                 ],
             ]);
         }
 
         $influencer->load([
             'createdBy:id,full_name',
-            'influencerProducts' => fn($q) => $q->latest()->with([
+            'influencerProducts' => fn ($q) => $q->latest()->with([
                 'items.item:id,name,sku',
                 'branch:id,name',
                 'createdBy:id,full_name',
@@ -146,32 +149,26 @@ class InfluencersController extends Controller
         return view('influencers.show', compact('influencer'));
     }
 
-    /**
-     * Përditëso të dhënat e influencerit
-     */
-    public function update(Request $request, Influencer $influencer): RedirectResponse|JsonResponse
+    public function update(Request $request, DisInfluencer $influencer): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'name'      => ['required', 'string', 'max:255'],
             'platform'  => ['required', 'string', 'in:instagram,tiktok,youtube,other'],
             'handle'    => [
-                'nullable', 
-                'string', 
-                'max:255',
-                // Unique handle per platform (excluding current influencer and soft deletes)
+                'nullable', 'string', 'max:255',
                 function ($attribute, $value, $fail) use ($request, $influencer) {
-                    if (empty($value)) return;
-                    
-                    $exists = Influencer::where('platform', $request->input('platform'))
+                    if (empty($value)) {
+                        return;
+                    }
+                    $exists = DisInfluencer::where('platform', $request->input('platform'))
                         ->where('handle', $value)
                         ->where('id', '!=', $influencer->id)
                         ->whereNull('deleted_at')
                         ->exists();
-                    
                     if ($exists) {
                         $fail('Ky handle është tashmë i regjistruar për këtë platformë.');
                     }
-                }
+                },
             ],
             'phone'     => ['nullable', 'string', 'max:50'],
             'email'     => ['nullable', 'email', 'max:255'],
@@ -179,31 +176,38 @@ class InfluencersController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $influencer->update($validated);
+        try {
+            $this->service->updateInfluencer($influencer->id, $validated);
 
-        if ($request->ajax()) {
-            return response()->json(['success' => true]);
+            if ($request->ajax()) {
+                return response()->json(['success' => true]);
+            }
+
+            return redirect()->route('marketing.influencers.show', $influencer)
+                ->with('success', __('influencer.messages.updated'));
+        } catch (Exception $e) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
         }
-
-        return redirect()->route('marketing.influencers.show', $influencer)
-            ->with('success', __('influencer.messages.updated'));
     }
 
-    /**
-     * Kërko influencer (për select2 AJAX)
-     */
     public function search(Request $request): JsonResponse
     {
-        $search = $request->input('q', '');
+        $search = (string) $request->input('q', '');
 
-        $influencers = Influencer::active()
+        $influencers = DisInfluencer::active()
             ->search($search)
             ->orderBy('name')
             ->limit(30)
             ->get(['id', 'name', 'handle', 'platform']);
 
         return response()->json([
-            'results' => $influencers->map(fn(Influencer $i) => [
+            'results' => $influencers->map(fn (DisInfluencer $i) => [
                 'id'   => $i->id,
                 'text' => $i->label,
             ]),

@@ -131,6 +131,62 @@ class DisApiClient
         return $this->parseResponse($response, 'influencer_product');
     }
 
+    // ─── Influencer Profile Operations ──────────────────
+
+    /**
+     * List influencers with optional filters. Returns the full response
+     * body so callers get data + meta (pagination) in one shape.
+     */
+    public function listInfluencers(array $filters = []): array
+    {
+        $response = $this->get('/api/internal/influencers', $filters);
+
+        return $this->parseResponse($response);
+    }
+
+    /**
+     * Select2-friendly search.
+     */
+    public function searchInfluencers(string $q): array
+    {
+        $response = $this->get('/api/internal/influencers/search', ['q' => $q]);
+
+        return $this->parseResponse($response);
+    }
+
+    /**
+     * Fetch a single influencer profile.
+     */
+    public function getInfluencer(int $id): array
+    {
+        $response = $this->get("/api/internal/influencers/{$id}");
+
+        return $this->parseResponse($response, 'influencer');
+    }
+
+    /**
+     * Create a new influencer (DIS writes the row, marketing sees it
+     * immediately via the dis connection).
+     */
+    public function createInfluencer(array $data, int $actingUserId): array
+    {
+        $response = $this->post('/api/internal/influencers', array_merge($data, [
+            'acting_user_id' => $actingUserId,
+        ]));
+
+        return $this->parseResponse($response, 'influencer');
+    }
+
+    /**
+     * Update an influencer's profile.
+     */
+    public function updateInfluencer(int $id, array $data): array
+    {
+        $response = $this->put("/api/internal/influencers/{$id}", $data);
+
+        return $this->parseResponse($response, 'influencer');
+    }
+
     // ─── Merch Calendar Operations ────────────────────
 
     /**

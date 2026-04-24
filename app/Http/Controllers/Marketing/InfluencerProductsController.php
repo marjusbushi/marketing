@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Marketing;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dis\DisBranch;
+use App\Models\Dis\DisInfluencer;
 use App\Models\Dis\DisItem;
 use App\Models\Dis\DisWarehouse;
 use App\Models\Dis\InfluencerProduct;
-use App\Models\Influencer;
 use App\Services\DisApiClient;
 use Closure;
 use Exception;
@@ -93,7 +93,7 @@ class InfluencerProductsController extends Controller
         // Fetch the page, then resolve marketing-side influencers in one
         // batch and attach.
         $influencerIds = (clone $query)->pluck('influencer_id')->unique()->values();
-        $influencers = Influencer::withTrashed()
+        $influencers = DisInfluencer::withTrashed()
             ->whereIn('id', $influencerIds)
             ->get(['id', 'name', 'handle', 'platform'])
             ->keyBy('id');
@@ -143,7 +143,7 @@ class InfluencerProductsController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'influencer_id'          => ['required', 'exists:influencers,id'],
+            'influencer_id'          => ['required', 'integer', $this->existsOnDis('influencers')],
             'source_branch_id'       => ['required', 'integer', $this->existsOnDis('branches')],
             'source_warehouse_id'    => ['required', 'integer', $this->existsOnDis('warehouses')],
             'agreement_type'         => ['required', 'in:loan,gift,tbd'],
@@ -215,7 +215,7 @@ class InfluencerProductsController extends Controller
 
         // Override the dis-bound influencer relation with the authoritative
         // marketing-side record so blades can use $product->influencer.
-        $influencer = Influencer::withTrashed()->find($influencerProduct->influencer_id);
+        $influencer = DisInfluencer::withTrashed()->find($influencerProduct->influencer_id);
         $influencerProduct->setRelation('influencer', $influencer);
 
         return view('influencer-products.show', [

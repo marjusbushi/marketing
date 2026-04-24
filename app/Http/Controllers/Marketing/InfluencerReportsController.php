@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Marketing;
 
 use App\Enums\InfluencerProductStatusEnum;
 use App\Http\Controllers\Controller;
+use App\Models\Dis\DisInfluencer as Influencer;
 use App\Models\Dis\InfluencerProduct;
-use App\Models\Influencer;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
