@@ -97,28 +97,84 @@
 </div>
 
 <style>
-    #influencer-products-table_wrapper .dataTables_processing { @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-500 shadow-sm; }
-    .dt-footer { @apply flex items-center justify-between gap-2 px-4 py-2.5 border-t border-slate-100 bg-slate-50/60 text-xs text-slate-500; }
-    .dataTables_paginate { @apply flex items-center gap-1; }
-    .paginate_button { @apply min-w-[30px] h-[30px] inline-flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 text-xs cursor-pointer transition-colors hover:border-primary-500 hover:text-primary-600; }
-    .paginate_button.current { @apply bg-primary-600 border-primary-600 text-white font-semibold; }
-    .paginate_button.disabled { @apply opacity-40 cursor-default; }
+    /* Plain CSS. @apply inside a blade <style> block isn't processed
+       by Tailwind's JIT, so we avoid it entirely. */
+    #influencer-products-table { border-collapse: separate; border-spacing: 0; }
+    #influencer-products-table thead th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+    #influencer-products-table_wrapper .dataTables_processing {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0;
+        background: white; font-size: 13px; color: #64748b;
+        box-shadow: 0 2px 4px rgba(0,0,0,.04); z-index: 10;
+    }
+    .dt-footer {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; padding: 10px 16px; border-top: 1px solid #f1f5f9;
+        background: #f8fafc; font-size: 12px; color: #64748b;
+    }
+    .dataTables_paginate { display: flex; align-items: center; gap: 4px; }
+    .paginate_button {
+        min-width: 30px; height: 30px; display: inline-flex;
+        align-items: center; justify-content: center;
+        border-radius: 6px; border: 1px solid #e2e8f0;
+        background: white; color: #64748b; font-size: 12px;
+        cursor: pointer; transition: all .15s; padding: 0 8px;
+    }
+    .paginate_button:hover { border-color: #8b5cf6; color: #7c3aed; }
+    .paginate_button.current {
+        background: #7c3aed; border-color: #7c3aed;
+        color: white; font-weight: 600;
+    }
+    .paginate_button.disabled { opacity: .4; cursor: default; pointer-events: none; }
     #influencer-products-table thead .sorting:after, #influencer-products-table thead .sorting_asc:after,
     #influencer-products-table thead .sorting_desc:after, #influencer-products-table thead .sorting:before,
     #influencer-products-table thead .sorting_asc:before, #influencer-products-table thead .sorting_desc:before { display: none !important; }
-    #influencer-products-table tbody td { @apply px-4 py-2.5 text-slate-700 border-b border-slate-50 align-middle; }
-    #influencer-products-table tbody tr:hover td { @apply bg-slate-50/60; }
+    #influencer-products-table tbody td {
+        padding: 10px 16px; color: #334155; font-size: 13px;
+        border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+    }
+    #influencer-products-table tbody tr:hover td { background: #f8fafc; }
     #influencer-products-table tbody tr.overdue-row td { background: rgba(239,68,68,.04); }
     #influencer-products-table tbody tr.overdue-row:hover td { background: rgba(239,68,68,.08); }
-    .ip-badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap; }
-    .ip-badge-draft { @apply bg-slate-100 text-slate-600; }
-    .ip-badge-warning { @apply bg-amber-50 text-amber-700; }
-    .ip-badge-info { @apply bg-blue-50 text-blue-700; }
-    .ip-badge-purple { @apply bg-violet-50 text-violet-700; }
-    .ip-badge-success { @apply bg-emerald-50 text-emerald-700; }
-    .ip-badge-primary { @apply bg-primary-50 text-primary-700; }
-    .ip-badge-danger { @apply bg-red-50 text-red-700; }
-    .ip-count { @apply inline-flex items-center justify-center min-w-[26px] h-[22px] px-2 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold; }
+
+    .ip-serial { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 600; color: #7c3aed; }
+    .ip-value  { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; color: #0f172a; }
+
+    .ip-badge {
+        display: inline-flex; align-items: center;
+        padding: 3px 10px; border-radius: 9999px;
+        font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .ip-badge-draft   { background: #f1f5f9; color: #475569; }
+    .ip-badge-warning { background: #fef3c7; color: #b45309; }
+    .ip-badge-info    { background: #dbeafe; color: #1d4ed8; }
+    .ip-badge-purple  { background: #ede9fe; color: #6d28d9; }
+    .ip-badge-success { background: #d1fae5; color: #047857; }
+    .ip-badge-primary { background: #f5f3ff; color: #6d28d9; }
+    .ip-badge-danger  { background: #fee2e2; color: #b91c1c; }
+    .ip-badge-secondary { background: #f1f5f9; color: #64748b; }
+
+    .ip-count {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 26px; height: 22px; padding: 0 8px;
+        border-radius: 9999px; background: #f5f3ff; color: #6d28d9;
+        font-size: 12px; font-weight: 600;
+    }
+
+    .ip-row-action {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 6px;
+        color: #94a3b8; transition: all .15s;
+    }
+    .ip-row-action:hover { background: #f1f5f9; color: #7c3aed; }
+    .ip-row-action.success { color: #10b981; }
+    .ip-row-action.success:hover { background: #ecfdf5; color: #059669; }
+    .ip-row-action.danger { color: #ef4444; }
+    .ip-row-action.danger:hover { background: #fee2e2; color: #dc2626; }
+
+    .ip-date-overdue { color: #dc2626; font-weight: 600; font-size: 12px; white-space: nowrap; }
+    .ip-date         { color: #64748b; font-size: 12px; white-space: nowrap; }
+    .ip-date-faded   { color: #cbd5e1; font-size: 12px; white-space: nowrap; }
 </style>
 @endsection
 
@@ -141,7 +197,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const badgeMap = {
         warning:'ip-badge-warning', info:'ip-badge-info', purple:'ip-badge-purple',
-        success:'ip-badge-success', primary:'ip-badge-primary', danger:'ip-badge-danger', draft:'ip-badge-draft'
+        success:'ip-badge-success', primary:'ip-badge-primary', danger:'ip-badge-danger',
+        draft:'ip-badge-draft', secondary:'ip-badge-secondary'
     };
 
     const table = $('#influencer-products-table').DataTable({
@@ -162,15 +219,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         },
         columns: [
-            { data:'serial', name:'serial', render: d => `<span class="font-mono text-xs font-semibold text-primary-600">${d}</span>` },
-            { data:null, name:'influencer_name', render: d => { let h = `<span class="font-semibold text-slate-900">${d.influencer_name}</span>`; if(d.influencer_handle && d.influencer_handle!=='-') h += `<br><span class="text-[11px] text-slate-400">@${String(d.influencer_handle).replace(/^@+/, '')}</span>`; return h; } },
-            { data:'branch_name', name:'branch_name', render: d => `<span class="text-slate-600">${d}</span>` },
+            { data:'serial', name:'serial', render: d => `<span class="ip-serial">${d}</span>` },
+            { data:null, name:'influencer_name', render: d => {
+                let h = `<div style="font-weight:600;color:#0f172a;font-size:13px">${d.influencer_name}</div>`;
+                if (d.influencer_handle && d.influencer_handle !== '-') {
+                    h += `<div style="font-size:11px;color:#94a3b8;margin-top:2px">@${String(d.influencer_handle).replace(/^@+/, '')}</div>`;
+                }
+                return h;
+            } },
+            { data:'branch_name', name:'branch_name', render: d => `<span style="color:#475569;font-size:13px">${d}</span>` },
             { data:'items_count', className:'text-center', searchable:false, render: d => `<span class="ip-count">${d}</span>` },
-            { data:'total_value_formatted', className:'text-right', searchable:false, render: d => `<span class="font-semibold tabular-nums">${d}</span>` },
+            { data:'total_value_formatted', className:'text-right', searchable:false, render: d => `<span class="ip-value">${d}</span>` },
             { data:null, className:'text-center', searchable:false, render: d => `<span class="ip-badge ${badgeMap[d.status_color]||'ip-badge-info'}">${d.status_label}</span>` },
             { data:null, className:'text-center', searchable:false, render: d => `<span class="ip-badge ${badgeMap[d.agreement_color]||'ip-badge-info'}">${d.agreement_label}</span>` },
-            { data:'expected_return_formatted', searchable:false, render: (d,t,row) => { if(d==='-') return '<span class="text-slate-300">—</span>'; if(row.is_overdue) return `<span class="text-xs font-semibold text-red-600">${d}</span>`; return `<span class="text-xs text-slate-400">${d}</span>`; } },
-            { data:'created_at_formatted', name:'created_at', searchable:false, render: d => `<span class="text-xs text-slate-400">${d}</span>` },
+            { data:'expected_return_formatted', searchable:false, render: (d,t,row) => {
+                if (d === '-') return '<span class="ip-date-faded">—</span>';
+                return row.is_overdue
+                    ? `<span class="ip-date-overdue">${d}</span>`
+                    : `<span class="ip-date">${d}</span>`;
+            } },
+            { data:'created_at_formatted', name:'created_at', searchable:false, render: d => `<span class="ip-date">${d}</span>` },
             { data:'actions', name:'actions', orderable:false, searchable:false, className:'text-right' }
         ],
         pageLength: 25,

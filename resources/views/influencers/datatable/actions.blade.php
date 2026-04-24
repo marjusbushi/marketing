@@ -1,16 +1,13 @@
 <div class="flex items-center gap-1 justify-end">
-    {{-- View --}}
     <a href="{{ route('marketing.influencers.show', $influencer) }}"
-       class="dt-tippy-btn"
-       data-tippy-content="@lang('influencer.actions.view')">
-        <iconify-icon class="text-2xl inline-block text-slate-600" icon="heroicons:eye"></iconify-icon>
+       class="inf-row-action"
+       title="@lang('influencer.actions.view')">
+        <iconify-icon icon="heroicons-outline:eye" width="16"></iconify-icon>
     </a>
-
-    {{-- Edit --}}
     <button type="button"
             onclick="editInfluencer({{ $influencer->id }})"
-            class="dt-tippy-btn"
-            data-tippy-content="@lang('influencer.actions.edit')">
-        <iconify-icon class="text-2xl inline-block text-slate-600" icon="heroicons:pencil-square"></iconify-icon>
+            class="inf-row-action"
+            title="@lang('influencer.actions.edit')">
+        <iconify-icon icon="heroicons-outline:pencil-square" width="16"></iconify-icon>
     </button>
 </div>

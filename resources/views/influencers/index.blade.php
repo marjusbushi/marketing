@@ -157,22 +157,73 @@
 </div>
 
 <style>
-    /* DataTables minimal overrides */
-    #influencers-table_wrapper .dataTables_processing { @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-500 shadow-sm; }
-    .dt-footer { @apply flex items-center justify-between gap-2 px-4 py-2.5 border-t border-slate-100 bg-slate-50/60 text-xs text-slate-500; }
-    .dataTables_paginate { @apply flex items-center gap-1; }
-    .paginate_button { @apply min-w-[30px] h-[30px] inline-flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 text-xs cursor-pointer transition-colors hover:border-primary-500 hover:text-primary-600; }
-    .paginate_button.current { @apply bg-primary-600 border-primary-600 text-white font-semibold; }
-    .paginate_button.disabled { @apply opacity-40 cursor-default; }
+    /* Plain CSS (no Tailwind @apply — inline <style> blocks aren't
+       processed by the Tailwind compiler, so @apply rules become
+       invalid CSS and are silently dropped). */
+    #influencers-table { border-collapse: separate; border-spacing: 0; }
+    #influencers-table thead th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+    #influencers-table_wrapper .dataTables_processing {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        padding: 8px 16px; border-radius: 8px; border: 1px solid #e2e8f0;
+        background: white; font-size: 13px; color: #64748b;
+        box-shadow: 0 2px 4px rgba(0,0,0,.04); z-index: 10;
+    }
+    .dt-footer {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; padding: 10px 16px; border-top: 1px solid #f1f5f9;
+        background: #f8fafc; font-size: 12px; color: #64748b;
+    }
+    .dataTables_paginate { display: flex; align-items: center; gap: 4px; }
+    .paginate_button {
+        min-width: 30px; height: 30px; display: inline-flex;
+        align-items: center; justify-content: center;
+        border-radius: 6px; border: 1px solid #e2e8f0;
+        background: white; color: #64748b; font-size: 12px;
+        cursor: pointer; transition: all .15s; padding: 0 8px;
+    }
+    .paginate_button:hover { border-color: #8b5cf6; color: #7c3aed; }
+    .paginate_button.current {
+        background: #7c3aed; border-color: #7c3aed;
+        color: white; font-weight: 600;
+    }
+    .paginate_button.disabled { opacity: .4; cursor: default; pointer-events: none; }
     #influencers-table thead .sorting:after, #influencers-table thead .sorting_asc:after,
     #influencers-table thead .sorting_desc:after, #influencers-table thead .sorting:before,
     #influencers-table thead .sorting_asc:before, #influencers-table thead .sorting_desc:before { display: none !important; }
-    #influencers-table tbody td { @apply px-4 py-2.5 text-slate-700 border-b border-slate-50 align-middle; }
-    #influencers-table tbody tr:hover td { @apply bg-slate-50/60; }
-    .status-dot { @apply inline-block w-2 h-2 rounded-full; }
-    .status-dot.active { @apply bg-emerald-500; }
-    .status-dot.inactive { @apply bg-slate-300; }
-    .products-badge { @apply inline-flex items-center justify-center min-w-[26px] h-[22px] px-2 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold; }
+    #influencers-table tbody td {
+        padding: 10px 16px; color: #334155; font-size: 13px;
+        border-bottom: 1px solid #f1f5f9; vertical-align: middle;
+    }
+    #influencers-table tbody tr:hover td { background: #f8fafc; }
+
+    /* Status pill — replaces the near-invisible 2px dot. */
+    .inf-status {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 2px 8px; border-radius: 9999px;
+        font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .inf-status.active { background: #ecfdf5; color: #047857; }
+    .inf-status.inactive { background: #f1f5f9; color: #64748b; }
+    .inf-status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .inf-status.active .inf-status-dot { background: #10b981; }
+    .inf-status.inactive .inf-status-dot { background: #94a3b8; }
+
+    .products-badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 26px; height: 22px; padding: 0 8px;
+        border-radius: 9999px; background: #f5f3ff; color: #6d28d9;
+        font-size: 12px; font-weight: 600;
+    }
+    .products-badge.zero { background: #f1f5f9; color: #94a3b8; }
+
+    /* Row action icons — always visible, consistent sizing. */
+    .inf-row-action {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 6px;
+        color: #94a3b8; transition: all .15s;
+    }
+    .inf-row-action:hover { background: #f1f5f9; color: #7c3aed; }
+
     @keyframes slideIn { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:translateY(0); } }
 </style>
 @endsection
@@ -211,11 +262,16 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             {
                 data: 'active_products_count', className: 'text-center', searchable: false,
-                render: data => `<span class="products-badge">${data || 0}</span>`
+                render: data => {
+                    const n = Number(data) || 0;
+                    return `<span class="products-badge ${n === 0 ? 'zero' : ''}">${n}</span>`;
+                }
             },
             {
                 data: 'is_active', className: 'text-center',
-                render: data => `<span class="status-dot ${data ? 'active' : 'inactive'}"></span>`
+                render: data => data
+                    ? '<span class="inf-status active"><span class="inf-status-dot"></span>Aktiv</span>'
+                    : '<span class="inf-status inactive"><span class="inf-status-dot"></span>Joaktiv</span>'
             },
             {
                 data: 'created_at_formatted', name: 'created_at', searchable: false,
