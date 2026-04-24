@@ -83,9 +83,9 @@
     </div>
 </div>
 
-@include('merch-calendar._partials.collection-sidebar')
 <script>
     const SUMMARY_API = @json(route('marketing.merch-calendar.api.weeks.summary'));
+    const COLLECTION_URL_BASE = @json(url('/marketing/merch-calendar/collection'));
     const CDN_PROXY = @json(route('marketing.cdn-image'));
     let allWeeks = [];
     let currentFilter = 'all';
@@ -220,7 +220,7 @@
 
                 return `<div style="position:relative; margin-bottom:20px;">
                     <div style="position:absolute; left:-29px; top:16px; width:10px; height:10px; border-radius:50%; background:${dotColors[st]}; border:2px solid #fff; box-shadow:0 0 0 2px ${dotColors[st]}33;"></div>
-                    <div class="tl-card" onclick="showWeekDetail(${weekId})" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showWeekDetail(${weekId});}">
+                    <a class="tl-card" href="${COLLECTION_URL_BASE}/${weekId}" style="text-decoration:none; color:inherit; display:block;">
                         <div style="padding:14px 16px;">
                             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;">
                                 <div style="min-width:0; flex:1;">
@@ -259,7 +259,7 @@
                                 <div class="tl-progress-bar ${progress.cls}" style="width:${progress.pct}%;"></div>
                             </div>
                         </div>
-                    </div>
+                    </a>
                 </div>`;
             }).join('') + '</div>';
 

@@ -120,10 +120,10 @@
     </div>
 </div>
 
-@include('merch-calendar._partials.collection-sidebar')
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script>
     const WEEKS_API = @json(route('marketing.merch-calendar.api.weeks'));
+    const COLLECTION_URL_BASE = @json(url('/marketing/merch-calendar/collection'));
     const CSRF = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
     let calendarInstance = null;
@@ -216,7 +216,7 @@
             html += `<button class="mc-popover-btn${active}" onclick="changeStatus(${weekId},'${s}')"><span class="mc-popover-dot" style="background:${st.dot}"></span>${st.label}</button>`;
         });
         html += `<button class="mc-popover-btn" onclick="closePopover();openWeekModal(${weekId})" style="margin-top:4px;"><iconify-icon icon="heroicons-outline:pencil" width="12" style="color:#94a3b8;"></iconify-icon> Edit</button>`;
-        html += `<a class="mc-popover-link" href="javascript:void(0)" onclick="closePopover();showWeekDetail(${weekId})">View details →</a>`;
+        html += `<a class="mc-popover-link" href="${COLLECTION_URL_BASE}/${Number(weekId)}">View details →</a>`;
 
         pop.innerHTML = html;
         document.body.appendChild(pop);
@@ -243,7 +243,7 @@
         } catch (e) { alert('Error: ' + e.message); }
     }
 
-    // showWeekDetail is provided by collection-sidebar partial
+    // Collection detail now lives at /marketing/merch-calendar/collection/{id}
 
     // ─── Create/Edit Modal ───────────────────
 

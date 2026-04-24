@@ -13,7 +13,8 @@
     .gantt-cells { display:flex; flex:1; position:relative; }
     .gantt-cell { min-width:40px; height:32px; border-right:1px solid #f8fafc; position:relative; }
     .gantt-cell.today { background:#eef2ff; }
-    .gantt-bar { position:absolute; top:4px; height:24px; border-radius:4px; display:flex; align-items:center; padding:0 8px; font-size:10px; font-weight:500; overflow:hidden; white-space:nowrap; z-index:1; }
+    .gantt-bar { position:absolute; top:4px; height:24px; border-radius:4px; display:flex; align-items:center; padding:0 8px; font-size:10px; font-weight:500; overflow:hidden; white-space:nowrap; z-index:1; text-decoration:none; cursor:pointer; transition:filter 0.1s; }
+    .gantt-bar:hover { filter:brightness(0.96); box-shadow:0 0 0 1px rgba(99,102,241,0.25); }
     .gantt-bar-planned { background:#e2e8f0; color:#475569; }
     .gantt-bar-active { background:#bbf7d0; color:#166534; }
     .gantt-bar-completed { background:#bfdbfe; color:#1e40af; }
@@ -49,10 +50,14 @@
     </div>
 </div>
 
-@include('merch-calendar._partials.collection-sidebar')
 <script>
     const SUMMARY_API = @json(route('marketing.merch-calendar.api.weeks.summary'));
+    const COLLECTION_URL_BASE = @json(url('/marketing/merch-calendar/collection'));
     let ganttOffset = 0; // days offset from today
+
+    // HTML-escape helper for DB-sourced strings that land in innerHTML.
+    const _esc = document.createElement('div');
+    function esc(s) { if (s == null) return ''; _esc.textContent = String(s); return _esc.innerHTML; }
 
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -141,10 +146,12 @@
             const cells = days.map(d => `<div class="gantt-cell${d.isToday ? ' today' : ''}"></div>`).join('');
 
             const barClass = 'gantt-bar gantt-bar-' + (w.status || 'planned');
-            const bar = `<div class="${barClass}" style="left:${barStart * 40}px;width:${barWidth * 40 - 2}px;">${w.name}</div>`;
+            const weekId = Number(w.id) || 0;
+            const nameSafe = esc(w.name);
+            const bar = `<a class="${barClass}" href="${COLLECTION_URL_BASE}/${weekId}" style="left:${barStart * 40}px;width:${barWidth * 40 - 2}px;">${nameSafe}</a>`;
 
             return `<div class="gantt-row">
-                <div class="gantt-label" title="${w.name}">${w.name}</div>
+                <a class="gantt-label" href="${COLLECTION_URL_BASE}/${weekId}" title="${nameSafe}" style="text-decoration:none; color:inherit;">${nameSafe}</a>
                 <div class="gantt-cells">${cells}${bar}</div>
             </div>`;
         }).join('');

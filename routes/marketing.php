@@ -223,6 +223,9 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::get('/timeline', [MerchCalendarController::class, 'timeline'])->name('timeline');
         Route::get('/gantt', [MerchCalendarController::class, 'gantt'])->name('gantt');
         Route::get('/quick-scan', [MerchCalendarController::class, 'quickScan'])->name('quick-scan');
+        Route::get('/collection/{id}', [MerchCalendarController::class, 'collectionDetail'])
+            ->whereNumber('id')
+            ->name('collection.show');
 
         // API proxies
         Route::get('/api/weeks', [MerchCalendarController::class, 'weeksJson'])->name('api.weeks');

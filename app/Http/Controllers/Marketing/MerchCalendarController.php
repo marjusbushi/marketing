@@ -36,6 +36,24 @@ class MerchCalendarController extends Controller
         return view('merch-calendar.quick-scan');
     }
 
+    /**
+     * Dedicated full-page view of a collection (replaces the sidebar).
+     * Fetches week detail server-side so the page renders without a
+     * subsequent API round-trip.
+     */
+    public function collectionDetail(int $id): View
+    {
+        try {
+            $collection = $this->disApi->getWeek($id);
+        } catch (\RuntimeException $e) {
+            abort($e->getCode() === 404 ? 404 : 502, $e->getMessage());
+        }
+
+        return view('merch-calendar.collection-detail', [
+            'collection' => $collection,
+        ]);
+    }
+
     // ─── API Proxies (JSON) ──────────────────────
 
     /**
