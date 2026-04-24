@@ -61,7 +61,27 @@
     .cd-filter-btn:hover:not(.active) { background: #f8fafc; }
     .cd-filter-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
     .cd-filter-btn .cd-count { margin-left: 4px; opacity: 0.7; font-size: 10px; }
-    .cd-toolbar-right { font-size: 12px; color: #64748b; }
+    .cd-toolbar-right { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #64748b; }
+    .cd-view-toggle { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+    .cd-view-toggle button { padding: 6px 10px; font-size: 12px; background: #fff; border: none; cursor: pointer; color: #64748b; display: inline-flex; align-items: center; gap: 4px; }
+    .cd-view-toggle button:hover:not(.active) { background: #f8fafc; }
+    .cd-view-toggle button.active { background: #f1f5f9; color: #0f172a; font-weight: 600; }
+
+    /* List view */
+    .cd-grid.is-list { display: flex; flex-direction: column; gap: 8px; }
+    .cd-grid.is-list .cd-card { flex-direction: row; align-items: stretch; }
+    .cd-grid.is-list .cd-card-img-wrap { width: 88px; min-width: 88px; height: auto; min-height: 88px; flex-shrink: 0; }
+    .cd-grid.is-list .cd-card-body { flex-direction: row; align-items: center; gap: 14px; padding: 10px 14px; }
+    .cd-grid.is-list .cd-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .cd-grid.is-list .cd-card-head { cursor: pointer; }
+    .cd-grid.is-list .cd-card-price-row { flex-shrink: 0; min-width: 150px; padding: 6px 10px; gap: 10px; }
+    .cd-grid.is-list .cd-date-row { min-width: 260px; flex-shrink: 0; padding: 6px 10px; }
+    .cd-grid.is-list .cd-card-meta { margin-top: 0; }
+    @media (max-width: 900px) {
+        .cd-grid.is-list .cd-card-body { flex-direction: column; align-items: stretch; }
+        .cd-grid.is-list .cd-card-price-row { min-width: 0; }
+        .cd-grid.is-list .cd-date-row { min-width: 0; }
+    }
 
     /* Products grid */
     .cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
@@ -70,9 +90,9 @@
     .cd-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; transition: all 0.15s; display: flex; flex-direction: column; }
     .cd-card:hover { border-color: #c7d2fe; box-shadow: 0 6px 18px rgba(99,102,241,0.06); }
 
-    .cd-card-img-wrap { position: relative; height: 170px; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); display: flex; align-items: center; justify-content: center; color: #cbd5e1; cursor: pointer; }
-    .cd-card-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .cd-card-discount { position: absolute; top: 8px; right: 8px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; }
+    .cd-card-img-wrap { position: relative; height: 280px; background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #cbd5e1; cursor: pointer; overflow: hidden; }
+    .cd-card-img-wrap img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .cd-card-discount { position: absolute; top: 8px; right: 8px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; z-index: 2; }
 
     .cd-card-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
     .cd-card-head { display: flex; justify-content: space-between; align-items: start; gap: 8px; cursor: pointer; }
@@ -192,7 +212,15 @@
             {{-- Rendered by JS --}}
         </div>
         <div class="cd-toolbar-right">
-            <span id="cdShownCount">0</span> produkte
+            <span><span id="cdShownCount">0</span> produkte</span>
+            <div class="cd-view-toggle" role="group" aria-label="View mode">
+                <button type="button" id="cdViewGrid" class="active" aria-label="Grid view" title="Grid">
+                    <iconify-icon icon="heroicons-outline:squares-2x2" width="14"></iconify-icon>
+                </button>
+                <button type="button" id="cdViewList" aria-label="List view" title="Listë">
+                    <iconify-icon icon="heroicons-outline:bars-3" width="14"></iconify-icon>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -222,6 +250,10 @@
 
     let collectionData = COLLECTION;
     let currentFilter  = 'all';
+    let viewMode       = (() => {
+        try { return localStorage.getItem('cd-view-mode') === 'list' ? 'list' : 'grid'; }
+        catch (_) { return 'grid'; }
+    })();
 
     const classStyles = {
         best_seller: { bg:'#fef3c7', text:'#92400e', label:'Best Seller' },
@@ -388,6 +420,7 @@
 
         const grid = document.getElementById('cdGrid');
         clearChildren(grid);
+        grid.classList.toggle('is-list', viewMode === 'list');
 
         document.getElementById('cdShownCount').textContent = groups.length;
 
@@ -441,7 +474,9 @@
         // Body
         const body = el('div', 'cd-card-body');
 
-        // Head — name + badge
+        // Main (name + meta) — wrapped so list view can place it beside price/dates
+        const main = el('div', 'cd-card-main');
+
         const head = el('div', 'cd-card-head');
         head.addEventListener('click', () => openProductModal(realIdx));
 
@@ -454,13 +489,14 @@
         badge.style.color = cs.text;
         head.appendChild(badge);
 
-        body.appendChild(head);
+        main.appendChild(head);
 
-        // Meta
         const parts = [g.code, g.vendor_name, g.category_name].filter(Boolean);
         const meta = el('div', 'cd-card-meta', parts.join(' · '));
         meta.title = meta.textContent;
-        body.appendChild(meta);
+        main.appendChild(meta);
+
+        body.appendChild(main);
 
         // Price + stock row
         const priceRow = el('div', 'cd-card-price-row');
@@ -786,6 +822,16 @@
         document.getElementById('cdModalBg').classList.remove('open');
     };
 
+    // ─── View mode toggle ──────────────────────────────
+
+    function setViewMode(mode) {
+        viewMode = mode === 'list' ? 'list' : 'grid';
+        try { localStorage.setItem('cd-view-mode', viewMode); } catch (_) {}
+        document.getElementById('cdViewGrid').classList.toggle('active', viewMode === 'grid');
+        document.getElementById('cdViewList').classList.toggle('active', viewMode === 'list');
+        renderProducts();
+    }
+
     // ─── Init ──────────────────────────────────────────
 
     document.addEventListener('keydown', function(e) {
@@ -793,6 +839,13 @@
             closeProductModal();
         }
     });
+
+    document.getElementById('cdViewGrid').addEventListener('click', () => setViewMode('grid'));
+    document.getElementById('cdViewList').addEventListener('click', () => setViewMode('list'));
+
+    // Apply persisted view mode before first product render
+    document.getElementById('cdViewGrid').classList.toggle('active', viewMode === 'grid');
+    document.getElementById('cdViewList').classList.toggle('active', viewMode === 'list');
 
     renderNotes();
     renderStats();
