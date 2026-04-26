@@ -26,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Redirect authenticated users away from login page
         $middleware->redirectUsersTo('/');
 
+        // Redirect unauthenticated users to login page (instead of returning 401)
+        $middleware->redirectGuestsTo(fn () => route('login'));
+
         // Meta signs webhook POSTs with X-Hub-Signature-256; we verify HMAC
         // inside the controller. CSRF tokens do not apply to server-to-server
         // calls from Meta, so exclude the entire webhook namespace.
