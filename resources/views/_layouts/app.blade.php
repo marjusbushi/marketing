@@ -48,19 +48,8 @@
 
     {{-- Sidebar --}}
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 overflow-y-auto flex flex-col transition-all duration-200 w-64 {{ $studioChrome ? 'bg-zinc-900 border-r border-zinc-800' : 'bg-sidebar border-r border-slate-200' }}" data-expanded="true">
-        {{-- Brand --}}
-        <div class="flex items-center gap-3 px-5 py-5 border-b min-h-[68px] {{ $studioChrome ? 'border-zinc-800' : 'border-slate-100' }}">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-400 via-rose-500 to-purple-600 flex items-center justify-center shrink-0">
-                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z" />
-                </svg>
-            </div>
-            <div class="sidebar-label overflow-hidden whitespace-nowrap">
-                <div class="text-sm font-bold tracking-tight {{ $studioChrome ? 'text-zinc-100' : 'text-slate-900' }}">Flare</div>
-                <div class="text-[10px] {{ $studioChrome ? 'text-zinc-500' : 'text-sidebar-text' }}">by Zero Absolute</div>
-            </div>
-        </div>
+        {{-- Brand → App Switcher (klik për të kaluar në apps të tjera) --}}
+        @include('_partials.app-switcher')
 
         {{-- Navigation --}}
         <nav class="flex-1 px-3 py-4 space-y-0.5">
