@@ -6,9 +6,9 @@
 @php
     $apps = [
         [
-            'name'    => 'Paneli',
-            'tagline' => 'Dashboard & Menaxhim',
-            'icon'    => 'heroicons-outline:home',
+            'name'    => 'DIS',
+            'tagline' => 'Dynamic Innovative Solution',
+            'icon'    => 'mdi:view-dashboard',
             'url'     => config('app.dis_url', 'https://dis.zeroabsolute.dev') . '/management/dashboard',
             'bg'      => 'linear-gradient(135deg,#6366f1,#8b5cf6)',
             'current' => false,
