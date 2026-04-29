@@ -47,6 +47,8 @@ class DailyBasketPost extends Model
         'content_post_id',
         'creative_brief_id',
         'assigned_to',
+        'claimed_by_user_id',
+        'claimed_at',
         'priority',
         'sort_order',
     ];
@@ -54,6 +56,7 @@ class DailyBasketPost extends Model
     protected $casts = [
         'target_platforms' => 'array',
         'scheduled_for'    => 'datetime',
+        'claimed_at'       => 'datetime',
         'stage'            => DailyBasketPostStage::class,
         'post_type'        => DailyBasketPostType::class,
     ];
@@ -92,6 +95,11 @@ class DailyBasketPost extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function claimer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'claimed_by_user_id');
     }
 
     public function contentPost(): BelongsTo
