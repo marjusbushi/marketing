@@ -253,6 +253,27 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->name('api.items.by-barcode');
     });
 
+    // ─── Production phone view (mobile-first) ──────
+    Route::prefix('production')->as('production.')
+        ->middleware('marketing.permission:' . P::PRODUCTION_VIEW->value)
+        ->group(function () {
+            Route::get('/', [\App\Http\Controllers\Marketing\ProductionController::class, 'queue'])
+                ->name('queue');
+            Route::get('/{post}', [\App\Http\Controllers\Marketing\ProductionController::class, 'show'])
+                ->whereNumber('post')
+                ->name('show');
+            Route::post('/{post}/claim', [\App\Http\Controllers\Marketing\ProductionController::class, 'claim'])
+                ->whereNumber('post')
+                ->name('claim');
+            Route::post('/{post}/release', [\App\Http\Controllers\Marketing\ProductionController::class, 'release'])
+                ->whereNumber('post')
+                ->name('release');
+            Route::post('/{post}/advance', [\App\Http\Controllers\Marketing\ProductionController::class, 'advance'])
+                ->whereNumber('post')
+                ->middleware('marketing.permission:' . P::PRODUCTION_ADVANCE->value)
+                ->name('advance');
+        });
+
     // ─── Shporta Ditore ─────────────────────────────
     Route::prefix('daily-basket')->as('daily-basket.')->group(function () {
         // Page view
