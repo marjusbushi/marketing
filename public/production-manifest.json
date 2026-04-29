@@ -1,0 +1,13 @@
+{
+  "name": "Prodhimi · Zero Absolute",
+  "short_name": "Prodhimi",
+  "start_url": "/marketing/production",
+  "scope": "/marketing/production",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1f2937",
+  "background_color": "#fafafa",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}
