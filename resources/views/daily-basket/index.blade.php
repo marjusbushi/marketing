@@ -479,11 +479,10 @@
     /* ─── Post card v2 (#1323) — flat grid inside .db-canvas ──── */
     .db-grid {
         display: grid;
-        /* Columns are capped at 260px so cards don't stretch to 500px on
-           wide screens — a 9:16 reel at 500px wide would be >850px tall
-           and blow the row alignment apart. 260px keeps reels at ~460px
-           tall which is readable without dominating the layout. */
-        grid-template-columns: repeat(auto-fill, minmax(220px, 260px));
+        /* Always exactly 3 columns regardless of viewport width — user
+           explicitly wants a consistent IG-feed-style layout (no 2/4 swing
+           with breakpoints). Cards stretch to fill the canvas. */
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 14px;
         padding: 14px;
         background: #fff;
@@ -667,19 +666,18 @@
     }
     .db-post-ref-add:hover { border-color: var(--db-text); color: var(--db-text); background: var(--db-accent-soft); }
 
-    /* Delete button on card header — only shows on hover so the header
-       stays clean most of the time. */
+    /* Delete button on card header — always visible (muted) so users know
+       a post can be removed, not just its material. Hover turns it red. */
     .db-post-del {
         width: 18px; height: 18px; border-radius: 50%;
         border: none; background: transparent;
         color: var(--db-text-3); cursor: pointer;
         font-size: 14px; line-height: 1;
         display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0; opacity: 0;
-        transition: opacity 0.12s, background 0.12s, color 0.12s;
+        flex-shrink: 0;
+        transition: background 0.12s, color 0.12s;
     }
-    .db-post:hover .db-post-del { opacity: 1; }
-    .db-post-del:hover { background: #fee2e2; color: #dc2626; opacity: 1; }
+    .db-post-del:hover { background: #fee2e2; color: #dc2626; }
 
     /* Empty / "+ Post i ri" card */
     .db-post-empty {
