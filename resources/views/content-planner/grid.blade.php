@@ -15,6 +15,21 @@
     .story-card .story-date { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border-radius: 8px; padding: 4px 8px; text-align: center; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .story-card .story-platform { position: absolute; bottom: 10px; right: 10px; }
     .story-card .story-status { position: absolute; bottom: 10px; left: 10px; }
+    /* Delete affordance — hidden until hover so kartela mbetet e qet­ë.
+       Shfaqet vetëm për story-t pre-skedulim (status draft/pending/approved)
+       dhe asnjëherë për ato të importuara nga Meta. */
+    .story-card .story-del {
+        position: absolute; top: 8px; right: 8px;
+        width: 22px; height: 22px; border-radius: 50%;
+        border: none; background: rgba(255,255,255,0.95);
+        color: #475569; font-size: 14px; line-height: 1;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; opacity: 0;
+        transition: opacity 0.15s, background 0.15s, color 0.15s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+    .story-card:hover .story-del { opacity: 1; }
+    .story-card .story-del:hover { background: #fee2e2; color: #dc2626; }
     .story-new { flex-shrink: 0; width: 150px; height: 230px; border-radius: 14px; border: 2px dashed #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
     .story-new:hover { border-color: #6366f1; background: #f5f3ff; }
 
@@ -367,6 +382,28 @@
         return url;
     }
 
+    // Fshin një story të paskeduluar. Click-u vjen nga butoni × te kartela
+    // — stop-propagation-on që click-u të mos hapë composer-in. Refresh i grid-it
+    // pas DELETE të suksesshëm e largon kartelën nga UI menjëherë.
+    async function deleteStory(event, postId) {
+        event.stopPropagation();
+        if (!confirm('Të hiqet ky story?')) return;
+        try {
+            const url = `{{ url('/marketing/api/posts') }}/${encodeURIComponent(postId)}`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                },
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            refreshGrid();
+        } catch (err) {
+            alert('Fshirja dështoi: ' + err.message);
+        }
+    }
+
     async function refreshGrid() {
         const platform = document.getElementById('filterPlatform').value;
         const params = new URLSearchParams();
@@ -444,6 +481,21 @@
                     <div class="text-[10px] font-medium text-slate-500 mt-0.5">${dt.month}</div>
                 </div>
             `;
+
+            // Fshirja lejohet vetëm para skedulimit (draft/pending/approved) dhe
+            // jo për story-t e importuara nga Meta (ato kthehen me sync, prandaj
+            // fshirja lokale do bëhej e padobishme — do riimportohej).
+            const canDelete = !isExternal && ['draft', 'pending_review', 'approved'].includes(props.status);
+            if (canDelete) {
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'story-del';
+                del.title = 'Hiq këtë story';
+                del.textContent = '×';
+                del.onclick = (e) => deleteStory(e, p.id);
+                card.appendChild(del);
+            }
+
             storiesTrack.appendChild(card);
         });
 
