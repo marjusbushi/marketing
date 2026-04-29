@@ -23,6 +23,10 @@ enum MarketingPermissionEnum: string
     case CONTENT_PLANNER_PUBLISH = 'content_planner.publish';
     case CONTENT_PLANNER_MANAGE  = 'content_planner.manage';
 
+    // ── Production (phone view) ───────────────────
+    case PRODUCTION_VIEW    = 'production.view';
+    case PRODUCTION_ADVANCE = 'production.advance';
+
     // ── Analytics ─────────────────────────────────
     case ANALYTICS_VIEW   = 'analytics.view';
     case ANALYTICS_MANAGE = 'analytics.manage';
