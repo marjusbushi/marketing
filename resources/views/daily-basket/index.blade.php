@@ -78,12 +78,15 @@
     .db-skel::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent); animation: db-shimmer 1.2s infinite; }
     @keyframes db-shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-    .db-sheet-label { font-size: 11px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin: 40px 0 10px; }
+    /* Compact-mode (#1688): user e dëshironte detail-in të shkurtër mjaftueshëm
+       që track-u i status-it lart + 3 kolonat të dukeshin pa scroll. Margjinat
+       dhe padding-et u ulën rreth 30–50% pa prekur strukturën. */
+    .db-sheet-label { font-size: 11px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin: 16px 0 6px; }
     .db-sheet { background: var(--db-surface); border: 1px solid var(--db-border); border-radius: 12px; overflow: hidden; }
     .db-sheet-placeholder { padding: 40px; text-align: center; color: var(--db-text-3); font-size: 12px; }
-    .db-sheet-head { padding: 20px 24px; border-bottom: 1px solid var(--db-border); }
-    .db-sheet-crumb { font-size: 11px; color: var(--db-text-3); margin-bottom: 4px; }
-    .db-sheet-title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+    .db-sheet-head { padding: 12px 20px; border-bottom: 1px solid var(--db-border); }
+    .db-sheet-crumb { font-size: 11px; color: var(--db-text-3); margin-bottom: 2px; }
+    .db-sheet-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
     .db-sheet-close {
         font-size: 11px; color: var(--db-text-2);
         background: var(--db-accent-soft); border: none;
@@ -92,7 +95,7 @@
     }
     .db-sheet-close:hover { background: var(--db-border); color: var(--db-text); }
 
-    .db-track { display: flex; padding: 16px 24px; background: #fafafa; border-bottom: 1px solid var(--db-border); gap: 4px; }
+    .db-track { display: flex; padding: 10px 20px; background: #fafafa; border-bottom: 1px solid var(--db-border); gap: 4px; }
     .db-track-step {
         flex: 1; padding: 4px 0;
         transition: opacity 0.12s;
@@ -120,7 +123,7 @@
     .db-prod-row-name { font-size: 12px; font-weight: 500; flex: 1; }
     .db-prod-row-role { font-size: 10px; color: var(--db-text-3); }
 
-    .db-sheet-foot { display: flex; justify-content: space-between; padding: 14px 20px; border-top: 1px solid var(--db-border); background: #fafafa; }
+    .db-sheet-foot { display: flex; justify-content: space-between; padding: 10px 16px; border-top: 1px solid var(--db-border); background: #fafafa; }
     .db-btn { padding: 7px 14px; font-size: 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; font-weight: 500; background: transparent; color: var(--db-text-2); }
     .db-btn:hover { background: var(--db-accent-soft); color: var(--db-text); }
     .db-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -708,22 +711,22 @@
 
     /* ─── Inline 3-column edit panel ─────────────────────────────── */
     .db-sheet-body-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
-    .db-col-group { padding: 20px 24px; border-right: 1px solid var(--db-border); min-width: 0; }
+    .db-col-group { padding: 14px 18px; border-right: 1px solid var(--db-border); min-width: 0; }
     .db-col-group:last-child { border-right: 0; }
     .db-field-inline { min-width: 0; }
     .db-col-group-title {
         font-size: 10px; color: var(--db-text-3); text-transform: uppercase;
-        letter-spacing: 0.08em; font-weight: 700; margin-bottom: 14px;
+        letter-spacing: 0.08em; font-weight: 700; margin-bottom: 8px;
         display: flex; align-items: center; gap: 6px;
     }
     .db-col-group-icon { font-size: 14px; }
 
-    .db-field-inline { margin-bottom: 14px; }
+    .db-field-inline { margin-bottom: 9px; }
     .db-field-inline:last-child { margin-bottom: 0; }
 
     .db-inline-textarea {
         width: 100%;
-        padding: 7px 9px;
+        padding: 6px 8px;
         border: 1px solid var(--db-border);
         border-radius: 5px;
         font-family: inherit;
@@ -731,7 +734,7 @@
         color: var(--db-text);
         background: #fff;
         resize: vertical;
-        min-height: 76px;
+        min-height: 52px;
     }
     .db-inline-textarea:focus { outline: none; border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.05); }
 
@@ -926,9 +929,17 @@
     .db-url-ext { font-size: 10px; opacity: 0.7; flex-shrink: 0; }
 
     /* ─── Media uploader ─────────────────────────────────────────── */
+    /* Compact-mode (#1688): single-asset slot (photo/video) capped at
+       300px në vend që të zinte gjithë gjerësinë e kolonës — pa këtë cap,
+       photo posts ishin po aq të gjata sa reel/story para fix-it. Inside
+       carousel grid (.db-media-grid) cap-i hiqet që cells të vazhdojnë
+       sipas 1fr × 3. */
     .db-media-slot {
         position: relative;
         width: 100%;
+        max-width: 300px;
+        margin-left: auto;
+        margin-right: auto;
         aspect-ratio: 1 / 1;
         border: 1.5px dashed var(--db-border-strong);
         border-radius: 8px;
@@ -970,11 +981,13 @@
         z-index: 2;
     }
     .db-media-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .db-media-grid .db-media-slot { aspect-ratio: 1/1; }
+    .db-media-grid .db-media-slot { aspect-ratio: 1/1; max-width: none; margin: 0; }
 
     /* Single-asset reel/story slot: large enough to feel like a real reel.
-       Inside a carousel grid, tiles stay small (overridden below). */
-    .db-media-reel { aspect-ratio: 9/16; max-width: 340px; margin: 0 auto; }
+       Inside a carousel grid, tiles stay small (overridden below).
+       Compact-mode (#1688): reduced from 340px → 260px so the detail card
+       fits the viewport without scrolling away from the status track. */
+    .db-media-reel { aspect-ratio: 9/16; max-width: 260px; margin: 0 auto; }
     .db-media-grid .db-media-reel { max-width: 140px; margin: 0; }
 
     .db-media-progress {
