@@ -1148,6 +1148,19 @@
 
     const CSRF = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
+    // R2 CDN images (web-cdn.zeroabsolute.com) bllokojnë hotlinking nga
+    // browser-i. Merch Calendar i ridrejton përmes /marketing/cdn-image
+    // (server fetchon + cache 24h) — Shporta s'po e bënte, prandaj fotot
+    // dukeshin bosh në rail edhe kur prodhuktet i kishin në Merch Calendar.
+    const CDN_PROXY = @json(route('marketing.cdn-image'));
+    function proxyCdnUrl(url) {
+        if (!url || typeof url !== 'string') return url;
+        if (url.startsWith('https://web-cdn.zeroabsolute.com/')) {
+            return CDN_PROXY + '?url=' + encodeURIComponent(url);
+        }
+        return url;
+    }
+
     const STAGE_LABELS = {
         planning: 'Planifikim',
         production: 'Prodhim',
@@ -1728,7 +1741,7 @@
         thumb.className = 'db-p-thumb';
         if (p.thumbnail_url) {
             const img = document.createElement('img');
-            img.src = p.thumbnail_url;
+            img.src = proxyCdnUrl(p.thumbnail_url);
             img.alt = '';
             img.loading = 'lazy';
             img.onerror = () => {
@@ -2225,7 +2238,7 @@
         thumbHost.className = 'db-post-chip-thumb';
         if (p.image_url) {
             const img = document.createElement('img');
-            img.src = p.image_url;
+            img.src = proxyCdnUrl(p.image_url);
             img.alt = '';
             img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
             img.onerror = () => {
@@ -2399,7 +2412,7 @@
         } else {
             if (full.image_url) {
                 const img = document.createElement('img');
-                img.src = full.image_url;
+                img.src = proxyCdnUrl(full.image_url);
                 // max-height tied to viewport so the full photo + name + meta
                 // stays inside 80vh; contain preserves the actual fashion
                 // framing (no model heads/feet cut off).
@@ -2646,7 +2659,7 @@
         if (p.image_url) {
             const img = document.createElement('img');
             img.className = 'db-plan-chip-thumb';
-            img.src = p.image_url;
+            img.src = proxyCdnUrl(p.image_url);
             img.alt = '';
             img.onerror = () => { img.replaceWith(document.createElement('span')); };
             chip.appendChild(img);
@@ -2723,7 +2736,7 @@
                 if (p.image_url) {
                     const img = document.createElement('img');
                     img.className = 'db-plan-pop-thumb';
-                    img.src = p.image_url;
+                    img.src = proxyCdnUrl(p.image_url);
                     img.onerror = () => { img.replaceWith(document.createElement('div')); };
                     item.appendChild(img);
                 } else {
@@ -2944,7 +2957,7 @@
                 if (p.image_url) {
                     const img = document.createElement('img');
                     img.className = 'db-thumb';
-                    img.src = p.image_url;
+                    img.src = proxyCdnUrl(p.image_url);
                     img.alt = p.name || '';
                     img.title = p.name || '';
                     img.onerror = () => {
@@ -3759,7 +3772,7 @@
             if (p.image_url) {
                 const img = document.createElement('img');
                 img.className = 'db-thumb';
-                img.src = p.image_url;
+                img.src = proxyCdnUrl(p.image_url);
                 img.alt = p.name || '';
                 img.onerror = () => {
                     const fb = document.createElement('div');
@@ -3919,7 +3932,7 @@
             if (p.image_url) {
                 const img = document.createElement('img');
                 img.className = 'db-picker-thumb';
-                img.src = p.image_url;
+                img.src = proxyCdnUrl(p.image_url);
                 img.alt = '';
                 img.onerror = () => { img.replaceWith(thumb); };
                 item.appendChild(img);
