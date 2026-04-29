@@ -118,18 +118,18 @@
             </a>
         @endif
 
-        {{-- Products --}}
-        @if ($post->itemGroups->isNotEmpty())
+        {{-- Products — enriched via DisApiClient (see controller) --}}
+        @if (! empty($products))
             <div class="pd-lbl">🛍️ Produktet që duhen veshur</div>
             <div>
-                @foreach ($post->itemGroups as $g)
+                @foreach ($products as $g)
                     <span class="pd-chip">
-                        @if ($g->image_url)
-                            <img class="pd-chip-thumb" src="{{ route('marketing.cdn-image') }}?url={{ urlencode($g->image_url) }}" alt="">
+                        @if (! empty($g['image_url']))
+                            <img class="pd-chip-thumb" src="{{ route('marketing.cdn-image') }}?url={{ urlencode($g['image_url']) }}" alt="">
                         @else
                             <span class="pd-chip-thumb"></span>
                         @endif
-                        {{ $g->name }}
+                        {{ $g['name'] ?? 'Produkt #'.$g['item_group_id'] }}
                     </span>
                 @endforeach
             </div>

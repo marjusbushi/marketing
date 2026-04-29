@@ -6,6 +6,7 @@ use App\Enums\DailyBasketPostStage;
 use App\Enums\MarketingPermissionEnum;
 use App\Http\Controllers\Controller;
 use App\Models\DailyBasketPost;
+use App\Services\DisApiClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +26,8 @@ use Illuminate\View\View;
  */
 class ProductionController extends Controller
 {
+    public function __construct(private DisApiClient $disApi) {}
+
     public function queue(Request $request): View|JsonResponse
     {
         $userId = $request->user()->id;
@@ -56,10 +59,15 @@ class ProductionController extends Controller
 
     public function show(DailyBasketPost $post): View
     {
+        // Note: do NOT eager-load `itemGroups` via the BelongsToMany — that
+        // relation lives across two databases (pivot in marketing,
+        // DisItemGroup in dis_db) and the underlying SQL JOIN can't reach
+        // both. Mirror DailyBasketController's pattern: fetch pivot rows
+        // directly from the marketing DB, then enrich via DisApiClient
+        // (cached + try/catch'd, so a slow DIS doesn't break the page).
         $post->load([
             'basket',
             'media',
-            'itemGroups',
             'claimer:id,name',
         ]);
 
@@ -73,6 +81,8 @@ class ProductionController extends Controller
         $position = (array_search($post->id, $sameDay, true) === false ? 0 : array_search($post->id, $sameDay, true)) + 1;
         $totalToday = count($sameDay) ?: 1;
 
+        $products = $this->loadProductsForPost($post);
+
         $referencePreview = $this->referencePreview($post);
 
         $userId = auth()->id();
@@ -82,7 +92,60 @@ class ProductionController extends Controller
             default                                => 'taken',
         };
 
-        return view('production.detail', compact('post', 'position', 'totalToday', 'referencePreview', 'claimState'));
+        return view('production.detail', compact('post', 'position', 'totalToday', 'products', 'referencePreview', 'claimState'));
+    }
+
+    /**
+     * Pivot rows for a post enriched with product metadata from DIS.
+     * Returns a list of associative arrays with item_group_id, name,
+     * image_url. Empty array on DIS errors so the page stays usable.
+     *
+     * @return array<int, array{item_group_id:int, name:?string, image_url:?string}>
+     */
+    private function loadProductsForPost(DailyBasketPost $post): array
+    {
+        $pivotRows = DB::table('daily_basket_post_products')
+            ->where('daily_basket_post_id', $post->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($pivotRows->isEmpty()) {
+            return [];
+        }
+
+        $weekId = $post->basket?->distribution_week_id;
+        if (! $weekId) {
+            return $pivotRows->map(fn ($r) => [
+                'item_group_id' => (int) $r->item_group_id,
+                'name'          => null,
+                'image_url'     => null,
+            ])->all();
+        }
+
+        // 5-min cache, graceful empty fallback when DIS is slow/down.
+        $cacheKey = 'production:collection_products:'.$weekId;
+        $lookup   = Cache::remember($cacheKey, 300, function () use ($weekId) {
+            try {
+                $week   = $this->disApi->getWeek($weekId);
+                $groups = $week['item_groups'] ?? [];
+
+                return collect($groups)->keyBy('id')->all();
+            } catch (\Throwable $e) {
+                report($e);
+
+                return [];
+            }
+        });
+
+        return $pivotRows->map(function ($r) use ($lookup) {
+            $meta = $lookup[$r->item_group_id] ?? null;
+
+            return [
+                'item_group_id' => (int) $r->item_group_id,
+                'name'          => $meta['name'] ?? null,
+                'image_url'     => $meta['image_url'] ?? null,
+            ];
+        })->all();
     }
 
     public function claim(DailyBasketPost $post): JsonResponse
