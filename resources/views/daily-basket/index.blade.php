@@ -82,7 +82,13 @@
        që track-u i status-it lart + 3 kolonat të dukeshin pa scroll. Margjinat
        dhe padding-et u ulën rreth 30–50% pa prekur strukturën. */
     .db-sheet-label { font-size: 11px; color: var(--db-text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500; margin: 16px 0 6px; }
-    .db-sheet { background: var(--db-surface); border: 1px solid var(--db-border); border-radius: 12px; overflow: hidden; }
+    /* overflow:visible (#1688): që status track-u i poshtëm të mund të
+       jetë position:sticky relative ndaj page scroll. Border-radius i
+       dukshmërinë e ruan duke vendosur radius eksplicit te head-i (corners
+       lart) dhe foot-i (corners poshtë). */
+    .db-sheet { background: var(--db-surface); border: 1px solid var(--db-border); border-radius: 12px; }
+    .db-sheet-head { border-radius: 12px 12px 0 0; }
+    .db-sheet-foot { border-radius: 0 0 12px 12px; }
     .db-sheet-placeholder { padding: 40px; text-align: center; color: var(--db-text-3); font-size: 12px; }
     .db-sheet-head { padding: 12px 20px; border-bottom: 1px solid var(--db-border); }
     .db-sheet-crumb { font-size: 11px; color: var(--db-text-3); margin-bottom: 2px; }
@@ -95,7 +101,14 @@
     }
     .db-sheet-close:hover { background: var(--db-border); color: var(--db-text); }
 
-    .db-track { display: flex; padding: 10px 20px; background: #fafafa; border-bottom: 1px solid var(--db-border); gap: 4px; }
+    /* Sticky track (#1688): kur user-i scroll-on faqen poshtë për të lexuar
+       fushat, status-track-u qëndron i ngjitur në krye të viewport-it që të
+       jetë gjithmonë i dukshëm. */
+    .db-track {
+        display: flex; padding: 10px 20px; background: #fafafa;
+        border-bottom: 1px solid var(--db-border); gap: 4px;
+        position: sticky; top: 0; z-index: 5;
+    }
     .db-track-step {
         flex: 1; padding: 4px 0;
         transition: opacity 0.12s;
@@ -711,17 +724,17 @@
 
     /* ─── Inline 3-column edit panel ─────────────────────────────── */
     .db-sheet-body-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; }
-    .db-col-group { padding: 14px 18px; border-right: 1px solid var(--db-border); min-width: 0; }
+    .db-col-group { padding: 10px 14px; border-right: 1px solid var(--db-border); min-width: 0; }
     .db-col-group:last-child { border-right: 0; }
     .db-field-inline { min-width: 0; }
     .db-col-group-title {
         font-size: 10px; color: var(--db-text-3); text-transform: uppercase;
-        letter-spacing: 0.08em; font-weight: 700; margin-bottom: 8px;
+        letter-spacing: 0.08em; font-weight: 700; margin-bottom: 6px;
         display: flex; align-items: center; gap: 6px;
     }
     .db-col-group-icon { font-size: 14px; }
 
-    .db-field-inline { margin-bottom: 9px; }
+    .db-field-inline { margin-bottom: 6px; }
     .db-field-inline:last-child { margin-bottom: 0; }
 
     .db-inline-textarea {
@@ -734,7 +747,7 @@
         color: var(--db-text);
         background: #fff;
         resize: vertical;
-        min-height: 52px;
+        min-height: 40px;
     }
     .db-inline-textarea:focus { outline: none; border-color: var(--db-text); box-shadow: 0 0 0 3px rgba(24,24,27,0.05); }
 
@@ -937,7 +950,7 @@
     .db-media-slot {
         position: relative;
         width: 100%;
-        max-width: 300px;
+        max-width: 220px;
         margin-left: auto;
         margin-right: auto;
         aspect-ratio: 1 / 1;
@@ -985,9 +998,9 @@
 
     /* Single-asset reel/story slot: large enough to feel like a real reel.
        Inside a carousel grid, tiles stay small (overridden below).
-       Compact-mode (#1688): reduced from 340px → 260px so the detail card
-       fits the viewport without scrolling away from the status track. */
-    .db-media-reel { aspect-ratio: 9/16; max-width: 260px; margin: 0 auto; }
+       Compact-mode (#1688): reduced 340 → 180 ne 2 hapa — story 9:16 ishte
+       pjesa më dominante e detail-it. Tani 180×320 në vend të 340×604. */
+    .db-media-reel { aspect-ratio: 9/16; max-width: 180px; margin: 0 auto; }
     .db-media-grid .db-media-reel { max-width: 140px; margin: 0; }
 
     .db-media-progress {
