@@ -52,6 +52,23 @@ class ContentPost extends Model
         'approval_locked_at' => 'datetime',
     ];
 
+    /**
+     * Generate a UUID for any row that wasn't given one explicitly. The DB
+     * column is `unique NOT NULL`, so paths like ContentFeedImportService
+     * (which calls updateOrCreate without a uuid) used to fail with
+     * "Field 'uuid' doesn't have a default value". Centralizing it here
+     * means every writer — service, importer, factory, manual seed —
+     * gets a uuid for free.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (ContentPost $post) {
+            if (empty($post->uuid)) {
+                $post->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
