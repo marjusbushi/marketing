@@ -88,6 +88,7 @@
 @include('content-planner._partials.post-composer-modal')
 @include('content-planner._partials.media-picker-modal')
 @include('content-planner._partials.image-editor-modal')
+@include('content-planner._partials.post-retry-script')
 
 <style>
     .cp-list-thumb { @apply w-9 h-9 rounded-md object-cover bg-slate-100; }
@@ -99,9 +100,9 @@
 </style>
 
 <script>
-    const statusColors = { draft:'#9CA3AF', pending_review:'#F59E0B', approved:'#3B82F6', scheduled:'#8B5CF6', published:'#10B981', failed:'#EF4444' };
-    const statusLabels = { draft:'Draft', pending_review:'In Review', approved:'Approved', scheduled:'Scheduled', published:'Published', failed:'Failed' };
-    const statusBgColors = { draft:'#F3F4F6', pending_review:'#FEF3C7', approved:'#DBEAFE', scheduled:'#EDE9FE', published:'#D1FAE5', failed:'#FEE2E2' };
+    const statusColors = { draft:'#9CA3AF', pending_review:'#F59E0B', approved:'#3B82F6', scheduled:'#8B5CF6', publishing:'#06B6D4', published:'#10B981', failed:'#EF4444' };
+    const statusLabels = { draft:'Draft', pending_review:'In Review', approved:'Approved', scheduled:'Scheduled', publishing:'Publishing…', published:'Published', failed:'Failed' };
+    const statusBgColors = { draft:'#F3F4F6', pending_review:'#FEF3C7', approved:'#DBEAFE', scheduled:'#EDE9FE', publishing:'#CFFAFE', published:'#D1FAE5', failed:'#FEE2E2' };
     const platformIcons = { facebook:'logos:facebook', instagram:'skill-icons:instagram', tiktok:'logos:tiktok-icon' };
 
     let currentSort = 'scheduled_at', currentDir = 'desc', currentPage = 1, selectedIds = [], debounceTimer;

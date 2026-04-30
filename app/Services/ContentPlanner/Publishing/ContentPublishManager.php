@@ -12,10 +12,14 @@ class ContentPublishManager
 
     public function __construct()
     {
+        // Resolve through the container so each publisher's own dependencies
+        // (e.g. TiktokPublishService needs TiktokApiService) get injected
+        // properly. Bypassing the container with `new` crashed every publish
+        // attempt with ArgumentCountError on the TikTok constructor.
         $this->publishers = [
-            new FacebookPublishService(),
-            new InstagramPublishService(),
-            new TiktokPublishService(),
+            app(FacebookPublishService::class),
+            app(InstagramPublishService::class),
+            app(TiktokPublishService::class),
         ];
     }
 
@@ -57,11 +61,14 @@ class ContentPublishManager
             }
         }
 
+        $firstError = collect($results)->first(fn ($r) => ! $r->success)?->error;
+
         $post->update([
             "status" => $allSucceeded ? "published" : "failed",
             "published_at" => $allSucceeded ? now() : null,
             "platform_post_id" => $results[array_key_first($results)]->platformPostId ?? $post->platform_post_id,
             "permalink" => $results[array_key_first($results)]->permalink ?? $post->permalink,
+            "error_message" => $allSucceeded ? null : $firstError,
         ]);
 
         Log::info("Content post publish complete", [

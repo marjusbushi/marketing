@@ -736,6 +736,14 @@ class DailyBasketController extends Controller
             default    => 'post',   // photo, video, or null
         };
 
+        // approval_type='none' is intentional and explicit: the Daily Basket
+        // production workflow IS the approval gate for content sourced this
+        // way. By the time a basket post reaches the SCHEDULING stage it has
+        // already moved through the basket's own production checkpoints. We
+        // pass it explicitly (rather than relying on the column default) so
+        // the bypass is visible to anyone reading this code, and so a future
+        // change to the column default doesn't silently re-introduce a
+        // second-gate requirement that would block every basket transition.
         $contentPost = $this->contentPostService->createPost([
             'platform' => $platform,
             'platforms' => $platforms,
@@ -743,6 +751,7 @@ class DailyBasketController extends Controller
             'content_type' => $contentType,
             'scheduled_at' => $post->scheduled_for?->toIso8601String(),
             'status' => 'scheduled',
+            'approval_type' => 'none',
             'notes' => $notes,
             'media_ids' => $mediaIds,
         ], $this->currentUserId() ?? 1);

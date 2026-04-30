@@ -45,6 +45,10 @@ return [
         'pending_review',
         'approved',
         'scheduled',
+        // Intermediate, set by PublishContentPostJob's atomic claim. Not
+        // a status users can pick — UI shows it as a transient "Publishing…"
+        // badge while the job hits Meta.
+        'publishing',
         'published',
         'failed',
     ],

@@ -4,6 +4,8 @@ namespace App\Services\ContentPlanner;
 
 use App\Models\Content\ContentMedia;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Facades\Image;
@@ -12,33 +14,46 @@ class ContentMediaService
 {
     protected string $disk;
     protected int $maxSizeMb;
+    protected int $videoMaxSizeMb;
+    protected int $photoMaxSizeMb;
     protected int $thumbWidth;
     protected int $thumbQuality;
+    protected array $allowedImageTypes;
+    protected array $allowedVideoTypes;
 
     public function __construct()
     {
-        $this->disk = config('content-planner.media_disk', 'r2_cdn');
+        $this->disk = config('content-planner.media_disk', 'r2_social');
         $this->maxSizeMb = config('content-planner.media_max_size_mb', 50);
+        $this->videoMaxSizeMb = config('content-planner.video_max_size_mb', 500);
+        $this->photoMaxSizeMb = config('content-planner.photo_max_size_mb', 25);
         $this->thumbWidth = config('content-planner.thumbnail_width', 400);
         $this->thumbQuality = config('content-planner.thumbnail_quality', 80);
+        $this->allowedImageTypes = config('content-planner.allowed_image_types', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+        $this->allowedVideoTypes = config('content-planner.allowed_video_types', ['mp4', 'mov', 'avi']);
     }
 
     public function upload(UploadedFile $file, int $userId, array $overrides = []): ContentMedia
     {
+        $this->validateUpload($file);
+
         $uuid = (string) Str::uuid();
-        $extension = $file->getClientOriginalExtension();
+        $extension = strtolower($file->getClientOriginalExtension());
         $filename = $uuid . '.' . $extension;
-        $path = 'content-planner/media/' . now()->format('Y/m') . '/' . $filename;
+        $folderPath = 'content-planner/media/' . now()->format('Y/m');
+        $path = $folderPath . '/' . $filename;
 
-        // Store original
-        Storage::disk($this->disk)->put($path, file_get_contents($file));
+        // putFileAs streams from the temp upload to the target disk, so we
+        // never load 500 MB videos into memory. Returns the stored path.
+        Storage::disk($this->disk)->putFileAs($folderPath, $file, $filename);
 
-        // Get dimensions for images
         $width = null;
         $height = null;
         $thumbnailPath = null;
+        $duration = null;
+        $mime = $file->getMimeType();
 
-        if ($this->isImage($file->getMimeType())) {
+        if ($this->isImage($mime)) {
             try {
                 $imageSize = getimagesize($file->getPathname());
                 if ($imageSize) {
@@ -47,11 +62,17 @@ class ContentMediaService
                 }
                 $thumbnailPath = $this->generateThumbnail($file, $path);
             } catch (\Throwable $e) {
-                // Thumbnail generation failed — non-fatal
+                Log::warning('Image thumbnail generation failed', ['path' => $path, 'error' => $e->getMessage()]);
             }
+        } elseif ($this->isVideo($mime)) {
+            $probe = $this->probeVideo($file->getPathname());
+            $width = $probe['width'] ?? null;
+            $height = $probe['height'] ?? null;
+            $duration = $probe['duration'] ?? null;
+            $thumbnailPath = $this->generateVideoThumbnail($file, $path);
         }
 
-        $folder = $overrides['folder'] ?? $this->classifyFolder($file->getMimeType(), $width, $height);
+        $folder = $overrides['folder'] ?? $this->classifyFolder($mime, $width, $height);
         $stage = $overrides['stage'] ?? 'raw';
 
         return ContentMedia::create([
@@ -61,14 +82,175 @@ class ContentMediaService
             'original_filename' => $file->getClientOriginalName(),
             'disk' => $this->disk,
             'path' => $path,
-            'mime_type' => $file->getMimeType(),
+            'mime_type' => $mime,
             'size_bytes' => $file->getSize(),
             'width' => $width,
             'height' => $height,
+            'duration_seconds' => $duration,
             'thumbnail_path' => $thumbnailPath,
             'folder' => $folder,
             'stage' => in_array($stage, ContentMedia::STAGES, true) ? $stage : 'raw',
         ]);
+    }
+
+    /**
+     * Pre-flight validation against config-defined limits. Throwing here
+     * surfaces the failure to the controller before we touch storage, so
+     * the user gets the size/format error before a 500 MB upload hits R2.
+     */
+    protected function validateUpload(UploadedFile $file): void
+    {
+        $mime = (string) $file->getMimeType();
+        $extension = strtolower($file->getClientOriginalExtension());
+        $sizeBytes = (int) $file->getSize();
+        $sizeMb = $sizeBytes / 1048576;
+
+        if ($this->isImage($mime)) {
+            if (! in_array($extension, $this->allowedImageTypes, true)) {
+                throw new \InvalidArgumentException(
+                    "Format i papranuar: .{$extension}. Lejohen: " . implode(', ', $this->allowedImageTypes) . '.'
+                );
+            }
+            if ($sizeMb > $this->photoMaxSizeMb) {
+                throw new \InvalidArgumentException(
+                    sprintf('Foto është %.1f MB; maksimumi i lejuar është %d MB.', $sizeMb, $this->photoMaxSizeMb)
+                );
+            }
+            return;
+        }
+
+        if ($this->isVideo($mime)) {
+            if (! in_array($extension, $this->allowedVideoTypes, true)) {
+                throw new \InvalidArgumentException(
+                    "Format video i papranuar: .{$extension}. Lejohen: " . implode(', ', $this->allowedVideoTypes) . '.'
+                );
+            }
+            if ($sizeMb > $this->videoMaxSizeMb) {
+                throw new \InvalidArgumentException(
+                    sprintf('Video është %.1f MB; maksimumi i lejuar është %d MB.', $sizeMb, $this->videoMaxSizeMb)
+                );
+            }
+            // .mov / .avi may need server-side transcoding before Meta accepts them.
+            // Meta prefers MP4 (H.264 + AAC). Warn but don't block — Meta's own
+            // ingest pipeline transcodes most containers; we surface failures at
+            // publish time if Meta refuses the file.
+            if ($extension !== 'mp4') {
+                Log::info('Non-MP4 video uploaded; Meta may transcode or reject', [
+                    'extension' => $extension,
+                    'mime' => $mime,
+                ]);
+            }
+            return;
+        }
+
+        throw new \InvalidArgumentException(
+            "Tipi i skedarit nuk pranohet: {$mime}. Vetëm foto ose video lejohen."
+        );
+    }
+
+    protected function isVideo(?string $mimeType): bool
+    {
+        return $mimeType !== null && str_starts_with($mimeType, 'video/');
+    }
+
+    /**
+     * Read width/height/duration from a video using ffprobe. Uses Process
+     * with array args so user-supplied paths can never be interpreted as
+     * shell. Returns an empty array silently if ffprobe is missing or
+     * fails — the upload still succeeds, the row just has nulls for
+     * those fields. Fix by `brew install ffmpeg` (which ships ffprobe).
+     */
+    protected function probeVideo(string $path): array
+    {
+        if (! $this->binaryAvailable('ffprobe')) {
+            return [];
+        }
+
+        $result = Process::run([
+            'ffprobe',
+            '-v', 'error',
+            '-select_streams', 'v:0',
+            '-show_entries', 'stream=width,height',
+            '-show_entries', 'format=duration',
+            '-of', 'json',
+            $path,
+        ]);
+
+        if (! $result->successful()) {
+            return [];
+        }
+
+        $data = json_decode($result->output(), true);
+        if (! is_array($data)) {
+            return [];
+        }
+
+        return [
+            'width' => isset($data['streams'][0]['width']) ? (int) $data['streams'][0]['width'] : null,
+            'height' => isset($data['streams'][0]['height']) ? (int) $data['streams'][0]['height'] : null,
+            'duration' => isset($data['format']['duration']) ? (int) round((float) $data['format']['duration']) : null,
+        ];
+    }
+
+    /**
+     * Capture a single frame at t=1s and upload it as the thumbnail.
+     * Process runs ffmpeg via array args (no shell interpolation). Falls
+     * back gracefully when ffmpeg is missing — the post will just show a
+     * placeholder in the planner. Stored alongside the video at
+     * thumbs/<basename>.jpg.
+     */
+    protected function generateVideoThumbnail(UploadedFile $file, string $videoPath): ?string
+    {
+        if (! $this->binaryAvailable('ffmpeg')) {
+            Log::info('ffmpeg not installed; skipping video thumbnail generation');
+            return null;
+        }
+
+        $thumbPath = str_replace('/media/', '/thumbs/', $videoPath);
+        $thumbPath = preg_replace('/\.[^.]+$/', '.jpg', $thumbPath);
+
+        $localTmp = tempnam(sys_get_temp_dir(), 'flare_thumb_') . '.jpg';
+
+        try {
+            $result = Process::timeout(60)->run([
+                'ffmpeg',
+                '-y',
+                '-i', $file->getPathname(),
+                '-ss', '00:00:01.000',
+                '-vframes', '1',
+                '-vf', 'scale=' . $this->thumbWidth . ':-2',
+                '-q:v', '3',
+                $localTmp,
+            ]);
+
+            if (! $result->successful() || ! file_exists($localTmp) || filesize($localTmp) === 0) {
+                Log::warning('Video thumbnail extraction failed', [
+                    'video_path' => $videoPath,
+                    'exit' => $result->exitCode(),
+                ]);
+                return null;
+            }
+
+            Storage::disk($this->disk)->put($thumbPath, file_get_contents($localTmp));
+
+            return $thumbPath;
+        } finally {
+            if (file_exists($localTmp)) {
+                @unlink($localTmp);
+            }
+        }
+    }
+
+    /**
+     * True iff $name is on the system PATH and executable. Used by
+     * ffprobe / ffmpeg checks so a missing binary degrades gracefully.
+     * Uses Process with array args — no shell injection surface.
+     */
+    protected function binaryAvailable(string $name): bool
+    {
+        $finder = PHP_OS_FAMILY === 'Windows' ? 'where' : 'which';
+        $result = Process::run([$finder, $name]);
+        return $result->successful() && trim($result->output()) !== '';
     }
 
     /**

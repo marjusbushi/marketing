@@ -135,11 +135,18 @@ class ContentMedia extends Model
     }
 
     /**
-     * Resolve the storage disk — fall back to 'public' if the saved disk doesn't exist.
+     * Resolve the storage disk for URL generation. Two layers of fallback:
+     *
+     *   1. If the row has no disk recorded (shouldn't happen for new rows
+     *      written by ContentMediaService, but legacy data exists), use
+     *      whatever disk Content Planner is currently configured to write
+     *      to — that's the closest match to "where this file probably is".
+     *   2. If the recorded disk no longer exists in config (renamed or
+     *      removed), fall back to 'public' as a last-resort safe default.
      */
     private function resolvedDisk(): string
     {
-        $disk = $this->disk ?? 'public';
+        $disk = $this->disk ?? config('content-planner.media_disk', 'public');
 
         if (array_key_exists($disk, config('filesystems.disks', []))) {
             return $disk;

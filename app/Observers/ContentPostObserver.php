@@ -72,6 +72,10 @@ class ContentPostObserver
             'pending_review' => DailyBasketPostStage::SCHEDULING,
             'approved'       => DailyBasketPostStage::SCHEDULING,
             'scheduled'      => DailyBasketPostStage::SCHEDULING,
+            // Intermediate publishing — basket still belongs in SCHEDULING
+            // until Meta returns success. Treating it as PUBLISHED would
+            // flip dashboards prematurely and roll back if the call fails.
+            'publishing'     => DailyBasketPostStage::SCHEDULING,
             'published'      => DailyBasketPostStage::PUBLISHED,
             default          => null,
         };

@@ -2,6 +2,7 @@
 
 namespace App\Services\ContentPlanner;
 
+use App\Jobs\PublishContentPostJob;
 use App\Models\Content\ContentPost;
 use App\Models\Content\ContentPostPlatform;
 use App\Models\Content\ContentPostVersion;
@@ -9,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ContentPostService
 {
@@ -61,6 +63,7 @@ class ContentPostService
                     'is_imported' => $post->is_imported,
                     'permalink' => $post->permalink,
                     'meta_post_type' => $post->meta_post_type,
+                    'error_message' => $post->error_message,
                 ],
             ];
         })->toArray();
@@ -119,10 +122,75 @@ class ContentPostService
     }
 
     /**
+     * Approval gate — a post may enter `scheduled` only when human review is
+     * either not required (approval_type='none') or already complete
+     * (approved_at set). Checked at every boundary that can flip the status
+     * so the failure surfaces synchronously to the caller, not at fire time.
+     */
+    protected function ensureApprovalReady(string $approvalType, bool $hasBeenApproved): void
+    {
+        if ($approvalType === 'none') {
+            return;
+        }
+        if ($hasBeenApproved) {
+            return;
+        }
+        throw new \InvalidArgumentException(
+            'Posti kërkon aprovim para se të skedulohet. Dërgoje për review fillimisht.'
+        );
+    }
+
+    /**
+     * Hand the post off to the queue for delayed publish. Called after any
+     * write that lands the post in `scheduled`. Safe to invoke speculatively
+     * — it no-ops on every other status, on missing scheduled_at, and on
+     * un-approved posts (the gate is enforced upstream too).
+     *
+     * Reschedules work because scheduled_at_version was bumped before this
+     * call: the new job captures the new version, while any older job that
+     * was sitting in the queue fails its atomic claim at fire time and
+     * exits without publishing.
+     */
+    protected function dispatchScheduledJob(ContentPost $post): void
+    {
+        if ($post->status !== 'scheduled') {
+            return;
+        }
+        if (! $post->scheduled_at) {
+            return;
+        }
+        if ($post->approval_type !== 'none' && $post->approved_at === null) {
+            return;
+        }
+
+        // Past-time fallback: if the user picked a moment that has already
+        // passed (e.g., scheduled at 14:00 while it's 14:01), don't refuse
+        // — fire it as soon as the worker pulls it off the queue.
+        $delay = $post->scheduled_at->isPast() ? now() : $post->scheduled_at;
+
+        if (now()->diffInDays($delay, false) > 7) {
+            Log::info('PublishContentPostJob scheduled >7 days out', [
+                'post_id' => $post->id,
+                'scheduled_at' => $delay->toIso8601String(),
+                'version' => $post->scheduled_at_version,
+            ]);
+        }
+
+        PublishContentPostJob::dispatch($post)->delay($delay);
+    }
+
+    /**
      * Create a new post with platforms and media attachments.
      */
     public function createPost(array $data, int $userId): ContentPost
     {
+        if (($data['status'] ?? null) === 'scheduled') {
+            $this->ensureApprovalReady(
+                $data['approval_type'] ?? 'none',
+                !empty($data['approved_at'])
+            );
+        }
+
         return DB::transaction(function () use ($data, $userId) {
             $post = ContentPost::create([
                 'uuid' => (string) \Illuminate\Support\Str::uuid(),
@@ -170,6 +238,8 @@ class ContentPostService
                 $post->update(['status' => 'scheduled']);
             }
 
+            $this->dispatchScheduledJob($post->fresh() ?? $post);
+
             return $post->load(['media', 'labels', 'platforms', 'user']);
         });
     }
@@ -179,6 +249,13 @@ class ContentPostService
      */
     public function updatePost(ContentPost $post, array $data): ContentPost
     {
+        if (($data['status'] ?? null) === 'scheduled') {
+            $this->ensureApprovalReady(
+                $data['approval_type'] ?? $post->approval_type,
+                $post->approved_at !== null
+            );
+        }
+
         return DB::transaction(function () use ($post, $data) {
             // Snapshot current state before updating
             $maxVersion = ContentPostVersion::where('post_id', $post->id)->max('version_number') ?? 0;
@@ -197,17 +274,27 @@ class ContentPostService
                 'created_by' => auth()->id(),
             ]);
 
-            $post->update(array_filter([
+            $newScheduledAt = array_key_exists('scheduled_at', $data)
+                ? (!empty($data['scheduled_at']) ? Carbon::parse($data['scheduled_at']) : null)
+                : $post->scheduled_at;
+
+            $scheduledAtChanged = ! $this->sameTimestamp($post->scheduled_at, $newScheduledAt);
+
+            $updates = array_filter([
                 'content' => $data['content'] ?? $post->content,
                 'platform' => $data['platform'] ?? $post->platform,
-                'scheduled_at' => array_key_exists('scheduled_at', $data)
-                    ? (!empty($data['scheduled_at']) ? Carbon::parse($data['scheduled_at']) : null)
-                    : $post->scheduled_at,
+                'scheduled_at' => $newScheduledAt,
                 'status' => $data['status'] ?? $post->status,
                 'approval_type' => $data['approval_type'] ?? $post->approval_type,
                 'notes' => array_key_exists('notes', $data) ? $data['notes'] : $post->notes,
                 'campaign_id' => array_key_exists('campaign_id', $data) ? $data['campaign_id'] : $post->campaign_id,
-            ], fn ($v) => $v !== null));
+            ], fn ($v) => $v !== null);
+
+            if ($scheduledAtChanged) {
+                $updates['scheduled_at_version'] = ((int) ($post->scheduled_at_version ?? 0)) + 1;
+            }
+
+            $post->update($updates);
 
             // Update platforms
             if (isset($data['platforms'])) {
@@ -235,7 +322,10 @@ class ContentPostService
                 $post->labels()->sync($data['label_ids']);
             }
 
-            return $post->fresh(['media', 'labels', 'platforms', 'user']);
+            $refreshed = $post->fresh(['media', 'labels', 'platforms', 'user']);
+            $this->dispatchScheduledJob($refreshed ?? $post);
+
+            return $refreshed;
         });
     }
 
@@ -271,18 +361,77 @@ class ContentPostService
             throw new \InvalidArgumentException('Cannot schedule a post without a scheduled_at date.');
         }
 
+        if ($newStatus === 'scheduled') {
+            $this->ensureApprovalReady($post->approval_type, $post->approved_at !== null);
+        }
+
         $post->update($updates);
+
+        $refreshed = $post->fresh();
+        $this->dispatchScheduledJob($refreshed ?? $post);
+
+        return $refreshed;
+    }
+
+    /**
+     * Re-queue a failed post. Bumps the schedule a minute into the future
+     * (so the worker reliably picks it up), increments the version so any
+     * stale job in the queue exits, clears the previous error, and lets
+     * the standard dispatchScheduledJob plumbing handle the rest.
+     *
+     * Per-platform retry is intentionally out of scope here — multi-platform
+     * partial failures are rare enough to handle as a v2 feature.
+     */
+    public function retry(ContentPost $post): ContentPost
+    {
+        if ($post->status !== 'failed') {
+            throw new \InvalidArgumentException(
+                "Vetëm post-et me status='failed' mund të riprovohen. Statusi aktual: '{$post->status}'."
+            );
+        }
+
+        $post->status = 'scheduled';
+        $post->scheduled_at = now()->addMinute();
+        $post->scheduled_at_version = ((int) ($post->scheduled_at_version ?? 0)) + 1;
+        $post->error_message = null;
+        $post->save();
+
+        $this->dispatchScheduledJob($post->fresh() ?? $post);
 
         return $post->fresh();
     }
 
     /**
      * Reschedule a post (drag-drop on calendar).
+     *
+     * Bumps scheduled_at_version so any in-flight PublishContentPostJob
+     * that captured the old version exits silently when it fires — the
+     * caller (or downstream wiring) is responsible for dispatching a new
+     * job with the new version.
      */
     public function reschedule(ContentPost $post, Carbon $scheduledAt): ContentPost
     {
-        $post->update(['scheduled_at' => $scheduledAt]);
+        if (! $this->sameTimestamp($post->scheduled_at, $scheduledAt)) {
+            $post->scheduled_at = $scheduledAt;
+            $post->scheduled_at_version = ((int) ($post->scheduled_at_version ?? 0)) + 1;
+            $post->save();
+
+            $this->dispatchScheduledJob($post->fresh() ?? $post);
+        }
+
         return $post;
+    }
+
+    /**
+     * True when two nullable Carbon-ish values point at the same instant.
+     * Used to decide whether scheduled_at really moved (and therefore
+     * whether scheduled_at_version needs to bump).
+     */
+    protected function sameTimestamp($a, $b): bool
+    {
+        if ($a === null && $b === null) return true;
+        if ($a === null || $b === null) return false;
+        return Carbon::parse($a)->equalTo(Carbon::parse($b));
     }
 
     /**

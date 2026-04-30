@@ -70,6 +70,7 @@
     .stage-badge.status-pending_review { background: #F59E0B; }
     .stage-badge.status-approved       { background: #3B82F6; }
     .stage-badge.status-scheduled      { background: #8B5CF6; }
+    .stage-badge.status-publishing     { background: #06B6D4; }
     .stage-badge.status-published      { background: #10B981; }
     .stage-badge.status-failed         { background: #EF4444; }
 
@@ -296,11 +297,12 @@
 @include('content-planner._partials.media-picker-modal')
 @include('content-planner._partials.image-editor-modal')
 @include('content-planner._partials.media-sidebar')
+@include('content-planner._partials.post-retry-script')
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
 <script>
-    const statusColors = { draft:'#9CA3AF', pending_review:'#F59E0B', approved:'#3B82F6', scheduled:'#8B5CF6', published:'#10B981', failed:'#EF4444' };
-    const statusLabels = { draft:'Draft', pending_review:'Review', approved:'Approved', scheduled:'Scheduled', published:'Published', failed:'Failed' };
+    const statusColors = { draft:'#9CA3AF', pending_review:'#F59E0B', approved:'#3B82F6', scheduled:'#8B5CF6', publishing:'#06B6D4', published:'#10B981', failed:'#EF4444' };
+    const statusLabels = { draft:'Draft', pending_review:'Review', approved:'Approved', scheduled:'Scheduled', publishing:'Publishing…', published:'Published', failed:'Failed' };
     const platformIcons = { facebook:'logos:facebook', instagram:'skill-icons:instagram', tiktok:'logos:tiktok-icon' };
     let sortable;
 
@@ -582,7 +584,7 @@
         } else if (isExternal) {
             stageBadgeHtml = `<span class="stage-dot status-published" title="Publikuar"></span>`;
         } else if (p.status) {
-            const statusLabelsAL = { draft:'Draft', pending_review:'Rishikim', approved:'Aprovuar', scheduled:'Skeduluar', published:'Publikuar', failed:'Dështoi' };
+            const statusLabelsAL = { draft:'Draft', pending_review:'Rishikim', approved:'Aprovuar', scheduled:'Skeduluar', publishing:'Po publikohet…', published:'Publikuar', failed:'Dështoi' };
             stageBadgeHtml = `<span class="stage-badge status-${p.status}">${statusLabelsAL[p.status] || p.status}</span>`;
         }
 

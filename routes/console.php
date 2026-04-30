@@ -68,3 +68,15 @@ Schedule::command('meta:ig-webhook-heal')
     ->hourlyAt(35)
     ->withoutOverlapping(50)
     ->runInBackground();
+
+// Safety net for the Content Planner publish pipeline. The primary path is
+// dispatch-with-delay from ContentPostService — when a post enters
+// `scheduled`, the PublishContentPostJob gets queued with delay equal to
+// scheduled_at. This cron only re-dispatches posts whose primary job never
+// fired (worker crash, queue table truncated, etc.). Most runs find zero
+// rows and return immediately. 10-minute grace inside the command keeps it
+// from racing the primary dispatch under load.
+Schedule::command('content-planner:publish-due-safety-net')
+    ->cron('*/30 * * * *')
+    ->withoutOverlapping(25)
+    ->runInBackground();

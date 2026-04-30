@@ -36,6 +36,7 @@
                     'pending_review' => '#F59E0B',
                     'approved' => '#3B82F6',
                     'scheduled' => '#8B5CF6',
+                    'publishing' => '#06B6D4',
                     'published' => '#10B981',
                     'failed' => '#EF4444',
                 ];
@@ -44,6 +45,7 @@
                     'pending_review' => 'In Review',
                     'approved' => 'Approved',
                     'scheduled' => 'Scheduled',
+                    'publishing' => 'Publishing…',
                     'published' => 'Published',
                     'failed' => 'Failed',
                 ];
@@ -52,6 +54,23 @@
                 {{ $statusLabels[$status] ?? ucfirst($status) }}
             </span>
         </div>
+
+        {{-- Failure banner — shown only for failed posts. Includes the
+             Meta error message and an inline retry button that re-queues
+             the post via /api/posts/{id}/retry. --}}
+        @if($status === 'failed' && !empty($post['id']))
+            @php $err = $post['error_message'] ?? null; @endphp
+            <div style="margin-bottom: 6px; padding: 6px 8px; background: #FEE2E2; border: 1px solid #FECACA; border-radius: 4px; font-size: 11px; color: #991B1B; line-height: 1.4;">
+                @if($err)
+                    <div style="margin-bottom: 4px;">{{ \Illuminate\Support\Str::limit($err, 160) }}</div>
+                @endif
+                <button type="button"
+                        onclick="event.stopPropagation(); cpRetryPost({{ (int) $post['id'] }}, this);"
+                        style="font-size: 10px; font-weight: 600; padding: 3px 8px; background: #DC2626; color: #fff; border: 0; border-radius: 3px; cursor: pointer;">
+                    Riprovo
+                </button>
+            </div>
+        @endif
 
         {{-- Content preview --}}
         @php $content = $post['content'] ?? ''; @endphp

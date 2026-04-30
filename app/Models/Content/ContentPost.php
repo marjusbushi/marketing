@@ -25,10 +25,15 @@ class ContentPost extends Model
         'content',
         'content_type',
         'scheduled_at',
+        // scheduled_at_version is intentionally NOT fillable — it's the
+        // load-bearing column for the atomic-claim race protection. Service
+        // code bumps it by direct assignment + save(); never accept it from
+        // user input or array writes.
         'published_at',
         'status',
         'platform_post_id',
         'permalink',
+        'error_message',
         'approval_type',
         'approved_by',
         'approved_at',
@@ -166,6 +171,7 @@ class ContentPost extends Model
             'pending_review' => '#F59E0B',
             'approved' => '#3B82F6',
             'scheduled' => '#8B5CF6',
+            'publishing' => '#06B6D4',
             'published' => '#10B981',
             'failed' => '#EF4444',
             default => '#6B7280',
@@ -179,6 +185,7 @@ class ContentPost extends Model
             'pending_review' => '#FEF3C7',
             'approved' => '#DBEAFE',
             'scheduled' => '#EDE9FE',
+            'publishing' => '#CFFAFE',
             'published' => '#D1FAE5',
             'failed' => '#FEE2E2',
             default => '#F3F4F6',
@@ -192,6 +199,7 @@ class ContentPost extends Model
             'pending_review' => 'Review',
             'approved' => 'Approved',
             'scheduled' => 'Scheduled',
+            'publishing' => 'Publishing…',
             'published' => 'Published',
             'failed' => 'Failed',
             default => ucfirst($this->status),

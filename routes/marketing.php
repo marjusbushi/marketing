@@ -65,6 +65,9 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
         Route::patch('/api/posts/{id}/schedule', [ContentPlannerApiController::class, 'reschedule'])
             ->name('api.posts.schedule')
             ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::post('/api/posts/{id}/retry', [ContentPlannerApiController::class, 'retry'])
+            ->name('api.posts.retry')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_PUBLISH->value);
         Route::patch('/api/posts/reorder', [ContentPlannerApiController::class, 'reorderGrid'])
             ->name('api.posts.reorder')
             ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);

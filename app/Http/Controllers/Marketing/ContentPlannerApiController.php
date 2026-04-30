@@ -267,6 +267,24 @@ class ContentPlannerApiController extends Controller
         return response()->json($post);
     }
 
+    /**
+     * Re-queue a post that failed to publish. Backed by ContentPostService::retry,
+     * which clears the error, bumps the schedule by a minute, increments the
+     * version (so any zombie job from the previous attempt drops out), and
+     * lets the standard dispatch path queue a fresh PublishContentPostJob.
+     */
+    public function retry(int $id): JsonResponse
+    {
+        $post = ContentPost::findOrFail($id);
+
+        try {
+            $post = $this->postService->retry($post);
+            return response()->json($post);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
     public function reorderGrid(Request $request): JsonResponse
     {
         $request->validate([
@@ -902,20 +920,47 @@ class ContentPlannerApiController extends Controller
         $scheduledAt = Carbon::parse($request->scheduled_at);
         $interval = (int) $request->input('interval_minutes', 0);
 
+        // Route each post through the service so we get the same guarantees
+        // as a single schedule: approval gate, scheduled_at_version bump,
+        // PublishContentPostJob dispatch with delay. Direct ->update() here
+        // would skip all three and leave posts that depend on approval in
+        // a half-scheduled state with no job queued.
         $updated = 0;
+        $skipped = [];
         foreach ($request->post_ids as $i => $postId) {
             $post = ContentPost::find($postId);
-            if ($post && in_array($post->status, ['draft', 'pending_review', 'approved', 'scheduled'])) {
-                $time = $scheduledAt->copy()->addMinutes($interval * $i);
-                $post->update([
-                    'scheduled_at' => $time,
-                    'status' => 'scheduled',
-                ]);
+            if (! $post) {
+                continue;
+            }
+
+            $time = $scheduledAt->copy()->addMinutes($interval * $i);
+
+            try {
+                if ($post->status === 'scheduled') {
+                    // Already scheduled — just shift the time. reschedule()
+                    // bumps the version and dispatches a fresh job; the old
+                    // queued job will fail its claim and exit silently.
+                    $this->postService->reschedule($post, $time);
+                } else {
+                    // First write the new time without touching status; then
+                    // ask changeStatus to enforce the approval gate. If the
+                    // gate fails we still leave scheduled_at moved (caller
+                    // can review and approve), but we don't quietly accept
+                    // un-approved posts into `scheduled`.
+                    $this->postService->updatePost($post, ['scheduled_at' => $time->toIso8601String()]);
+                    $this->postService->changeStatus($post->fresh(), 'scheduled', auth()->id());
+                }
                 $updated++;
+            } catch (\InvalidArgumentException $e) {
+                $skipped[] = ['post_id' => $postId, 'reason' => $e->getMessage()];
             }
         }
 
-        return response()->json(['message' => "{$updated} posts scheduled.", 'count' => $updated]);
+        return response()->json([
+            'message' => "{$updated} posts scheduled." . (count($skipped) ? ' Some skipped — see "skipped".' : ''),
+            'count' => $updated,
+            'skipped' => $skipped,
+        ]);
     }
 
     // ── Campaigns ──

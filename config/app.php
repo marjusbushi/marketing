@@ -59,13 +59,17 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | Marketing operates in Albania — content scheduling, daily basket
+    | windows, and analytics rollups all use local clock time. With this
+    | set to Europe/Tirane, Carbon and Eloquent interpret datetimes in
+    | local time (CET/CEST with DST). The queue's `available_at` is a
+    | Unix timestamp so dispatch->delay() works correctly across the
+    | DST switch. MySQL connection has no explicit timezone — application
+    | layer handles all conversion via Carbon.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Europe/Tirane',
 
     /*
     |--------------------------------------------------------------------------

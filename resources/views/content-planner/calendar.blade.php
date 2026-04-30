@@ -206,6 +206,7 @@
 @include('content-planner._partials.post-composer-modal')
 @include('content-planner._partials.media-picker-modal')
 @include('content-planner._partials.image-editor-modal')
+@include('content-planner._partials.post-retry-script')
 
 {{-- FullCalendar JS --}}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
