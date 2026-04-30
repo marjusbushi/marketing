@@ -13,7 +13,6 @@ use App\Models\Content\ContentPostVersion;
 use App\Models\Content\ContentShareLink;
 use App\Models\Content\ContentSuggestion;
 use App\Services\ContentPlanner\ContentAiService;
-use App\Services\ContentPlanner\ContentFeedImportService;
 use App\Services\ContentPlanner\ContentMediaService;
 use App\Services\ContentPlanner\ContentPostService;
 use App\Services\ContentPlanner\DailyBasketGridService;
@@ -325,7 +324,6 @@ class ContentPlannerApiController extends Controller
     public function syncFromMeta(Request $request): JsonResponse
     {
         $postSyncService = app(\App\Services\Meta\MetaPostSyncService::class);
-        $feedImport = app(ContentFeedImportService::class);
 
         // Sync window: default 30 days for speed (PHP timeout=30s; full
         // history hits 600+ posts × ~500ms = 10 min, dies with FatalError).
@@ -348,8 +346,14 @@ class ContentPlannerApiController extends Controller
             $issues[] = 'META_IG_ACCOUNT_ID mungon (auto-discover do provohet)';
         }
 
-        // Layer 1: insights + metrics (MetaPostInsight records feed the
-        // external column of the grid).
+        // Sync Meta posts into MetaPostInsight (cross-DB, includes per-post
+        // mediaItems with downloaded MP4s + per-post insights). The grid
+        // renders these via ExternalPostService — already carousel-aware,
+        // already has local video paths, already shows the full metric set.
+        // We deliberately do NOT mirror them into ContentPost: a Layer 2
+        // import was tried briefly and ended up shadowing the rich external
+        // posts behind thumbnail-only stubs because the listPosts dedup
+        // gives planned rows priority over external rows.
         try {
             $fbCount = $postSyncService->syncFacebookPosts($sinceDays, $maxPages);
             $igCount = $postSyncService->syncInstagramPosts($sinceDays, $maxPages);
@@ -363,23 +367,9 @@ class ContentPlannerApiController extends Controller
             ], 500);
         }
 
-        // Layer 2: import published posts as ContentPost records (with media
-        // carousels downloaded to local storage). Redundant but resilient —
-        // if Layer 1 tabela lexohet ndryshe, kjo siguron qe UI vazhdon.
-        $importCounts = ['facebook' => 0, 'instagram' => 0];
-        try {
-            $since = Carbon::now()->subDays($sinceDays ?? (int) config('content-planner.import_days_back', 90))->toDateString();
-            $importCounts['facebook']  = $feedImport->importFacebookPosts($since);
-            $importCounts['instagram'] = $feedImport->importInstagramPosts($since);
-        } catch (\Throwable $e) {
-            // Non-fatal — Layer 1 already succeeded.
-            $issues[] = 'ContentFeedImport partial: ' . $e->getMessage();
-        }
-
         $totalInsights = $fbCount + $igCount;
-        $totalContentPosts = $importCounts['facebook'] + $importCounts['instagram'];
 
-        if ($totalInsights === 0 && $totalContentPosts === 0 && ! empty($issues)) {
+        if ($totalInsights === 0 && ! empty($issues)) {
             return response()->json([
                 'message'  => 'Sync ran por 0 poste u importuan. Arsye te mundshme ↓',
                 'facebook' => 0,
@@ -390,12 +380,11 @@ class ContentPlannerApiController extends Controller
         }
 
         return response()->json([
-            'message'         => "Synced {$totalInsights} post insights + imported {$totalContentPosts} as planner posts.",
-            'facebook'        => $fbCount,
-            'instagram'       => $igCount,
-            'content_posts'   => $importCounts,
-            'full'            => $fullHistory,
-            'issues'          => $issues,
+            'message'   => "Synced {$totalInsights} post insights.",
+            'facebook'  => $fbCount,
+            'instagram' => $igCount,
+            'full'      => $fullHistory,
+            'issues'    => $issues,
         ]);
     }
 
