@@ -139,6 +139,7 @@ class ContentFeedImportService
                 [
                     'user_id' => config('content-planner.import_user_id', 1),
                     'content' => mb_substr($post['message'] ?? '', 0, 5000),
+                    'content_type' => $this->mapToContentType($postType),
                     'scheduled_at' => $createdTime,
                     'published_at' => $createdTime,
                     'status' => 'published',
@@ -170,6 +171,7 @@ class ContentFeedImportService
                 [
                     'user_id' => config('content-planner.import_user_id', 1),
                     'content' => mb_substr($item['caption'] ?? '', 0, 5000),
+                    'content_type' => $this->mapToContentType($postType),
                     'scheduled_at' => $createdTime,
                     'published_at' => $createdTime,
                     'status' => 'published',
@@ -348,6 +350,22 @@ class ContentFeedImportService
             'VIDEO' => 'video',
             'CAROUSEL_ALBUM' => 'carousel_album',
             default => 'photo',
+        };
+    }
+
+    /**
+     * Map Meta-side post type ('reel', 'video', 'carousel_album', etc.) to
+     * the local content_type field that drives UI labels ('Foto', 'Reel',
+     * 'Carousel'). Without this, every imported post defaults to 'post' and
+     * shows up as "Foto" even when it's a Reel or video.
+     */
+    private function mapToContentType(string $metaPostType): string
+    {
+        return match ($metaPostType) {
+            'reel', 'video' => 'reel',
+            'carousel_album' => 'carousel',
+            'story' => 'story',
+            default => 'post',
         };
     }
 

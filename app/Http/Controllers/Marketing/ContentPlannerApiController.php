@@ -186,7 +186,29 @@ class ContentPlannerApiController extends Controller
     public function getPost(int $id): JsonResponse
     {
         $post = $this->postService->getPost($id);
-        return response()->json($post);
+        $payload = $post->toArray();
+
+        // Imported FB/IG posts mirror the metrics that live in
+        // meta_post_insights. Attaching them here lets the post detail modal
+        // show Reach/Likes/Comments/Saves without a second round-trip.
+        if ($post->platform_post_id) {
+            $insight = \App\Models\Meta\MetaPostInsight::where('post_id', $post->platform_post_id)->first();
+            if ($insight) {
+                $payload['metrics'] = [
+                    'reach' => $insight->reach,
+                    'impressions' => $insight->impressions,
+                    'likes' => $insight->likes,
+                    'comments' => $insight->comments,
+                    'shares' => $insight->shares,
+                    'saves' => $insight->saves,
+                    'video_views' => $insight->video_views,
+                    'clicks' => $insight->clicks,
+                    'plays' => $insight->plays,
+                ];
+            }
+        }
+
+        return response()->json($payload);
     }
 
     public function storePost(Request $request): JsonResponse

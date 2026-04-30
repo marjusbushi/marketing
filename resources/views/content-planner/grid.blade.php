@@ -804,21 +804,32 @@
     function normalisePlanned(data, cached) {
         const p = (cached && cached.extendedProps) || {};
         const scheduled = data.scheduled_at || p.scheduled_at || null;
+        // For Reels/videos imported from Meta, only the JPEG thumbnail is
+        // stored locally (the MP4 URL expires ~24h). The modal renders the
+        // thumbnail and surfaces a "Hap në Instagram" button via the footer
+        // so the user can watch the actual video in IG/FB.
+        const postIsVideo = (p.is_video === true) || (p.has_video === true)
+            || (data.content_type === 'reel' || data.content_type === 'video')
+            || (data.meta_post_type === 'reel' || data.meta_post_type === 'video');
         return {
             id: (cached && cached.id) || data.id,
             extendedProps: {
                 is_external: false,
+                is_imported: p.is_imported === true || !!data.external_source,
                 platform: p.platform || data.platform || 'multi',
                 status: p.status || data.status || 'draft',
                 status_label: p.status_label || data.status_label || 'Draft',
                 content: data.content || p.content || '',
+                content_type: data.content_type || p.content_type || 'post',
+                meta_post_type: data.meta_post_type || p.meta_post_type || null,
+                is_video: postIsVideo,
                 media_items: (data.media || []).map(m => ({
                     url: m.url || m.thumbnail_url || '',
                     thumbnail: m.thumbnail_url || m.url || '',
                     is_video: (m.mime_type || '').startsWith('video/'),
                 })),
-                metrics: null,
-                permalink: null,
+                metrics: data.metrics || null,
+                permalink: data.permalink || p.permalink || null,
                 scheduled_at: scheduled,
             },
         };
@@ -877,11 +888,13 @@
         });
         applyCaptionCap();
 
-        // Metrics — external only
+        // Metrics — show whenever insights are present (external posts, but
+        // also imported posts whose getPost response now joins the
+        // meta_post_insights row).
         const metricsSec = document.getElementById('pdMetricsSection');
         const metricsGrid = document.getElementById('pdMetricsGrid');
         while (metricsGrid.firstChild) metricsGrid.removeChild(metricsGrid.firstChild);
-        if (isExternal && p.metrics) {
+        if (p.metrics) {
             metricsSec.style.display = '';
             const m = p.metrics;
             const cells = [
@@ -1029,28 +1042,29 @@
     }
 
     function buildFooterActions(event, p, isExternal) {
-        if (isExternal) {
-            const actions = [];
-            if (p.permalink) {
-                actions.push({
-                    kind: 'ghost',
-                    label: 'Kopjo link',
-                    onClick: async () => {
-                        try {
-                            await navigator.clipboard.writeText(p.permalink);
-                            toast('Link u kopjua');
-                        } catch (_) {}
-                    },
-                });
-                actions.push({
-                    kind: 'secondary',
-                    label: 'Hap në ' + prettyPlatform((p.platform || '').toLowerCase()),
-                    onClick: () => window.open(p.permalink, '_blank', 'noopener'),
-                });
-            }
+        const actions = [];
+        const treatAsExternal = isExternal || p.is_imported === true;
+
+        if (treatAsExternal && p.permalink) {
+            actions.push({
+                kind: 'ghost',
+                label: 'Kopjo link',
+                onClick: async () => {
+                    try {
+                        await navigator.clipboard.writeText(p.permalink);
+                        toast('Link u kopjua');
+                    } catch (_) {}
+                },
+            });
+            actions.push({
+                kind: 'secondary',
+                label: 'Hap në ' + prettyPlatform((p.platform || '').toLowerCase()),
+                onClick: () => window.open(p.permalink, '_blank', 'noopener'),
+            });
             return actions;
         }
-        // Planned-post actions
+
+        // Planned-post actions (user-created drafts/scheduled posts).
         return [
             { kind: 'primary', label: 'Edito brief', onClick: () => editFromPreview() },
         ];
