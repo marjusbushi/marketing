@@ -1128,20 +1128,35 @@
 
         preview.media.forEach((m) => {
             const slide = document.createElement('div');
-            slide.style.cssText = 'flex:0 0 100%;width:100%;display:flex;align-items:center;justify-content:center;';
+            slide.style.cssText = 'flex:0 0 100%;width:100%;display:flex;align-items:center;justify-content:center;position:relative;';
             const isVideo = (m.mime_type || '').startsWith('video/');
             const el = document.createElement(isVideo ? 'video' : 'img');
             el.src = m.url || m.thumbnail_url || '';
             el.style.cssText = 'max-width:100%;max-height:80vh;object-fit:contain;display:block;' + (isVideo ? '' : 'pointer-events:none;');
             if (isVideo) {
-                // Autoplay still requires muted (browser policy) — but expose
-                // native controls so the user can unmute / scrub / pause.
+                // Native HTML5 player. controls=true keeps the play/scrub bar
+                // visible at all times; muted+autoplay lets it start without
+                // user interaction (browsers require muted for autoplay).
                 el.muted = true;
                 el.autoplay = true;
                 el.loop = true;
                 el.playsInline = true;
                 el.controls = true;
+                el.controlsList = 'nodownload';
                 el.preload = 'metadata';
+                el.poster = m.thumbnail_url || '';
+                // Surface load failures so they don't silently render as a
+                // blank frame with no controls.
+                el.addEventListener('error', (e) => {
+                    console.error('[preview-video] failed to load', el.src, el.error);
+                });
+                // If muted-autoplay is blocked (rare), nudge the play call so
+                // controls are at least guaranteed to render with a usable
+                // poster + loaded metadata.
+                el.addEventListener('loadedmetadata', () => {
+                    const p = el.play();
+                    if (p && typeof p.catch === 'function') p.catch(() => {});
+                });
             } else {
                 el.alt = '';
                 el.draggable = false;
