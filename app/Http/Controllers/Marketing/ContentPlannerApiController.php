@@ -305,10 +305,10 @@ class ContentPlannerApiController extends Controller
         $postSyncService = app(\App\Services\Meta\MetaPostSyncService::class);
         $feedImport = app(ContentFeedImportService::class);
 
-        // Manual sync button pulls the full available history by default —
-        // the grid is meant to show everything. Automated cron jobs keep the
-        // 30-day window (?full=0) for speed.
-        $fullHistory = $request->boolean('full', true);
+        // Sync window: default 30 days for speed (PHP timeout=30s; full
+        // history hits 600+ posts × ~500ms = 10 min, dies with FatalError).
+        // Pass ?full=1 explicitly for full-history sync (typically CLI only).
+        $fullHistory = $request->boolean('full', false);
         $sinceDays = $fullHistory ? null : 30;
         $maxPages  = $fullHistory ? 100 : 20;
 

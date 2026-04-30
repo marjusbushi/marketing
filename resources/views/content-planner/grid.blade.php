@@ -687,14 +687,11 @@
     async function syncFromMeta(btn) {
         const origText = btn.innerHTML;
         btn.disabled = true;
-        // Full-history sync can walk hundreds of Graph API pages — the
-        // "Syncing..." spinner plus explicit label manages expectations.
-        btn.innerHTML = '<iconify-icon icon="heroicons-outline:arrow-path" width="14" class="animate-spin"></iconify-icon> Syncing historik...';
+        // 30-day window keeps sync inside PHP's 30s timeout. For a full
+        // historical backfill use: php artisan content-planner:import-feed --full
+        btn.innerHTML = '<iconify-icon icon="heroicons-outline:arrow-path" width="14" class="animate-spin"></iconify-icon> Syncing...';
         try {
-            // ?full=1 → walk up to ~5000 posts per source with no 30-day cutoff.
-            // The server still stops at the end of pagination, so accounts with
-            // fewer posts finish quickly.
-            const res = await fetch('{{ route("marketing.planner.api.posts.sync-meta") }}?full=1', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } });
+            const res = await fetch('{{ route("marketing.planner.api.posts.sync-meta") }}', { method: 'POST', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' } });
             const ct = res.headers.get('Content-Type') || '';
             if (ct.includes('text/html')) { window.location.reload(); return; }
             const data = await res.json();

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ContentFeedImportService
 {
@@ -295,8 +296,11 @@ class ContentFeedImportService
                 $mimeType = trim(explode(';', $mimeType)[0]);
             }
 
-            // Create ContentMedia record
+            // Create ContentMedia record. UUID is required (NOT NULL, no DB
+            // default) — without it the insert silently fails inside the
+            // catch block below, leaving the post with no media attached.
             $media = ContentMedia::create([
+                'uuid' => (string) Str::uuid(),
                 'user_id' => config('content-planner.import_user_id', 1),
                 'filename' => basename($storagePath),
                 'original_filename' => $filenamePrefix . '.' . $ext,
