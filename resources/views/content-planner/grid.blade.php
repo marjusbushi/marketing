@@ -744,7 +744,6 @@
     const preview = {
         media: [],       // [{ url, thumbnail_url, mime_type }]
         index: 0,
-        embed_url: null, // IG/FB iframe URL when the post is an imported video
         dragging: false,
         startX: 0,
         currentDx: 0,
@@ -755,7 +754,6 @@
         previewPostId = postId;
         preview.media = [];
         preview.index = 0;
-        preview.embed_url = null;
 
         const overlay = document.getElementById('postPreviewOverlay');
         const mediaHost = document.getElementById('postPreviewMedia');
@@ -843,22 +841,15 @@
     function renderPreviewDetail(event, isExternal) {
         const p = event.extendedProps || {};
 
-        // Media. For imported video/reel posts (where we only have a JPEG
-        // thumbnail locally), build the IG/FB embed URL so the carousel
-        // renders the native player instead of a still image.
+        // Media — local MP4/JPEG paths come straight from media_items
+        // (MetaPostInsight.mediaItems for external, ContentPost.media for
+        // planned). The carousel below renders <video> for is_video=true.
         preview.media = (p.media_items || []).map(m => ({
             url: proxyMetaUrl(m.url || m.thumbnail || ''),
             thumbnail_url: proxyMetaUrl(m.thumbnail || m.url || ''),
             mime_type: m.is_video ? 'video/mp4' : 'image/jpeg',
         }));
         preview.index = 0;
-        const isImportedVideo = (p.is_imported === true || isExternal)
-            && (p.is_video === true || p.has_video === true
-                || p.content_type === 'reel' || p.content_type === 'video'
-                || p.meta_post_type === 'reel' || p.meta_post_type === 'video');
-        preview.embed_url = isImportedVideo
-            ? buildEmbedUrl(p.permalink, (p.platform || '').toLowerCase())
-            : null;
         renderPreviewCarousel();
         ensurePreviewWired();
 
@@ -1112,51 +1103,9 @@
         setTimeout(() => el.remove(), 2000);
     }
 
-    // Build the IG/FB embed URL for an imported video post. IG accepts
-    // /reel/{code}/embed and /p/{code}/embed; FB exposes plugins/post.php.
-    // The embed iframe restores native video playback that we can't
-    // replicate locally (Meta MP4 URLs expire ~24h after publish).
-    function buildEmbedUrl(permalink, platform) {
-        if (!permalink) return null;
-        try {
-            const url = new URL(permalink);
-            if (platform === 'instagram' || /instagram\.com/.test(url.host)) {
-                const path = url.pathname.replace(/\/$/, '');
-                return 'https://www.instagram.com' + path + '/embed/captioned';
-            }
-            if (platform === 'facebook' || /facebook\.com/.test(url.host)) {
-                return 'https://www.facebook.com/plugins/post.php?href='
-                    + encodeURIComponent(permalink)
-                    + '&show_text=false&width=500';
-            }
-        } catch (_) {}
-        return null;
-    }
-
     function renderPreviewCarousel() {
         const host = document.getElementById('postPreviewMedia');
         while (host.firstChild) host.removeChild(host.firstChild);
-
-        // Imported video/reel posts — embed the native IG/FB player so the
-        // user can actually watch the video in the modal. We only do this
-        // for video content; photos still render from the local thumbnail
-        // because we have the full image stored.
-        const embedUrl = preview.embed_url;
-        if (embedUrl) {
-            const wrap = document.createElement('div');
-            wrap.style.cssText = 'width:min(90vw, 540px);max-width:90vw;display:flex;align-items:center;justify-content:center;';
-            const iframe = document.createElement('iframe');
-            iframe.src = embedUrl;
-            iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
-            iframe.setAttribute('allowfullscreen', 'true');
-            iframe.setAttribute('scrolling', 'no');
-            iframe.setAttribute('frameborder', '0');
-            iframe.style.cssText = 'width:100%;height:min(80vh, 720px);border:0;border-radius:8px;background:#000;';
-            wrap.appendChild(iframe);
-            host.appendChild(wrap);
-            updatePreviewChrome();
-            return;
-        }
 
         if (preview.media.length === 0) {
             const empty = document.createElement('div');
@@ -1304,14 +1253,9 @@
         document.body.style.overflow = '';
         const vid = document.querySelector('#postPreviewMedia video');
         if (vid) vid.pause();
-        // Clearing the iframe src stops the IG/FB embed from continuing to
-        // play audio after the modal closes (browsers don't pause iframes).
-        const iframe = document.querySelector('#postPreviewMedia iframe');
-        if (iframe) iframe.src = 'about:blank';
         previewPostId = null;
         preview.media = [];
         preview.index = 0;
-        preview.embed_url = null;
     }
 
     // ESC closes the preview, and in the preview ← → navigate the carousel.
