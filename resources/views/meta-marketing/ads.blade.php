@@ -303,6 +303,21 @@
                 <tbody id="campaignTableBody">
                     <tr><td colspan="13" class="text-center py-8 text-slate-400">Duke ngarkuar...</td></tr>
                 </tbody>
+                <tfoot id="campaignTotalsFoot" class="hidden bg-slate-50/80 border-t-2 border-slate-200 text-xs">
+                    <tr>
+                        <td class="text-left px-4 py-3 font-semibold text-slate-700" colspan="3">Filtered Total</td>
+                        <td class="text-right px-3 py-3 font-bold text-slate-900 tabular-nums" id="totalSpend">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalImpressions">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalReach">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalClicks">—</td>
+                        <td class="text-right px-3 py-3 text-slate-400">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalPurchases">—</td>
+                        <td class="text-right px-3 py-3 font-bold text-slate-900 tabular-nums" id="totalRevenue">—</td>
+                        <td class="text-right px-3 py-3 font-bold tabular-nums" id="totalRoas">—</td>
+                        <td class="text-right px-3 py-3 text-slate-400">—</td>
+                        <td class="text-right px-3 py-3 text-slate-400">—</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -407,6 +422,38 @@
         refreshPillActiveStyle();
         refreshSearchClearButton();
         renderCampaigns();
+    }
+
+    function renderFilteredTotals(filtered) {
+        const foot = document.getElementById('campaignTotalsFoot');
+        if (!foot) return;
+        if (!filtered.length) {
+            foot.classList.add('hidden');
+            return;
+        }
+        const sum = filtered.reduce((acc, c) => {
+            acc.spend += Number(c.spend) || 0;
+            acc.impressions += Number(c.impressions) || 0;
+            acc.reach += Number(c.reach) || 0;
+            acc.link_clicks += Number(c.link_clicks) || 0;
+            acc.purchases += Number(c.purchases) || 0;
+            acc.revenue += Number(c.revenue) || 0;
+            return acc;
+        }, { spend: 0, impressions: 0, reach: 0, link_clicks: 0, purchases: 0, revenue: 0 });
+
+        const roas = sum.spend > 0 ? sum.revenue / sum.spend : 0;
+        document.getElementById('totalSpend').textContent = fmtEur(sum.spend);
+        document.getElementById('totalImpressions').textContent = fmtNum(sum.impressions);
+        document.getElementById('totalReach').textContent = fmtNum(sum.reach);
+        document.getElementById('totalClicks').textContent = fmtNum(sum.link_clicks);
+        document.getElementById('totalPurchases').textContent = fmtNum(sum.purchases);
+        document.getElementById('totalRevenue').textContent = fmtEur(sum.revenue);
+        const roasEl = document.getElementById('totalRoas');
+        if (roasEl) {
+            roasEl.textContent = fmtRoas(roas);
+            roasEl.style.color = roasColor(roas);
+        }
+        foot.classList.remove('hidden');
     }
 
     const baseUrl = '{{ route("marketing.analytics.index") }}';
@@ -846,12 +893,14 @@
 
         if (!campaignsData.length) {
             if (visibleCountEl) visibleCountEl.textContent = 0;
+            renderFilteredTotals([]);
             tbody.innerHTML = '<tr><td colspan="13" class="text-center py-8 text-slate-400">Nuk ka të dhëna për këtë periudhë</td></tr>';
             return;
         }
 
         const filtered = getFilteredCampaigns();
         if (visibleCountEl) visibleCountEl.textContent = filtered.length;
+        renderFilteredTotals(filtered);
 
         if (!filtered.length) {
             // Empty-filter state built via DOM API (avoids innerHTML in new code).
