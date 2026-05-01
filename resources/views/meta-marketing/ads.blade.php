@@ -114,7 +114,7 @@
     </div>
 
     {{-- KPI Cards --}}
-    <div id="kpiCards" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
+    <div id="kpiCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         @php
         $kpis = [
             ['key' => 'spend',       'label' => 'Amount Spent',  'icon' => 'heroicons-outline:currency-euro',    'color' => 'blue'],
@@ -134,7 +134,7 @@
                 <iconify-icon icon="{{ $kpi['icon'] }}" width="16" class="text-slate-400"></iconify-icon>
                 <span class="text-[11px] font-medium text-slate-500 uppercase tracking-wider truncate">{{ $kpi['label'] }}</span>
             </div>
-            <div id="kpi-{{ $kpi['key'] }}" class="text-xl font-bold text-slate-900 tabular-nums">&mdash;</div>
+            <div id="kpi-{{ $kpi['key'] }}" class="text-2xl font-bold text-slate-900 tabular-nums">&mdash;</div>
             <div id="kpi-{{ $kpi['key'] }}-change" class="text-[11px] mt-1 font-medium"></div>
         </div>
         @endforeach
@@ -204,7 +204,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Spend by Platform</h3>
             </div>
             <div class="p-5">
-                <div class="relative w-full h-[260px]">
+                <div class="relative w-full h-[320px]">
                     <canvas id="platformChart"></canvas>
                 </div>
             </div>
@@ -217,7 +217,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Spend by Placement</h3>
             </div>
             <div class="p-5">
-                <div class="relative w-full h-[260px]">
+                <div class="relative w-full h-[320px]">
                     <canvas id="placementChart"></canvas>
                 </div>
             </div>
@@ -226,25 +226,54 @@
 
     {{-- Campaign Table --}}
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <iconify-icon icon="heroicons-outline:megaphone" width="18" class="text-slate-400"></iconify-icon>
-                <h3 class="text-sm font-semibold text-slate-800">Campaigns Performance</h3>
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+            <iconify-icon icon="heroicons-outline:megaphone" width="18" class="text-slate-400"></iconify-icon>
+            <h3 class="text-sm font-semibold text-slate-800">Campaigns Performance</h3>
+        </div>
+
+        {{-- Filter Bar --}}
+        <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/40 flex flex-wrap items-center gap-3">
+            <div id="statusPills" class="inline-flex rounded-md border border-slate-200 bg-white overflow-hidden text-xs">
+                <button data-status="ALL" class="status-pill px-3 py-1.5 font-medium border-r border-slate-200 hover:bg-slate-50 transition-colors">
+                    All <span class="ml-1" data-pill-count="ALL">0</span>
+                </button>
+                <button data-status="ACTIVE" class="status-pill px-3 py-1.5 font-medium border-r border-slate-200 hover:bg-slate-50 transition-colors">
+                    Active <span class="ml-1" data-pill-count="ACTIVE">0</span>
+                </button>
+                <button data-status="PAUSED" class="status-pill px-3 py-1.5 font-medium border-r border-slate-200 hover:bg-slate-50 transition-colors">
+                    Paused <span class="ml-1" data-pill-count="PAUSED">0</span>
+                </button>
+                <button data-status="ARCHIVED" class="status-pill px-3 py-1.5 font-medium hover:bg-slate-50 transition-colors">
+                    Archived <span class="ml-1" data-pill-count="ARCHIVED">0</span>
+                </button>
             </div>
-            <div class="flex gap-2">
-                <button onclick="expandAll()" class="inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                    <iconify-icon icon="heroicons-outline:chevron-double-down" width="14"></iconify-icon> Expand All
+
+            <div class="relative flex-1 min-w-[220px] max-w-[320px]">
+                <iconify-icon icon="heroicons-outline:magnifying-glass" width="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
+                <input id="campaignSearch" type="text" placeholder="Kërko campaign..." class="w-full h-[30px] pl-8 pr-8 text-xs rounded-md border border-slate-200 bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none" autocomplete="off" />
+                <button id="campaignSearchClear" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <iconify-icon icon="heroicons-outline:x-mark" width="14"></iconify-icon>
                 </button>
-                <button onclick="collapseAll()" class="inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                    <iconify-icon icon="heroicons-outline:chevron-double-up" width="14"></iconify-icon> Collapse All
+            </div>
+
+            <div class="ml-auto flex gap-1.5">
+                <button onclick="expandAll()" title="Expand all campaigns" class="inline-flex items-center justify-center h-[30px] w-[30px] rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+                    <iconify-icon icon="heroicons-outline:chevron-double-down" width="14"></iconify-icon>
                 </button>
+                <button onclick="collapseAll()" title="Collapse all campaigns" class="inline-flex items-center justify-center h-[30px] w-[30px] rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+                    <iconify-icon icon="heroicons-outline:chevron-double-up" width="14"></iconify-icon>
+                </button>
+            </div>
+
+            <div class="basis-full text-[11px] text-slate-500">
+                Po shfaqen <span id="campaignVisibleCount">0</span> nga <span id="campaignTotalCount">0</span> campaign-e
             </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm" id="campaignsTable">
                 <thead>
                     <tr class="border-b border-slate-100 bg-slate-50/60">
-                        <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[22%] cursor-pointer" onclick="sortTable('name')">
+                        <th class="sticky-col text-left px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[22%] cursor-pointer" onclick="sortTable('name')">
                             Campaign <iconify-icon icon="heroicons-outline:arrows-up-down" width="12" class="ml-1 opacity-50"></iconify-icon>
                         </th>
                         <th class="text-center px-3 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[7%]">Status</th>
@@ -274,6 +303,21 @@
                 <tbody id="campaignTableBody">
                     <tr><td colspan="13" class="text-center py-8 text-slate-400">Duke ngarkuar...</td></tr>
                 </tbody>
+                <tfoot id="campaignTotalsFoot" class="hidden bg-slate-50/80 border-t-2 border-slate-200 text-xs">
+                    <tr>
+                        <td class="sticky-col text-left px-4 py-3 font-semibold text-slate-700" colspan="3">Filtered Total</td>
+                        <td class="text-right px-3 py-3 font-bold text-slate-900 tabular-nums" id="totalSpend">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalImpressions">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalReach">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalClicks">—</td>
+                        <td class="text-right px-3 py-3 text-slate-400">—</td>
+                        <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalPurchases">—</td>
+                        <td class="text-right px-3 py-3 font-bold text-slate-900 tabular-nums" id="totalRevenue">—</td>
+                        <td class="text-right px-3 py-3 font-bold tabular-nums" id="totalRoas">—</td>
+                        <td class="text-right px-3 py-3 text-slate-400">—</td>
+                        <td class="text-right px-3 py-3 text-slate-400">—</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -288,6 +332,24 @@
     .dark .campaign-row:hover { background: #1E293B; }
     .expand-icon { transition: transform 0.2s; display: inline-block; }
     .expand-icon.rotated { transform: rotate(90deg); }
+    @media (min-width: 768px) {
+        #campaignsTable th.sticky-col,
+        #campaignsTable td.sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            background: #ffffff;
+            box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.08);
+        }
+        #campaignsTable thead th.sticky-col,
+        #campaignsTable tfoot td.sticky-col,
+        #campaignsTable .adset-row td.sticky-col {
+            background: #F8FAFC;
+        }
+        #campaignsTable .campaign-row:hover td.sticky-col {
+            background: #FAFAFA;
+        }
+    }
 </style>
 @endsection
 
@@ -304,6 +366,113 @@
     let campaignsData = [];
     let sortField = 'spend';
     let sortAsc = false;
+    let filterStatus = 'ACTIVE';   // ALL | ACTIVE | PAUSED | ARCHIVED
+    let filterQ = '';              // case-insensitive substring on campaign name
+    let searchDebounceTimer = null;
+
+    // === Filter helpers ============================================
+    const VALID_STATUSES = ['ALL', 'ACTIVE', 'PAUSED', 'ARCHIVED'];
+
+    function readFiltersFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const s = (params.get('status') || '').toUpperCase();
+        if (VALID_STATUSES.includes(s)) filterStatus = s;
+        filterQ = params.get('q') || '';
+    }
+
+    function writeFiltersToUrl() {
+        const params = new URLSearchParams(window.location.search);
+        if (filterStatus === 'ACTIVE') params.delete('status'); else params.set('status', filterStatus);
+        if (!filterQ) params.delete('q'); else params.set('q', filterQ);
+        const qs = params.toString();
+        const url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+        window.history.replaceState(null, '', url);
+    }
+
+    // Map raw campaign status to one of the filterable buckets. Anything that
+    // isn't ACTIVE or PAUSED falls into ARCHIVED so unknown values
+    // (DELETED, WITH_ISSUES, etc.) stay reachable via that pill.
+    function normalizeStatus(raw) {
+        const s = (raw || '').toUpperCase();
+        if (s === 'ACTIVE') return 'ACTIVE';
+        if (s === 'PAUSED') return 'PAUSED';
+        return 'ARCHIVED';
+    }
+
+    function getFilteredCampaigns() {
+        const q = filterQ.toLowerCase();
+        return campaignsData.filter(c => {
+            if (filterStatus !== 'ALL' && normalizeStatus(c.status) !== filterStatus) return false;
+            if (q && !(c.name || '').toLowerCase().includes(q)) return false;
+            return true;
+        });
+    }
+
+    function refreshPillCounts() {
+        const counts = { ALL: campaignsData.length, ACTIVE: 0, PAUSED: 0, ARCHIVED: 0 };
+        campaignsData.forEach(c => counts[normalizeStatus(c.status)]++);
+        document.querySelectorAll('[data-pill-count]').forEach(el => {
+            el.textContent = counts[el.getAttribute('data-pill-count')] ?? 0;
+        });
+    }
+
+    function refreshPillActiveStyle() {
+        document.querySelectorAll('.status-pill').forEach(btn => {
+            const isActive = btn.getAttribute('data-status') === filterStatus;
+            btn.classList.toggle('bg-primary-600', isActive);
+            btn.classList.toggle('text-white', isActive);
+            btn.classList.toggle('text-slate-700', !isActive);
+        });
+    }
+
+    function refreshSearchClearButton() {
+        const clear = document.getElementById('campaignSearchClear');
+        if (!clear) return;
+        clear.classList.toggle('hidden', !filterQ);
+    }
+
+    function clearAllFilters() {
+        filterStatus = 'ACTIVE';
+        filterQ = '';
+        const input = document.getElementById('campaignSearch');
+        if (input) input.value = '';
+        writeFiltersToUrl();
+        refreshPillActiveStyle();
+        refreshSearchClearButton();
+        renderCampaigns();
+    }
+
+    function renderFilteredTotals(filtered) {
+        const foot = document.getElementById('campaignTotalsFoot');
+        if (!foot) return;
+        if (!filtered.length) {
+            foot.classList.add('hidden');
+            return;
+        }
+        const sum = filtered.reduce((acc, c) => {
+            acc.spend += Number(c.spend) || 0;
+            acc.impressions += Number(c.impressions) || 0;
+            acc.reach += Number(c.reach) || 0;
+            acc.link_clicks += Number(c.link_clicks) || 0;
+            acc.purchases += Number(c.purchases) || 0;
+            acc.revenue += Number(c.revenue) || 0;
+            return acc;
+        }, { spend: 0, impressions: 0, reach: 0, link_clicks: 0, purchases: 0, revenue: 0 });
+
+        const roas = sum.spend > 0 ? sum.revenue / sum.spend : 0;
+        document.getElementById('totalSpend').textContent = fmtEur(sum.spend);
+        document.getElementById('totalImpressions').textContent = fmtNum(sum.impressions);
+        document.getElementById('totalReach').textContent = fmtNum(sum.reach);
+        document.getElementById('totalClicks').textContent = fmtNum(sum.link_clicks);
+        document.getElementById('totalPurchases').textContent = fmtNum(sum.purchases);
+        document.getElementById('totalRevenue').textContent = fmtEur(sum.revenue);
+        const roasEl = document.getElementById('totalRoas');
+        if (roasEl) {
+            roasEl.textContent = fmtRoas(roas);
+            roasEl.style.color = roasColor(roas);
+        }
+        foot.classList.remove('hidden');
+    }
 
     const baseUrl = '{{ route("marketing.analytics.index") }}';
     const datePresetEl = document.getElementById('datePreset');
@@ -570,7 +739,8 @@
 
             if (changeEl) {
                 if (info.change === null || info.change === undefined) {
-                    changeEl.textContent = 'Metrikë e re — pa informacion';
+                    // PR 1: empty until PR 3 fills with delta vs previous period.
+                    changeEl.textContent = '';
                     changeEl.className = 'text-[11px] mt-1 font-medium text-slate-400';
                 } else if (info.change === 'new') {
                     changeEl.textContent = 'E re — 0 vitin e kaluar';
@@ -729,18 +899,46 @@
         const { data } = await fetchApi('ads-campaigns', { from, to, platform, ...extra });
         if (gen !== null && gen !== loadGeneration) return;
         campaignsData = data;
+        refreshPillCounts();
         renderCampaigns();
     }
 
     function renderCampaigns() {
         const tbody = document.getElementById('campaignTableBody');
+        const totalCountEl = document.getElementById('campaignTotalCount');
+        const visibleCountEl = document.getElementById('campaignVisibleCount');
+        if (totalCountEl) totalCountEl.textContent = campaignsData.length;
 
         if (!campaignsData.length) {
+            if (visibleCountEl) visibleCountEl.textContent = 0;
+            renderFilteredTotals([]);
             tbody.innerHTML = '<tr><td colspan="13" class="text-center py-8 text-slate-400">Nuk ka të dhëna për këtë periudhë</td></tr>';
             return;
         }
 
-        const sorted = [...campaignsData].sort((a, b) => {
+        const filtered = getFilteredCampaigns();
+        if (visibleCountEl) visibleCountEl.textContent = filtered.length;
+        renderFilteredTotals(filtered);
+
+        if (!filtered.length) {
+            // Empty-filter state built via DOM API (avoids innerHTML in new code).
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 13;
+            td.className = 'text-center py-8 text-slate-400';
+            td.appendChild(document.createTextNode('Asnjë campaign nuk përputhet me filtrin. '));
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ml-2 text-primary-600 hover:underline font-medium';
+            btn.textContent = 'Pastro filtrat';
+            btn.addEventListener('click', clearAllFilters);
+            td.appendChild(btn);
+            tr.appendChild(td);
+            tbody.replaceChildren(tr);
+            return;
+        }
+
+        const sorted = [...filtered].sort((a, b) => {
             let va = a[sortField], vb = b[sortField];
             if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
             if (sortAsc) return va > vb ? 1 : va < vb ? -1 : 0;
@@ -752,9 +950,9 @@
             const hasAdSets = c.ad_sets && c.ad_sets.length > 0;
             html += `
                 <tr class="campaign-row border-b border-slate-50 hover:bg-slate-50/50" onclick="${hasAdSets ? `toggleAdSets(${idx})` : ''}" data-campaign="${idx}">
-                    <td class="text-left px-4 py-3">
+                    <td class="sticky-col text-left px-4 py-3">
                         <div class="flex items-center gap-2">
-                            ${hasAdSets ? `<iconify-icon icon="heroicons-outline:chevron-right" width="14" class="expand-icon text-slate-400" id="expand-${idx}"></iconify-icon>` : '<span class="inline-block w-3.5"></span>'}
+                            ${hasAdSets ? `<iconify-icon icon="heroicons-outline:chevron-right" width="14" class="expand-icon text-slate-500" id="expand-${idx}"></iconify-icon>` : '<span class="inline-block w-3.5"></span>'}
                             <div>
                                 <span class="font-semibold text-slate-900">${escHtml(c.name)}</span>
                                 ${hasAdSets ? `<span class="text-[11px] text-slate-400 ml-1">(${c.ad_sets.length} ad sets)</span>` : ''}
@@ -782,7 +980,7 @@
                 c.ad_sets.forEach(as => {
                     html += `
                         <tr class="adset-row hidden border-b border-slate-50" data-parent="${idx}">
-                            <td class="text-left pl-10 pr-4 py-2.5">
+                            <td class="sticky-col text-left pl-10 pr-4 py-2.5">
                                 <div class="flex items-center gap-2">
                                     <iconify-icon icon="heroicons-outline:adjustments-horizontal" width="14" class="text-slate-400"></iconify-icon>
                                     <span class="text-[13px] text-slate-600">${escHtml(as.name)}</span>
@@ -866,7 +1064,10 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right', labels: { font: { size: 11 }, padding: 8 } },
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 11 }, padding: 10, boxWidth: 12, boxHeight: 12 },
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(ctx) {
@@ -917,6 +1118,52 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => loadAll());
+    // === Filter wiring ============================================
+    function bindFilterControls() {
+        document.querySelectorAll('.status-pill').forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterStatus = btn.getAttribute('data-status');
+                writeFiltersToUrl();
+                refreshPillActiveStyle();
+                renderCampaigns();
+            });
+        });
+
+        const input = document.getElementById('campaignSearch');
+        const clear = document.getElementById('campaignSearchClear');
+        if (input) {
+            input.value = filterQ;
+            input.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => {
+                    filterQ = input.value.trim();
+                    writeFiltersToUrl();
+                    refreshSearchClearButton();
+                    renderCampaigns();
+                }, 200);
+            });
+        }
+        if (clear) {
+            clear.addEventListener('click', () => {
+                if (input) input.value = '';
+                filterQ = '';
+                writeFiltersToUrl();
+                refreshSearchClearButton();
+                renderCampaigns();
+            });
+        }
+
+        refreshPillActiveStyle();
+        refreshSearchClearButton();
+    }
+
+    // Read URL filter state before first render so the initial fetch already
+    // applies the correct filter when data arrives.
+    readFiltersFromUrl();
+
+    document.addEventListener('DOMContentLoaded', () => {
+        bindFilterControls();
+        loadAll();
+    });
 </script>
 @endsection
