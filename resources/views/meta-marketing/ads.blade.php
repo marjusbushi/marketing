@@ -226,18 +226,47 @@
 
     {{-- Campaign Table --}}
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <iconify-icon icon="heroicons-outline:megaphone" width="18" class="text-slate-400"></iconify-icon>
-                <h3 class="text-sm font-semibold text-slate-800">Campaigns Performance</h3>
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+            <iconify-icon icon="heroicons-outline:megaphone" width="18" class="text-slate-400"></iconify-icon>
+            <h3 class="text-sm font-semibold text-slate-800">Campaigns Performance</h3>
+        </div>
+
+        {{-- Filter Bar --}}
+        <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/40 flex flex-wrap items-center gap-3">
+            <div id="statusPills" class="inline-flex rounded-md border border-slate-200 bg-white overflow-hidden text-xs">
+                <button data-status="ALL" class="status-pill px-3 py-1.5 font-medium border-r border-slate-200 hover:bg-slate-50 transition-colors">
+                    All <span class="ml-1" data-pill-count="ALL">0</span>
+                </button>
+                <button data-status="ACTIVE" class="status-pill px-3 py-1.5 font-medium border-r border-slate-200 hover:bg-slate-50 transition-colors">
+                    Active <span class="ml-1" data-pill-count="ACTIVE">0</span>
+                </button>
+                <button data-status="PAUSED" class="status-pill px-3 py-1.5 font-medium border-r border-slate-200 hover:bg-slate-50 transition-colors">
+                    Paused <span class="ml-1" data-pill-count="PAUSED">0</span>
+                </button>
+                <button data-status="ARCHIVED" class="status-pill px-3 py-1.5 font-medium hover:bg-slate-50 transition-colors">
+                    Archived <span class="ml-1" data-pill-count="ARCHIVED">0</span>
+                </button>
             </div>
-            <div class="flex gap-2">
-                <button onclick="expandAll()" class="inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                    <iconify-icon icon="heroicons-outline:chevron-double-down" width="14"></iconify-icon> Expand All
+
+            <div class="relative flex-1 min-w-[220px] max-w-[320px]">
+                <iconify-icon icon="heroicons-outline:magnifying-glass" width="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"></iconify-icon>
+                <input id="campaignSearch" type="text" placeholder="Kërko campaign..." class="w-full h-[30px] pl-8 pr-8 text-xs rounded-md border border-slate-200 bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none" autocomplete="off" />
+                <button id="campaignSearchClear" type="button" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <iconify-icon icon="heroicons-outline:x-mark" width="14"></iconify-icon>
                 </button>
-                <button onclick="collapseAll()" class="inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
-                    <iconify-icon icon="heroicons-outline:chevron-double-up" width="14"></iconify-icon> Collapse All
+            </div>
+
+            <div class="ml-auto flex gap-1.5">
+                <button onclick="expandAll()" title="Expand all campaigns" class="inline-flex items-center justify-center h-[30px] w-[30px] rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+                    <iconify-icon icon="heroicons-outline:chevron-double-down" width="14"></iconify-icon>
                 </button>
+                <button onclick="collapseAll()" title="Collapse all campaigns" class="inline-flex items-center justify-center h-[30px] w-[30px] rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+                    <iconify-icon icon="heroicons-outline:chevron-double-up" width="14"></iconify-icon>
+                </button>
+            </div>
+
+            <div class="basis-full text-[11px] text-slate-500">
+                Po shfaqen <span id="campaignVisibleCount">0</span> nga <span id="campaignTotalCount">0</span> campaign-e
             </div>
         </div>
         <div class="overflow-x-auto">
