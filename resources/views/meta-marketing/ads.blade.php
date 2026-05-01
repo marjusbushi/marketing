@@ -204,7 +204,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Spend by Platform</h3>
             </div>
             <div class="p-5">
-                <div class="relative w-full h-[260px]">
+                <div class="relative w-full h-[320px]">
                     <canvas id="platformChart"></canvas>
                 </div>
             </div>
@@ -217,7 +217,7 @@
                 <h3 class="text-sm font-semibold text-slate-800">Spend by Placement</h3>
             </div>
             <div class="p-5">
-                <div class="relative w-full h-[260px]">
+                <div class="relative w-full h-[320px]">
                     <canvas id="placementChart"></canvas>
                 </div>
             </div>
@@ -867,7 +867,10 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right', labels: { font: { size: 11 }, padding: 8 } },
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 11 }, padding: 10, boxWidth: 12, boxHeight: 12 },
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(ctx) {
