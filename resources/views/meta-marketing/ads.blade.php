@@ -273,7 +273,7 @@
             <table class="w-full text-sm" id="campaignsTable">
                 <thead>
                     <tr class="border-b border-slate-100 bg-slate-50/60">
-                        <th class="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[22%] cursor-pointer" onclick="sortTable('name')">
+                        <th class="sticky-col text-left px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[22%] cursor-pointer" onclick="sortTable('name')">
                             Campaign <iconify-icon icon="heroicons-outline:arrows-up-down" width="12" class="ml-1 opacity-50"></iconify-icon>
                         </th>
                         <th class="text-center px-3 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-[7%]">Status</th>
@@ -305,7 +305,7 @@
                 </tbody>
                 <tfoot id="campaignTotalsFoot" class="hidden bg-slate-50/80 border-t-2 border-slate-200 text-xs">
                     <tr>
-                        <td class="text-left px-4 py-3 font-semibold text-slate-700" colspan="3">Filtered Total</td>
+                        <td class="sticky-col text-left px-4 py-3 font-semibold text-slate-700" colspan="3">Filtered Total</td>
                         <td class="text-right px-3 py-3 font-bold text-slate-900 tabular-nums" id="totalSpend">—</td>
                         <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalImpressions">—</td>
                         <td class="text-right px-3 py-3 font-semibold text-slate-700 tabular-nums" id="totalReach">—</td>
@@ -332,6 +332,24 @@
     .dark .campaign-row:hover { background: #1E293B; }
     .expand-icon { transition: transform 0.2s; display: inline-block; }
     .expand-icon.rotated { transform: rotate(90deg); }
+    @media (min-width: 768px) {
+        #campaignsTable th.sticky-col,
+        #campaignsTable td.sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 5;
+            background: #ffffff;
+            box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.08);
+        }
+        #campaignsTable thead th.sticky-col,
+        #campaignsTable tfoot td.sticky-col,
+        #campaignsTable .adset-row td.sticky-col {
+            background: #F8FAFC;
+        }
+        #campaignsTable .campaign-row:hover td.sticky-col {
+            background: #FAFAFA;
+        }
+    }
 </style>
 @endsection
 
@@ -932,7 +950,7 @@
             const hasAdSets = c.ad_sets && c.ad_sets.length > 0;
             html += `
                 <tr class="campaign-row border-b border-slate-50 hover:bg-slate-50/50" onclick="${hasAdSets ? `toggleAdSets(${idx})` : ''}" data-campaign="${idx}">
-                    <td class="text-left px-4 py-3">
+                    <td class="sticky-col text-left px-4 py-3">
                         <div class="flex items-center gap-2">
                             ${hasAdSets ? `<iconify-icon icon="heroicons-outline:chevron-right" width="14" class="expand-icon text-slate-400" id="expand-${idx}"></iconify-icon>` : '<span class="inline-block w-3.5"></span>'}
                             <div>
@@ -962,7 +980,7 @@
                 c.ad_sets.forEach(as => {
                     html += `
                         <tr class="adset-row hidden border-b border-slate-50" data-parent="${idx}">
-                            <td class="text-left pl-10 pr-4 py-2.5">
+                            <td class="sticky-col text-left pl-10 pr-4 py-2.5">
                                 <div class="flex items-center gap-2">
                                     <iconify-icon icon="heroicons-outline:adjustments-horizontal" width="14" class="text-slate-400"></iconify-icon>
                                     <span class="text-[13px] text-slate-600">${escHtml(as.name)}</span>
