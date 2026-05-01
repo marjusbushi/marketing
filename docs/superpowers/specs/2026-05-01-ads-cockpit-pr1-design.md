@@ -2,7 +2,7 @@
 
 **Status:** Design approved 2026-05-01
 **Implementation target:** ~5 dev tasks, single feature branch
-**Affects:** `/marketing/analytics/ads` (and optionally `/instagram`, `/facebook`, `/tiktok`)
+**Affects:** `/marketing/analytics/ads` only. Other analytics tabs (Instagram, Facebook, TikTok, Total) are out of scope.
 
 ## Context
 
@@ -72,23 +72,7 @@ Filtered Total:    €2.405    1.2M     14.3k   192     €5.823     2.42x
 
 Computed client-side from the currently visible (post-filter) rows. ROAS = sum(conv_value) / sum(spend); CTR and CPC omitted (averaging averages is misleading — keep the row to absolute totals only). Style: `bg-slate-50/80 font-semibold border-t-2 border-slate-200`. The label "Filtered Total" sits in the sticky `Campaign` column.
 
-### Section 4 — Cross-page Polish
-
-The 3 visual polish items (KPI subtitle removal #1, KPI strip responsive grid #2, donut legend reposition #3) apply to every analytics page that has the same patterns. The filter bar + sticky column + tfoot apply only where they make sense:
-
-| Page | #1 KPI subtitle | #2 KPI grid | #3 donut legend | #4 sticky col | #5 chevron | Filters + tfoot |
-|------|------------------|--------------|-------------------|----------------|-------------|-------------------|
-| `ads.blade.php` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (full PR 1) |
-| `tiktok.blade.php` | ✅ | ✅ | ✅ | ✅ | ❌ (no expand) | ❌ (different status vocabulary; deferred — see below) |
-| `instagram.blade.php` | ✅ | ✅ | ✅ | n/a | n/a | ❌ (post-level, no campaigns) |
-| `facebook.blade.php` | ✅ | ✅ | ✅ | n/a | n/a | ❌ (same) |
-| `total.blade.php` | ✅ | ✅ | n/a | n/a | n/a | ❌ |
-
-**Why TikTok is partial:** the TikTok renderCampaigns code at [tiktok.blade.php:742](resources/views/meta-marketing/tiktok.blade.php:742) checks `c.status === 'ENABLE' || c.status === 'ACTIVE'` — the TikTok Marketing API returns `ENABLE/DISABLE/DELETE` (operation_status), not Meta's `ACTIVE/PAUSED/ARCHIVED`. Status normalization to a unified vocabulary is a small but separate task; folding it into PR 1 widens scope. TikTok gets visual polish only; filters are queued for a follow-up (mini-PR 1.5 or rolled into PR 2 with the tiers work).
-
-This keeps the visual language consistent without scope-creeping into per-page feature parity.
-
-### Section 5 — URL State Encoding
+### Section 4 — URL State Encoding
 
 Query-string keys (lowercase):
 
@@ -106,12 +90,8 @@ Read on page load, write on each filter change via `history.replaceState`. Exist
 | File | Type of change | Approx. LoC delta |
 |------|----------------|-------------------|
 | `resources/views/meta-marketing/ads.blade.php` | UI markup + JS (filter state, URL sync, render filtering, totals computation, expand chevrons) + polish #1-5 | +180 / -40 |
-| `resources/views/meta-marketing/tiktok.blade.php` | Polish #1, #2, #3, #4 (sticky Campaign col). NO filters, NO chevron, NO tfoot in PR 1. | +30 / -20 |
-| `resources/views/meta-marketing/instagram.blade.php` | Polish only (#1, #2, #3) | +20 / -15 |
-| `resources/views/meta-marketing/facebook.blade.php` | Polish only (#1, #2, #3) | +20 / -15 |
-| `resources/views/meta-marketing/total.blade.php` | Polish only (#1, #2) | +15 / -10 |
 
-No controller changes. No service changes. No new endpoints. The campaigns API already returns `status` for every campaign / adset / ad. Single Blade + JS change.
+**This is the only file PR 1 touches.** No controller changes. No service changes. No new endpoints. Other analytics pages (instagram/facebook/tiktok/total) are not modified — they get their own PRs if and when they need similar treatment.
 
 ### Data flow
 
@@ -180,7 +160,6 @@ Manual E2E checklist (no automated tests added in PR 1 — the page has none cur
 
 - **Pill counts depend on unfiltered data** — if a user expects them to reflect search results too, that's a UX question. Decision: pills represent the *whole* dataset's status distribution; search narrows further within. Document in tooltip if needed.
 - **Filtered totals on a page where users expect "global" KPI cards** — the KPI cards at the top stay global (all campaigns); the `<tfoot>` shows filtered. Visual separation (different card vs table footer) should make this obvious. If users get confused, add a label like "Të gjitha" above the KPI strip in PR 2.
-- **TikTok status vocabulary differs** (resolved): TikTok returns `ENABLE/DISABLE/DELETE` instead of Meta's `ACTIVE/PAUSED/ARCHIVED`. PR 1 scope reduced for TikTok to visual polish + sticky column only. Filter+tfoot for TikTok will be added in a small follow-up that normalizes the vocabulary in `MetaMarketingV2ChannelService::tiktokCampaigns` (or in JS) before applying the same component.
 
 ## Out of Scope Reminders
 
