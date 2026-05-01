@@ -570,7 +570,8 @@
 
             if (changeEl) {
                 if (info.change === null || info.change === undefined) {
-                    changeEl.textContent = 'Metrikë e re — pa informacion';
+                    // PR 1: empty until PR 3 fills with delta vs previous period.
+                    changeEl.textContent = '';
                     changeEl.className = 'text-[11px] mt-1 font-medium text-slate-400';
                 } else if (info.change === 'new') {
                     changeEl.textContent = 'E re — 0 vitin e kaluar';
