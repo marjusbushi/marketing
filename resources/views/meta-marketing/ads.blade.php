@@ -952,7 +952,7 @@
                 <tr class="campaign-row border-b border-slate-50 hover:bg-slate-50/50" onclick="${hasAdSets ? `toggleAdSets(${idx})` : ''}" data-campaign="${idx}">
                     <td class="sticky-col text-left px-4 py-3">
                         <div class="flex items-center gap-2">
-                            ${hasAdSets ? `<iconify-icon icon="heroicons-outline:chevron-right" width="14" class="expand-icon text-slate-400" id="expand-${idx}"></iconify-icon>` : '<span class="inline-block w-3.5"></span>'}
+                            ${hasAdSets ? `<iconify-icon icon="heroicons-outline:chevron-right" width="14" class="expand-icon text-slate-500" id="expand-${idx}"></iconify-icon>` : '<span class="inline-block w-3.5"></span>'}
                             <div>
                                 <span class="font-semibold text-slate-900">${escHtml(c.name)}</span>
                                 ${hasAdSets ? `<span class="text-[11px] text-slate-400 ml-1">(${c.ad_sets.length} ad sets)</span>` : ''}
