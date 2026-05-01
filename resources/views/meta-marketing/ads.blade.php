@@ -114,7 +114,7 @@
     </div>
 
     {{-- KPI Cards --}}
-    <div id="kpiCards" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-3">
+    <div id="kpiCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         @php
         $kpis = [
             ['key' => 'spend',       'label' => 'Amount Spent',  'icon' => 'heroicons-outline:currency-euro',    'color' => 'blue'],
@@ -134,7 +134,7 @@
                 <iconify-icon icon="{{ $kpi['icon'] }}" width="16" class="text-slate-400"></iconify-icon>
                 <span class="text-[11px] font-medium text-slate-500 uppercase tracking-wider truncate">{{ $kpi['label'] }}</span>
             </div>
-            <div id="kpi-{{ $kpi['key'] }}" class="text-xl font-bold text-slate-900 tabular-nums">&mdash;</div>
+            <div id="kpi-{{ $kpi['key'] }}" class="text-2xl font-bold text-slate-900 tabular-nums">&mdash;</div>
             <div id="kpi-{{ $kpi['key'] }}-change" class="text-[11px] mt-1 font-medium"></div>
         </div>
         @endforeach
