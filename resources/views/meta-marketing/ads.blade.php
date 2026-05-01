@@ -333,6 +333,81 @@
     let campaignsData = [];
     let sortField = 'spend';
     let sortAsc = false;
+    let filterStatus = 'ACTIVE';   // ALL | ACTIVE | PAUSED | ARCHIVED
+    let filterQ = '';              // case-insensitive substring on campaign name
+    let searchDebounceTimer = null;
+
+    // === Filter helpers ============================================
+    const VALID_STATUSES = ['ALL', 'ACTIVE', 'PAUSED', 'ARCHIVED'];
+
+    function readFiltersFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const s = (params.get('status') || '').toUpperCase();
+        if (VALID_STATUSES.includes(s)) filterStatus = s;
+        filterQ = params.get('q') || '';
+    }
+
+    function writeFiltersToUrl() {
+        const params = new URLSearchParams(window.location.search);
+        if (filterStatus === 'ACTIVE') params.delete('status'); else params.set('status', filterStatus);
+        if (!filterQ) params.delete('q'); else params.set('q', filterQ);
+        const qs = params.toString();
+        const url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+        window.history.replaceState(null, '', url);
+    }
+
+    // Map raw campaign status to one of the filterable buckets. Anything that
+    // isn't ACTIVE or PAUSED falls into ARCHIVED so unknown values
+    // (DELETED, WITH_ISSUES, etc.) stay reachable via that pill.
+    function normalizeStatus(raw) {
+        const s = (raw || '').toUpperCase();
+        if (s === 'ACTIVE') return 'ACTIVE';
+        if (s === 'PAUSED') return 'PAUSED';
+        return 'ARCHIVED';
+    }
+
+    function getFilteredCampaigns() {
+        const q = filterQ.toLowerCase();
+        return campaignsData.filter(c => {
+            if (filterStatus !== 'ALL' && normalizeStatus(c.status) !== filterStatus) return false;
+            if (q && !(c.name || '').toLowerCase().includes(q)) return false;
+            return true;
+        });
+    }
+
+    function refreshPillCounts() {
+        const counts = { ALL: campaignsData.length, ACTIVE: 0, PAUSED: 0, ARCHIVED: 0 };
+        campaignsData.forEach(c => counts[normalizeStatus(c.status)]++);
+        document.querySelectorAll('[data-pill-count]').forEach(el => {
+            el.textContent = counts[el.getAttribute('data-pill-count')] ?? 0;
+        });
+    }
+
+    function refreshPillActiveStyle() {
+        document.querySelectorAll('.status-pill').forEach(btn => {
+            const isActive = btn.getAttribute('data-status') === filterStatus;
+            btn.classList.toggle('bg-primary-600', isActive);
+            btn.classList.toggle('text-white', isActive);
+            btn.classList.toggle('text-slate-700', !isActive);
+        });
+    }
+
+    function refreshSearchClearButton() {
+        const clear = document.getElementById('campaignSearchClear');
+        if (!clear) return;
+        clear.classList.toggle('hidden', !filterQ);
+    }
+
+    function clearAllFilters() {
+        filterStatus = 'ACTIVE';
+        filterQ = '';
+        const input = document.getElementById('campaignSearch');
+        if (input) input.value = '';
+        writeFiltersToUrl();
+        refreshPillActiveStyle();
+        refreshSearchClearButton();
+        renderCampaigns();
+    }
 
     const baseUrl = '{{ route("marketing.analytics.index") }}';
     const datePresetEl = document.getElementById('datePreset');
@@ -759,18 +834,44 @@
         const { data } = await fetchApi('ads-campaigns', { from, to, platform, ...extra });
         if (gen !== null && gen !== loadGeneration) return;
         campaignsData = data;
+        refreshPillCounts();
         renderCampaigns();
     }
 
     function renderCampaigns() {
         const tbody = document.getElementById('campaignTableBody');
+        const totalCountEl = document.getElementById('campaignTotalCount');
+        const visibleCountEl = document.getElementById('campaignVisibleCount');
+        if (totalCountEl) totalCountEl.textContent = campaignsData.length;
 
         if (!campaignsData.length) {
+            if (visibleCountEl) visibleCountEl.textContent = 0;
             tbody.innerHTML = '<tr><td colspan="13" class="text-center py-8 text-slate-400">Nuk ka të dhëna për këtë periudhë</td></tr>';
             return;
         }
 
-        const sorted = [...campaignsData].sort((a, b) => {
+        const filtered = getFilteredCampaigns();
+        if (visibleCountEl) visibleCountEl.textContent = filtered.length;
+
+        if (!filtered.length) {
+            // Empty-filter state built via DOM API (avoids innerHTML in new code).
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 13;
+            td.className = 'text-center py-8 text-slate-400';
+            td.appendChild(document.createTextNode('Asnjë campaign nuk përputhet me filtrin. '));
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ml-2 text-primary-600 hover:underline font-medium';
+            btn.textContent = 'Pastro filtrat';
+            btn.addEventListener('click', clearAllFilters);
+            td.appendChild(btn);
+            tr.appendChild(td);
+            tbody.replaceChildren(tr);
+            return;
+        }
+
+        const sorted = [...filtered].sort((a, b) => {
             let va = a[sortField], vb = b[sortField];
             if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
             if (sortAsc) return va > vb ? 1 : va < vb ? -1 : 0;
@@ -950,6 +1051,52 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => loadAll());
+    // === Filter wiring ============================================
+    function bindFilterControls() {
+        document.querySelectorAll('.status-pill').forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterStatus = btn.getAttribute('data-status');
+                writeFiltersToUrl();
+                refreshPillActiveStyle();
+                renderCampaigns();
+            });
+        });
+
+        const input = document.getElementById('campaignSearch');
+        const clear = document.getElementById('campaignSearchClear');
+        if (input) {
+            input.value = filterQ;
+            input.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(() => {
+                    filterQ = input.value.trim();
+                    writeFiltersToUrl();
+                    refreshSearchClearButton();
+                    renderCampaigns();
+                }, 200);
+            });
+        }
+        if (clear) {
+            clear.addEventListener('click', () => {
+                if (input) input.value = '';
+                filterQ = '';
+                writeFiltersToUrl();
+                refreshSearchClearButton();
+                renderCampaigns();
+            });
+        }
+
+        refreshPillActiveStyle();
+        refreshSearchClearButton();
+    }
+
+    // Read URL filter state before first render so the initial fetch already
+    // applies the correct filter when data arrives.
+    readFiltersFromUrl();
+
+    document.addEventListener('DOMContentLoaded', () => {
+        bindFilterControls();
+        loadAll();
+    });
 </script>
 @endsection
