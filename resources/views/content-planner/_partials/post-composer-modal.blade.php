@@ -41,11 +41,12 @@
             <div style="width:1px; height:20px; background:#e5e7eb;"></div>
             <button onclick="savePost('draft')" style="height:30px; padding:0 12px; font-size:11px; font-weight:500; border-radius:6px; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; display:inline-flex; align-items:center;">Save draft</button>
             <button onclick="savePost('scheduled')" style="height:30px; padding:0 12px; font-size:11px; font-weight:600; border-radius:6px; border:none; background:#6366f1; color:#fff; cursor:pointer; display:inline-flex; align-items:center;">Schedule</button>
-            {{-- Delete button -- shfaqet vetem per posts ekzistues me status te
-                 paskedulueshem (draft/pending_review/approved). Set ne JS te
-                 loadPostForEditing(). --}}
+            {{-- Delete button -- gjithmone i dukshem kur composer hapet per
+                 nje post ekzistues. Per post te ri (postId=null) fshihet ne
+                 openComposer(). Backend permission gate (CONTENT_PLANNER_DELETE)
+                 vendos perfundimisht; UI shfaq alert nese deshton. --}}
             <button id="composerDeleteBtn" onclick="deletePost()" type="button"
-                style="display:none; height:30px; padding:0 12px; font-size:11px; font-weight:500; border-radius:6px; border:1px solid #fecaca; background:#fff; color:#dc2626; cursor:pointer; align-items:center; gap:5px;"
+                style="display:inline-flex; height:30px; padding:0 12px; font-size:11px; font-weight:500; border-radius:6px; border:1px solid #fecaca; background:#fff; color:#dc2626; cursor:pointer; align-items:center; gap:5px;"
                 onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff'"
                 title="Fshi kete post">
                 <iconify-icon icon="heroicons-outline:trash" width="13"></iconify-icon>
@@ -628,10 +629,10 @@
     function openComposer(postId = null, date = null) {
         composerState = { postId, platforms: [], mediaIds: [], labelIds: [], campaignId: null, contentType: 'post', isEditing: !!postId, mediaItems: [], status: null };
         document.getElementById('postComposerOverlay').style.display = 'block';
-        // Hide delete button by default; loadPostForEditing() do ta shfaqe
-        // nese posti ka status te paskedulueshem (draft/pending_review/approved).
+        // Delete button -- shfaqet vetem kur editojme post ekzistues.
+        // Per post te ri (postId=null) fshihet sepse s'ka cfare te fshish.
         const delBtn = document.getElementById('composerDeleteBtn');
-        if (delBtn) delBtn.style.display = 'none';
+        if (delBtn) delBtn.style.display = postId ? 'inline-flex' : 'none';
         document.getElementById('composerContent').value = '';
         document.getElementById('composerMediaPreview').style.display = 'none';
         document.getElementById('composerMediaEmpty').style.display = 'flex';
@@ -693,17 +694,9 @@
         try {
             const res = await fetch(`{{ url('/marketing/planner/api/posts') }}/${postId}`);
             const post = await res.json();
-            // Save status + show delete button.
-            // Filtri me i lehtesuar -- shfaqet per cdo post qe NUK eshte
-            // ne nje terminale state (scheduled/publishing/published/failed)
-            // qe te kapim te gjitha rastet draft/pending_review/approved/etj.
-            // Backend permission gate (CONTENT_PLANNER_DELETE) vendos perfundimisht.
+            // Save status (delete button-i tashme i dukshem nga openComposer
+            // sepse postId eshte set; backend gate-on permission-in CONTENT_PLANNER_DELETE).
             composerState.status = post.status || null;
-            const delBtn = document.getElementById('composerDeleteBtn');
-            const noDeleteStatuses = ['scheduled', 'publishing', 'published', 'failed'];
-            if (delBtn && !noDeleteStatuses.includes(post.status)) {
-                delBtn.style.display = 'inline-flex';
-            }
             document.getElementById('composerContent').value = post.content || '';
             setScheduleInputs(post.scheduled_at ? post.scheduled_at.slice(0, 16) : '');
             if (post.content_type) switchContentType(post.content_type);
