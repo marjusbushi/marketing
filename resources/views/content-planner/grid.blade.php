@@ -392,7 +392,7 @@
         event.stopPropagation();
         if (!confirm('Të hiqet ky story?')) return;
         try {
-            const url = `{{ url('/marketing/api/posts') }}/${encodeURIComponent(postId)}`;
+            const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
             const res = await fetch(url, {
                 method: 'DELETE',
                 headers: {

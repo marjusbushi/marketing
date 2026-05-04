@@ -41,6 +41,16 @@
             <div style="width:1px; height:20px; background:#e5e7eb;"></div>
             <button onclick="savePost('draft')" style="height:30px; padding:0 12px; font-size:11px; font-weight:500; border-radius:6px; border:1px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; display:inline-flex; align-items:center;">Save draft</button>
             <button onclick="savePost('scheduled')" style="height:30px; padding:0 12px; font-size:11px; font-weight:600; border-radius:6px; border:none; background:#6366f1; color:#fff; cursor:pointer; display:inline-flex; align-items:center;">Schedule</button>
+            {{-- Delete button -- shfaqet vetem per posts ekzistues me status te
+                 paskedulueshem (draft/pending_review/approved). Set ne JS te
+                 loadPostForEditing(). --}}
+            <button id="composerDeleteBtn" onclick="deletePost()" type="button"
+                style="display:none; height:30px; padding:0 12px; font-size:11px; font-weight:500; border-radius:6px; border:1px solid #fecaca; background:#fff; color:#dc2626; cursor:pointer; align-items:center; gap:5px;"
+                onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff'"
+                title="Fshi kete post">
+                <iconify-icon icon="heroicons-outline:trash" width="13"></iconify-icon>
+                Fshi
+            </button>
             <div style="width:1px; height:20px; background:#e5e7eb;"></div>
             <button onclick="closeComposer()" style="width:30px; height:30px; border:none; background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:6px;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">
                 <iconify-icon icon="heroicons-outline:x-mark" width="18" style="color:#94a3b8;"></iconify-icon>
@@ -616,8 +626,12 @@
 
     // ── Open / Close ──
     function openComposer(postId = null, date = null) {
-        composerState = { postId, platforms: [], mediaIds: [], labelIds: [], campaignId: null, contentType: 'post', isEditing: !!postId, mediaItems: [] };
+        composerState = { postId, platforms: [], mediaIds: [], labelIds: [], campaignId: null, contentType: 'post', isEditing: !!postId, mediaItems: [], status: null };
         document.getElementById('postComposerOverlay').style.display = 'block';
+        // Hide delete button by default; loadPostForEditing() do ta shfaqe
+        // nese posti ka status te paskedulueshem (draft/pending_review/approved).
+        const delBtn = document.getElementById('composerDeleteBtn');
+        if (delBtn) delBtn.style.display = 'none';
         document.getElementById('composerContent').value = '';
         document.getElementById('composerMediaPreview').style.display = 'none';
         document.getElementById('composerMediaEmpty').style.display = 'flex';
@@ -646,11 +660,45 @@
         document.getElementById('postComposerOverlay').style.display = 'none';
     }
 
+    // ── Delete Post ──
+    // I aksesueshem permes butonit "Fshi" ne header-in e composer-it.
+    // Backend (DELETE /marketing/planner/api/posts/{id}) gating-on perms
+    // (CONTENT_PLANNER_DELETE) -- por UI gjithashtu e fsheh butonin per
+    // posts qe nuk lejohen (scheduled/published/failed) qe te shmangim
+    // confusion. Pas DELETE-it: closeComposer + refreshGrid (nese funksioni
+    // ekziston, p.sh. te grid view) ose location.reload().
+    async function deletePost() {
+        if (!composerState.postId) return;
+        if (!confirm('Te hiqet ky post? Ky veprim nuk mund te zhbehet.')) return;
+        try {
+            const res = await fetch(`{{ url('/marketing/planner/api/posts') }}/${composerState.postId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                },
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            closeComposer();
+            if (typeof refreshGrid === 'function') refreshGrid();
+            else if (typeof window.fc?.refetchEvents === 'function') window.fc.refetchEvents();
+            else window.location.reload();
+        } catch (err) {
+            alert('Fshirja deshtoi: ' + err.message);
+        }
+    }
+
     // ── Load Post ──
     async function loadPostForEditing(postId) {
         try {
             const res = await fetch(`{{ url('/marketing/planner/api/posts') }}/${postId}`);
             const post = await res.json();
+            // Save status + show delete button kur lejohet
+            composerState.status = post.status || null;
+            const delBtn = document.getElementById('composerDeleteBtn');
+            if (delBtn && ['draft', 'pending_review', 'approved'].includes(post.status)) {
+                delBtn.style.display = 'inline-flex';
+            }
             document.getElementById('composerContent').value = post.content || '';
             setScheduleInputs(post.scheduled_at ? post.scheduled_at.slice(0, 16) : '');
             if (post.content_type) switchContentType(post.content_type);
