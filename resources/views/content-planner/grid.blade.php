@@ -906,20 +906,41 @@
         });
         applyCaptionCap();
 
-        // Metrics — external only
+        // Metrics — show all available. Conditionally render only metrics
+        // qe kane vlere te ngarkuar (skip null/undefined) qe te shmangim
+        // klutter te card-eve "—". Engagement rate llogaritet local nga
+        // (likes + comments + shares + saves) / reach * 100.
         const metricsSec = document.getElementById('pdMetricsSection');
         const metricsGrid = document.getElementById('pdMetricsGrid');
         while (metricsGrid.firstChild) metricsGrid.removeChild(metricsGrid.firstChild);
-        // Show metrics for any post that has them (external + published planned).
         if (p.metrics) {
             metricsSec.style.display = '';
             const m = p.metrics;
-            const cells = [
-                { v: fmtNum(m.reach),    l: 'Reach' },
-                { v: fmtNum(m.likes),    l: 'Likes' },
-                { v: fmtNum(m.comments), l: 'Comments' },
-                { v: fmtNum(m.shares || m.saves), l: (m.shares ? 'Shares' : 'Saves') },
+            // Renditje sipas rendesise: discovery (reach/impressions) ->
+            // video performance -> engagement (likes/comments/shares/saves)
+            // -> conversions (clicks) -> derived (engagement rate).
+            const candidates = [
+                ['reach',        'Reach'],
+                ['impressions',  'Impressions'],
+                ['video_views',  'Video views'],
+                ['plays',        'Plays'],
+                ['likes',        'Likes'],
+                ['comments',     'Comments'],
+                ['shares',       'Shares'],
+                ['saves',        'Saves'],
+                ['clicks',       'Clicks'],
             ];
+            const cells = candidates
+                .filter(([key]) => m[key] !== null && m[key] !== undefined)
+                .map(([key, label]) => ({ v: fmtNum(m[key]), l: label }));
+
+            // Engagement rate -- vetem kur reach > 0 dhe ka pakten nje sinjal engagement.
+            const engagementSum = (m.likes || 0) + (m.comments || 0) + (m.shares || 0) + (m.saves || 0);
+            if ((m.reach || 0) > 0 && engagementSum > 0) {
+                const er = (engagementSum / m.reach) * 100;
+                cells.push({ v: er.toFixed(1) + '%', l: 'Engagement' });
+            }
+
             cells.forEach(c => {
                 const cell = document.createElement('div');
                 cell.className = 'pd-metric';
