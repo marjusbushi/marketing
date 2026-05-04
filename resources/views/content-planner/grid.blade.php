@@ -1132,7 +1132,7 @@
 
         preview.media.forEach((m) => {
             const slide = document.createElement('div');
-            slide.style.cssText = 'flex:0 0 100%;width:100%;display:flex;align-items:center;justify-content:center;';
+            slide.style.cssText = 'flex:0 0 100%;width:100%;display:flex;align-items:center;justify-content:center;position:relative;';
             const isVideo = (m.mime_type || '').startsWith('video/');
             const el = document.createElement(isVideo ? 'video' : 'img');
             el.src = m.url || m.thumbnail_url || '';
@@ -1151,6 +1151,39 @@
                 el.draggable = false;
             }
             slide.appendChild(el);
+
+            // Play overlay per Reels/video posts -- klik hap permalink-un ne
+            // tab te ri. Shfaqet vetem kur posti eshte video DHE ka permalink.
+            // Ndertuar me createElementNS per SVG (jo innerHTML) -- sigurt nga XSS.
+            if (!isVideo && preview.isVideoPost && preview.permalink) {
+                const playBtn = document.createElement('a');
+                playBtn.href = preview.permalink;
+                playBtn.target = '_blank';
+                playBtn.rel = 'noopener noreferrer';
+                playBtn.title = 'Hap ne Instagram per ta luajtur';
+                playBtn.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;background:rgba(0,0,0,0.0);transition:background 0.15s;';
+
+                const playIcon = document.createElement('div');
+                playIcon.style.cssText = 'width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.92);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.3);transition:transform 0.15s;';
+
+                const SVG_NS = 'http://www.w3.org/2000/svg';
+                const svg = document.createElementNS(SVG_NS, 'svg');
+                svg.setAttribute('width', '32');
+                svg.setAttribute('height', '32');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('fill', '#18181b');
+                const path = document.createElementNS(SVG_NS, 'path');
+                path.setAttribute('d', 'M8 5v14l11-7z');
+                svg.appendChild(path);
+                playIcon.appendChild(svg);
+
+                playBtn.onmouseover = () => { playBtn.style.background = 'rgba(0,0,0,0.25)'; playIcon.style.transform = 'scale(1.05)'; };
+                playBtn.onmouseout = () => { playBtn.style.background = 'rgba(0,0,0,0.0)'; playIcon.style.transform = 'scale(1)'; };
+
+                playBtn.appendChild(playIcon);
+                slide.appendChild(playBtn);
+            }
+
             track.appendChild(slide);
         });
 
