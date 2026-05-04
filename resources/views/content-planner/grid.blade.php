@@ -830,9 +830,10 @@
                 // nga meta_post_insights -- API e ka tashme te mbushur. Para
                 // rregullimit, normalisePlanned i hidhte poshte (metrics:null).
                 metrics: data.metrics || null,
-                permalink: data.permalink || null,
+                permalink: data.permalink || p.permalink || null,
                 scheduled_at: scheduled,
                 content_type: data.content_type || p.content_type || null,
+                meta_post_type: data.meta_post_type || p.meta_post_type || null,
             },
         };
     }
@@ -988,16 +989,33 @@
             : 'Multi';
     }
 
+    // Detection prioritet: content_type / meta_post_type (vijne nga DB) jane
+    // me te besueshme se mime_type i media-s, sepse ContentMedia per Reels
+    // ruan thumbnail JPG (video file vete s'eshte downloaded).
+    function isVideoPost(p) {
+        const ct = (p.content_type || '').toLowerCase();
+        const mt = (p.meta_post_type || '').toLowerCase();
+        if (ct === 'reel' || ct === 'video') return true;
+        if (mt === 'reel' || mt === 'video') return true;
+        return !!(p.is_video || p.has_video);
+    }
+
+    function isCarouselPost(p, count) {
+        const ct = (p.content_type || '').toLowerCase();
+        const mt = (p.meta_post_type || '').toLowerCase();
+        return ct === 'carousel' || mt === 'carousel_album' || count > 1;
+    }
+
     function postTypeFromMedia(p) {
-        if (p.is_video || p.has_video) return 'Reel';
+        if (isVideoPost(p)) return 'Reel';
         const count = Number(p.media_count || (p.media_items ? p.media_items.length : 0));
-        if (count > 1) return 'Carousel';
+        if (isCarouselPost(p, count)) return 'Carousel';
         return 'Foto';
     }
 
     function formatMediaTypeLabel(p, count) {
-        if (p.is_video || p.has_video) return 'Reel';
-        if (count > 1) return 'Carousel · ' + count;
+        if (isVideoPost(p)) return 'Reel';
+        if (isCarouselPost(p, count)) return 'Carousel · ' + count;
         return 'Foto';
     }
 
