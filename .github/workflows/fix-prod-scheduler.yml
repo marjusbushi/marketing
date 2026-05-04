@@ -1,0 +1,85 @@
+name: Fix Prod Scheduler + Backfill Sync
+
+# Aktivizon cron entry idempotent ne server-in prod (Hetzner) dhe nis nje
+# round backfill ne sfond me nohup. SSH-i kthehet brenda ~30s qe te shmange
+# timeout-in (default 10min i appleboy/ssh-action) — sync-i vazhdon ne server
+# pavaresisht nese GitHub Action mbaron.
+#
+# Triggerohet automatikisht kur ky file ndryshon (push), ose me dore me
+# `gh workflow run "Fix Prod Scheduler + Backfill Sync"`.
+#
+# Security note: ky workflow nuk lexon hyrje nga github.event.* ose nga PR/
+# commit messages — perdor vetem secrets dhe APP_PATH env. Pa rrezik
+# command injection.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-prod-scheduler.yml'
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Activate cron + kick off sync (SSH returns fast)
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          command_timeout: 4m
+          script: |
+            set -e
+            cd "$APP_PATH"
+
+            echo "=== STEP 1: Crontab BEFORE ==="
+            crontab -l 2>/dev/null || echo "(crontab i zbrazet)"
+
+            echo ""
+            echo "=== STEP 2: Add cron entry (idempotent) ==="
+            CRON_LINE="* * * * * cd $APP_PATH && php artisan schedule:run >> /dev/null 2>&1"
+            (crontab -l 2>/dev/null | grep -vF "schedule:run"; echo "$CRON_LINE") | crontab -
+
+            echo ""
+            echo "=== STEP 3: Crontab AFTER ==="
+            crontab -l 2>/dev/null
+
+            echo ""
+            echo "=== STEP 4: Verifiko qe cron daemon eshte aktiv ==="
+            (systemctl is-active cron 2>/dev/null && echo "cron: active") || \
+              (systemctl is-active crond 2>/dev/null && echo "crond: active") || \
+              echo "WARN: cron/crond service NOT active"
+
+            echo ""
+            echo "=== STEP 5: Token + last sync state ==="
+            php artisan tinker --no-interaction --execute='echo "page_token=".(config("meta.page_token") ? "SET (len ".strlen(config("meta.page_token")).")" : "EMPTY").PHP_EOL; echo "system_user_token=".(config("meta.token") ? "SET (len ".strlen(config("meta.token")).")" : "EMPTY").PHP_EOL;'
+            php artisan tinker --no-interaction --execute='try { $r = DB::connection("dis")->table("meta_sync_logs")->orderByDesc("id")->first(); echo $r ? "last_sync_log: id=$r->id type=$r->sync_type data=$r->data_type status=$r->status rec=$r->records_synced at=$r->created_at" : "meta_sync_logs EMPTY"; } catch (Throwable $e) { echo "EXC: ".$e->getMessage(); } echo PHP_EOL;'
+
+            echo ""
+            echo "=== STEP 6: Queue worker status ==="
+            (pgrep -f "queue:work" -a 2>/dev/null || echo "(asnje proces queue:work)")
+            (systemctl list-units --type=service --state=running 2>/dev/null | grep -iE "queue|laravel|horizon" | head -5 || true)
+            (supervisorctl status 2>/dev/null | head -10 || echo "(supervisor s'ka access ose s'ka konfigurim)")
+
+            echo ""
+            echo "=== STEP 7: Kick off backfill batch in background ==="
+            mkdir -p storage/logs/cron-fix
+            STAMP=$(date -u +%Y%m%d-%H%M%S)
+            BG_LOG="storage/logs/cron-fix/batch-$STAMP.log"
+            nohup bash -lc "set -x; cd '$APP_PATH'; php artisan content-planner:import-feed; php artisan meta:sync --type=ig; php artisan meta:sync --type=page; php artisan meta:sync --type=messaging; php artisan meta:sync --type=posts; echo BATCH_DONE" > "$BG_LOG" 2>&1 &
+            BG_PID=$!
+            disown 2>/dev/null || true
+            echo "Background batch PID=$BG_PID, log=$BG_LOG"
+            sleep 4
+            echo ""
+            echo "Procese php artisan aktive ne kete moment:"
+            pgrep -f "php artisan" -a | head -10 || echo "(asnje php artisan ende)"
+
+            echo ""
+            echo "=== DONE ==="
+            echo "Cron eshte aktiv. Sync-i vazhdon ne sfond."
