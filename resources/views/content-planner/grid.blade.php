@@ -158,46 +158,45 @@
     .pd-caption-wrap.is-capped + .pd-caption-hint { display: inline-flex; }
     .pd-hashtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
     .pd-hashtag { background: rgba(109,40,217,0.1); color: #6d28d9; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-    /* Performance metrics — IG Insights mobile-style: list rows me ikone
-       te vogel + label majtas, numer i madh djathtas, ndarje subtile.
-       Pa card boxes, pa color noise -- vetem hierarki tipografike. */
+    /* Performance metrics — IG Insights mobile-style: list rows kompakte
+       me ikone te vogel + label majtas, numer djathtas, ndarje subtile. */
     .pd-metrics { display: flex; flex-direction: column; gap: 0; }
     .pd-metric {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 13px 2px;
+        padding: 8px 2px;
         border-bottom: 1px solid #f1f5f9;
     }
     .pd-metric:last-child { border-bottom: none; }
     .pd-metric .label-group {
-        display: flex; align-items: center; gap: 10px;
+        display: flex; align-items: center; gap: 8px;
         min-width: 0; flex: 1;
     }
     .pd-metric .icon {
         flex-shrink: 0;
-        width: 18px; height: 18px;
+        width: 14px; height: 14px;
         display: flex; align-items: center; justify-content: center;
         color: #94a3b8;
     }
     .pd-metric .l {
-        font-size: 13px; color: #334155; font-weight: 500;
+        font-size: 12px; color: #475569; font-weight: 500;
         letter-spacing: 0; text-transform: none;
         margin: 0;
     }
     .pd-metric .v {
-        font-size: 17px; font-weight: 700; color: #0f172a;
+        font-size: 14px; font-weight: 700; color: #0f172a;
         letter-spacing: -0.01em; line-height: 1;
         font-feature-settings: 'tnum' 1, 'lnum' 1;
         flex-shrink: 0;
     }
-    /* Engagement rate -- ndarje me theksuar, ngjyre brand subtle ne numer. */
+    /* Engagement rate -- ndarje me theksuar, brand color ne numer. */
     .pd-metric.derived {
-        margin-top: 6px;
-        padding-top: 14px;
+        margin-top: 4px;
+        padding-top: 10px;
         border-top: 1px solid #e2e8f0;
         border-bottom: none;
     }
-    .pd-metric.derived .l { color: #475569; font-weight: 600; }
-    .pd-metric.derived .v { color: #6366f1; font-size: 19px; }
+    .pd-metric.derived .l { color: #334155; font-weight: 600; }
+    .pd-metric.derived .v { color: #6366f1; font-size: 15px; }
     .pd-metric.derived .icon { color: #6366f1; }
     .pd-kv-list { display: flex; flex-direction: column; gap: 6px; }
     .pd-kv { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #e4e4e7; }
@@ -1003,7 +1002,7 @@
                 iconWrap.className = 'icon';
                 const iconEl = document.createElement('iconify-icon');
                 iconEl.setAttribute('icon', c.icon);
-                iconEl.setAttribute('width', '16');
+                iconEl.setAttribute('width', '13');
                 iconWrap.appendChild(iconEl);
                 const l = document.createElement('div');
                 l.className = 'l';
