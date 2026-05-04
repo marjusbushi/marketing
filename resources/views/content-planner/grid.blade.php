@@ -158,10 +158,31 @@
     .pd-caption-wrap.is-capped + .pd-caption-hint { display: inline-flex; }
     .pd-hashtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
     .pd-hashtag { background: rgba(109,40,217,0.1); color: #6d28d9; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-    .pd-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .pd-metric { background: #fafafa; border: 1px solid #e4e4e7; border-radius: 7px; padding: 10px; text-align: center; }
-    .pd-metric .v { font-size: 16px; font-weight: 700; color: #18181b; }
-    .pd-metric .l { font-size: 10px; color: #52525b; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+    /* Performance metrics — auto-fit grid qe te mos kete celula bosh ne fund.
+       Cdo card me ikone te vogel + numer i madh + label. Tone subtile per
+       kategori (discovery/video/engagement/conversion) qe te kete grupim
+       vizual pa hierarchi te ngarkuar. */
+    .pd-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+    .pd-metric {
+        background: #fff; border: 1px solid #e4e4e7; border-radius: 10px;
+        padding: 12px 12px 11px; position: relative; overflow: hidden;
+        transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .pd-metric:hover { border-color: #c7c7cd; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .pd-metric .icon {
+        position: absolute; top: 10px; right: 10px; opacity: 0.55;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .pd-metric .v { font-size: 18px; font-weight: 700; color: #18181b; line-height: 1.1; letter-spacing: -0.01em; }
+    .pd-metric .l { font-size: 10px; color: #71717a; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
+    /* Color-code by category — only the icon, ndaj numri mbetet i lexueshem. */
+    .pd-metric.discovery  .icon { color: #6366f1; }
+    .pd-metric.video      .icon { color: #ec4899; }
+    .pd-metric.engagement .icon { color: #ef4444; }
+    .pd-metric.conversion .icon { color: #10b981; }
+    .pd-metric.derived    .icon { color: #f59e0b; }
+    /* Highlight derived (engagement %) -- me ngjyre te lehte bg dhe border. */
+    .pd-metric.derived { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a; }
     .pd-kv-list { display: flex; flex-direction: column; gap: 6px; }
     .pd-kv { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #e4e4e7; }
     .pd-kv:last-child { border-bottom: none; }
@@ -916,34 +937,40 @@
         if (p.metrics) {
             metricsSec.style.display = '';
             const m = p.metrics;
-            // Renditje sipas rendesise: discovery (reach/impressions) ->
-            // video performance -> engagement (likes/comments/shares/saves)
-            // -> conversions (clicks) -> derived (engagement rate).
+            // [key, label, category, iconify-icon]. Renditja: discovery ->
+            // video -> engagement -> conversion -> derived.
             const candidates = [
-                ['reach',        'Reach'],
-                ['impressions',  'Impressions'],
-                ['video_views',  'Video views'],
-                ['plays',        'Plays'],
-                ['likes',        'Likes'],
-                ['comments',     'Comments'],
-                ['shares',       'Shares'],
-                ['saves',        'Saves'],
-                ['clicks',       'Clicks'],
+                ['reach',        'Reach',        'discovery',  'heroicons-outline:eye'],
+                ['impressions',  'Impressions',  'discovery',  'heroicons-outline:rectangle-stack'],
+                ['video_views',  'Video views',  'video',      'heroicons-outline:play-circle'],
+                ['plays',        'Plays',        'video',      'heroicons-outline:forward'],
+                ['likes',        'Likes',        'engagement', 'heroicons-outline:heart'],
+                ['comments',     'Comments',     'engagement', 'heroicons-outline:chat-bubble-left-ellipsis'],
+                ['shares',       'Shares',       'engagement', 'heroicons-outline:share'],
+                ['saves',        'Saves',        'engagement', 'heroicons-outline:bookmark'],
+                ['clicks',       'Clicks',       'conversion', 'heroicons-outline:cursor-arrow-rays'],
             ];
             const cells = candidates
                 .filter(([key]) => m[key] !== null && m[key] !== undefined)
-                .map(([key, label]) => ({ v: fmtNum(m[key]), l: label }));
+                .map(([key, label, cat, icon]) => ({ v: fmtNum(m[key]), l: label, cat, icon }));
 
             // Engagement rate -- vetem kur reach > 0 dhe ka pakten nje sinjal engagement.
             const engagementSum = (m.likes || 0) + (m.comments || 0) + (m.shares || 0) + (m.saves || 0);
             if ((m.reach || 0) > 0 && engagementSum > 0) {
                 const er = (engagementSum / m.reach) * 100;
-                cells.push({ v: er.toFixed(1) + '%', l: 'Engagement' });
+                cells.push({ v: er.toFixed(1) + '%', l: 'Engagement', cat: 'derived', icon: 'heroicons-outline:bolt' });
             }
 
             cells.forEach(c => {
                 const cell = document.createElement('div');
-                cell.className = 'pd-metric';
+                cell.className = 'pd-metric ' + (c.cat || '');
+                const iconWrap = document.createElement('span');
+                iconWrap.className = 'icon';
+                const iconEl = document.createElement('iconify-icon');
+                iconEl.setAttribute('icon', c.icon);
+                iconEl.setAttribute('width', '14');
+                iconWrap.appendChild(iconEl);
+                cell.appendChild(iconWrap);
                 const v = document.createElement('div'); v.className = 'v'; v.textContent = c.v;
                 const l = document.createElement('div'); l.className = 'l'; l.textContent = c.l;
                 cell.appendChild(v); cell.appendChild(l);
