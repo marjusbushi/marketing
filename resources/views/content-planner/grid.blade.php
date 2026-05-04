@@ -158,31 +158,48 @@
     .pd-caption-wrap.is-capped + .pd-caption-hint { display: inline-flex; }
     .pd-hashtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
     .pd-hashtag { background: rgba(109,40,217,0.1); color: #6d28d9; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-    /* Performance metrics — auto-fit grid qe te mos kete celula bosh ne fund.
-       Cdo card me ikone te vogel + numer i madh + label. Tone subtile per
-       kategori (discovery/video/engagement/conversion) qe te kete grupim
-       vizual pa hierarchi te ngarkuar. */
-    .pd-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+    /* Performance metrics — Instagram-style: pa card boxes, layout i pastër
+       me dy kolona, numra te medhenj, labels te buta. Engagement rate
+       merr nje row te plote ne fund me theks special. */
+    .pd-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; }
     .pd-metric {
-        background: #fff; border: 1px solid #e4e4e7; border-radius: 10px;
-        padding: 12px 12px 11px; position: relative; overflow: hidden;
-        transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+        padding: 14px 0;
+        border-bottom: 1px solid #f1f5f9;
+        position: relative;
     }
-    .pd-metric:hover { border-color: #c7c7cd; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    .pd-metric .icon {
-        position: absolute; top: 10px; right: 10px; opacity: 0.55;
-        display: flex; align-items: center; justify-content: center;
+    /* Cdo metric e dyte (e djathta) ka padding-left qe te krijoje ndarje
+       vertikal ne mes te dy kolonave. Ndarja vetem visual, jo border. */
+    .pd-metric:nth-child(2n) { padding-left: 16px; }
+    .pd-metric:nth-child(2n+1) { padding-right: 16px; }
+    /* Heq border-bottom-in nga 2 rreshtat e fundit te grid-it. Per shkak
+       qe nuk dimë permasat, perdor :nth-last-child(-n+2) qe te kapim 2 te
+       fundit. */
+    .pd-metric:nth-last-child(-n+2) { border-bottom: none; }
+    .pd-metric .v {
+        font-size: 24px; font-weight: 700; color: #0f172a;
+        line-height: 1.1; letter-spacing: -0.02em;
+        font-feature-settings: 'tnum' 1, 'lnum' 1;
     }
-    .pd-metric .v { font-size: 18px; font-weight: 700; color: #18181b; line-height: 1.1; letter-spacing: -0.01em; }
-    .pd-metric .l { font-size: 10px; color: #71717a; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; }
-    /* Color-code by category — only the icon, ndaj numri mbetet i lexueshem. */
-    .pd-metric.discovery  .icon { color: #6366f1; }
-    .pd-metric.video      .icon { color: #ec4899; }
-    .pd-metric.engagement .icon { color: #ef4444; }
-    .pd-metric.conversion .icon { color: #10b981; }
-    .pd-metric.derived    .icon { color: #f59e0b; }
-    /* Highlight derived (engagement %) -- me ngjyre te lehte bg dhe border. */
-    .pd-metric.derived { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fde68a; }
+    .pd-metric .l {
+        font-size: 11px; color: #94a3b8; margin-top: 4px;
+        text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500;
+    }
+    /* Engagement rate — KPI derivuar, full-width row me theks. Merr klasë
+       `derived` ne JS dhe bllokon nth-child layout-in. */
+    .pd-metric.derived {
+        grid-column: 1 / -1;
+        margin-top: 10px;
+        padding: 14px 16px;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-radius: 10px;
+        border-bottom: none;
+        display: flex; align-items: center; justify-content: space-between;
+    }
+    .pd-metric.derived .v { font-size: 26px; color: #92400e; }
+    .pd-metric.derived .l { color: #b45309; margin-top: 0; font-weight: 600; }
+    /* Hide ikonat ne stil IG (s'i perdor nativisht). E ruajme ne DOM por jo
+       te dukshme, ne rast se duhet ti rikthejme. */
+    .pd-metric .icon { display: none; }
     .pd-kv-list { display: flex; flex-direction: column; gap: 6px; }
     .pd-kv { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #e4e4e7; }
     .pd-kv:last-child { border-bottom: none; }
