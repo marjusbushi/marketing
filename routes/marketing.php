@@ -317,6 +317,14 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->name('api.posts.media.destroy');
     });
 
+    // ─── Settings hub ───────────────────────────────
+    // Hub me 4 cards (Visual Studio, Brand Kit, Meta Auth, TikTok Auth)
+    // qe perdoruesi e arrin nga dropdown te user profile box ne sidebar.
+    // Cards filtrohet me @can per cdo perm — user-i pa permission s'e sheh.
+    Route::get('/settings', function () {
+        return view('marketing.settings.index');
+    })->name('settings.index');
+
     // ─── Visual Studio: Brand Kit ───────────────────
     Route::prefix('settings/brand-kit')
         ->as('settings.brand-kit.')

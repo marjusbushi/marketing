@@ -70,10 +70,8 @@
                 <span class="sidebar-label">Shporta Ditore</span>
             </a>
 
-            <a href="{{ route('marketing.studio.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.studio.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Visual Studio">
-                <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" /></svg>
-                <span class="sidebar-label">Visual Studio</span>
-            </a>
+            {{-- Visual Studio, Brand Kit, Meta Auth, TikTok Auth jane levizur
+                 ne Settings hub (klik ne user profile box ne fund). --}}
 
             <a href="{{ route('marketing.planner.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ (request()->routeIs('marketing.planner.*') && !request()->routeIs('marketing.planner.media')) ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Content Planner">
                 <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" /></svg>
@@ -83,11 +81,6 @@
             <a href="{{ route('marketing.planner.media') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.planner.media') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Media Library">
                 <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
                 <span class="sidebar-label">Media</span>
-            </a>
-
-            <a href="{{ route('marketing.settings.brand-kit.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.settings.brand-kit.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Brand Kit">
-                <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.098 19.902a3.75 3.75 0 005.304 0l6.401-6.402M6.75 21A3.75 3.75 0 013 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072m-6.402 11.705L19.5 4.5m0 0h-5.25M19.5 4.5v5.25" /></svg>
-                <span class="sidebar-label">Brand Kit</span>
             </a>
 
             {{-- ───────────── Influencer section ─────────────
@@ -144,23 +137,16 @@
                 </div>
             @endif
 
-            <div class="h-2"></div>
             {{-- ───────────── end Influencer section ───────────── --}}
-
-            <a href="{{ route('marketing.meta-auth.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.meta-auth.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="Meta Auth">
-                <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" /></svg>
-                <span class="sidebar-label">Meta Auth</span>
-            </a>
-
-            <a href="{{ route('marketing.tiktok-auth.index') }}" class="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-150 {{ request()->routeIs('marketing.tiktok-auth.*') ? 'bg-sidebar-active text-sidebar-text-active font-medium' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active' }}" title="TikTok Auth">
-                <svg class="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg>
-                <span class="sidebar-label">TikTok Auth</span>
-            </a>
         </nav>
 
-        {{-- User footer --}}
-        <div class="border-t border-slate-100 p-4">
-            <div class="flex items-center gap-3">
+        {{-- User footer me dropdown — Settings + Dil --}}
+        <div class="border-t border-slate-100 p-3 relative" id="userMenuWrap">
+            <button type="button"
+                    id="userMenuTrigger"
+                    onclick="document.getElementById('userMenuPanel').classList.toggle('hidden')"
+                    class="w-full flex items-center gap-3 p-1.5 rounded-lg hover:bg-sidebar-hover transition-colors text-left"
+                    title="Klik per Settings ose Dil">
                 <div class="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-semibold shrink-0">
                     {{ auth()->user()->initials }}
                 </div>
@@ -168,10 +154,24 @@
                     <div class="text-sm font-medium text-slate-900 truncate">{{ auth()->user()->full_name }}</div>
                     <div class="text-[11px] text-sidebar-text truncate">{{ auth()->user()->email }}</div>
                 </div>
+                <svg class="w-3.5 h-3.5 text-sidebar-text sidebar-label shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
+                </svg>
+            </button>
+
+            <div id="userMenuPanel" class="hidden absolute bottom-full left-3 right-3 mb-2 bg-white rounded-xl border border-slate-200 shadow-xl py-1.5 z-50">
+                <a href="{{ route('marketing.settings.index') }}"
+                   class="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                    <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a6.759 6.759 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Settings
+                </a>
+                <div class="my-1 border-t border-slate-100"></div>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button type="submit" class="p-1.5 rounded-md text-sidebar-text hover:text-slate-900 hover:bg-sidebar-hover transition-colors" title="Dil">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+                    <button type="submit"
+                            class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+                        Dil
                     </button>
                 </form>
             </div>
@@ -282,11 +282,15 @@
         @if(session('success')) toastr.success('{{ session('success') }}'); @endif
         @if(session('error')) toastr.error('{{ session('error') }}'); @endif
 
-        // View switcher — close on outside click
+        // View switcher + User menu — close on outside click
         document.addEventListener('click', function(e) {
             const wrap = document.getElementById('viewSwitcherWrap');
             const panel = document.getElementById('viewSwitcherPanel');
             if (wrap && panel && !wrap.contains(e.target)) panel.classList.add('hidden');
+
+            const userWrap = document.getElementById('userMenuWrap');
+            const userPanel = document.getElementById('userMenuPanel');
+            if (userWrap && userPanel && !userWrap.contains(e.target)) userPanel.classList.add('hidden');
         });
 
         // Sidebar collapse/expand
