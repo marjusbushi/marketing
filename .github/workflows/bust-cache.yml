@@ -1,0 +1,68 @@
+name: Bust Cache
+
+# Force cache bust ne prod -- thirret kur ndryshimet e Blade s'shfaqen
+# pas deploy-it (mundesi: php-fpm OPcache, view cache i vjeter, etj.).
+# Pa rrezik command injection -- vetem secrets dhe APP_PATH env.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/bust-cache.yml'
+  workflow_dispatch:
+
+jobs:
+  bust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify deployed code + bust caches
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          command_timeout: 3m
+          script: |
+            set +e
+            cd "$APP_PATH"
+
+            echo "=== git HEAD ==="
+            git log -1 --oneline
+
+            echo ""
+            echo "=== Verify composerDeleteBtn ne composer file ==="
+            grep -n "composerDeleteBtn" resources/views/content-planner/_partials/post-composer-modal.blade.php | head -5
+            echo ""
+            grep -n "function deletePost" resources/views/content-planner/_partials/post-composer-modal.blade.php | head -3
+
+            echo ""
+            echo "=== Verify deleteStory URL ne grid file ==="
+            grep -n "marketing.*api/posts" resources/views/content-planner/grid.blade.php | head -5
+
+            echo ""
+            echo "=== Bust caches ==="
+            php artisan optimize:clear 2>&1 | tail -3
+            php artisan config:cache 2>&1 | tail -2
+            php artisan route:cache 2>&1 | tail -2
+            php artisan view:cache 2>&1 | tail -2
+
+            echo ""
+            echo "=== Try reload php-fpm (may skip without sudo) ==="
+            sudo -n systemctl reload php8.4-fpm 2>/dev/null && echo "php-fpm 8.4 reloaded" || \
+              sudo -n systemctl reload php-fpm 2>/dev/null && echo "php-fpm reloaded" || \
+              echo "(reload skipped: no sudo)"
+
+            echo ""
+            echo "=== Touch composer view to bust OPcache via mtime ==="
+            touch resources/views/content-planner/_partials/post-composer-modal.blade.php
+            touch resources/views/content-planner/grid.blade.php
+
+            echo ""
+            echo "=== queue:restart ==="
+            php artisan queue:restart 2>&1 | tail -2
+
+            echo ""
+            echo "=== DONE ==="
