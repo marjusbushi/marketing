@@ -808,6 +808,12 @@
     function normalisePlanned(data, cached) {
         const p = (cached && cached.extendedProps) || {};
         const scheduled = data.scheduled_at || p.scheduled_at || null;
+        const mediaItems = (data.media || []).map(m => ({
+            url: m.url || m.thumbnail_url || '',
+            thumbnail: m.thumbnail_url || m.url || '',
+            is_video: (m.mime_type || '').startsWith('video/'),
+        }));
+        const hasVideo = mediaItems.some(m => m.is_video);
         return {
             id: (cached && cached.id) || data.id,
             extendedProps: {
@@ -816,14 +822,17 @@
                 status: p.status || data.status || 'draft',
                 status_label: p.status_label || data.status_label || 'Draft',
                 content: data.content || p.content || '',
-                media_items: (data.media || []).map(m => ({
-                    url: m.url || m.thumbnail_url || '',
-                    thumbnail: m.thumbnail_url || m.url || '',
-                    is_video: (m.mime_type || '').startsWith('video/'),
-                })),
-                metrics: null,
-                permalink: null,
+                media_items: mediaItems,
+                media_count: mediaItems.length,
+                is_video: hasVideo,
+                has_video: hasVideo,
+                // Posts e publikuar (qe kane platform_post_id) marrin metrics
+                // nga meta_post_insights -- API e ka tashme te mbushur. Para
+                // rregullimit, normalisePlanned i hidhte poshte (metrics:null).
+                metrics: data.metrics || null,
+                permalink: data.permalink || null,
                 scheduled_at: scheduled,
+                content_type: data.content_type || p.content_type || null,
             },
         };
     }
@@ -885,7 +894,8 @@
         const metricsSec = document.getElementById('pdMetricsSection');
         const metricsGrid = document.getElementById('pdMetricsGrid');
         while (metricsGrid.firstChild) metricsGrid.removeChild(metricsGrid.firstChild);
-        if (isExternal && p.metrics) {
+        // Show metrics for any post that has them (external + published planned).
+        if (p.metrics) {
             metricsSec.style.display = '';
             const m = p.metrics;
             const cells = [
