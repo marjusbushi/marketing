@@ -261,7 +261,16 @@ class ContentPlannerApiController extends Controller
 
     public function deletePost($id): JsonResponse
     {
-        $post = ContentPost::findOrFail($id);
+        // Lookup me trashed=false eshte default; perfshi soft-deleted nese
+        // perdoren tek ContentPost (s'po e perdorin tani por mire ta jemi safe).
+        $post = ContentPost::find($id);
+        if (!$post) {
+            \Log::warning('deletePost: post not found', ['id_received' => $id, 'id_type' => gettype($id)]);
+            return response()->json([
+                'message' => "Post-i nuk u gjet (id={$id}). Mund te jete fshire nga nje veprim tjeter.",
+            ], 404);
+        }
+
         $this->postService->deletePost($post);
 
         return response()->json(['message' => 'Post deleted.']);
