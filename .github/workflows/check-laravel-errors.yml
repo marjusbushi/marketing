@@ -1,0 +1,36 @@
+name: Check Laravel Errors
+
+# Lexon error-et e fundit ne laravel.log per debug.
+# Pa rrezik command injection -- vetem secrets.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/check-laravel-errors.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read recent Laravel errors
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          command_timeout: 2m
+          script: |
+            set +e
+            cd "$APP_PATH"
+
+            echo "=== Search for ERROR / Exception ne 500 linjat e fundit ==="
+            tail -500 storage/logs/laravel.log 2>/dev/null | grep -iE "ERROR|Exception|FATAL|deletePost" | tail -30
+
+            echo ""
+            echo "=== Last 80 linjat e logut (cdo gje) ==="
+            tail -80 storage/logs/laravel.log 2>/dev/null
