@@ -693,10 +693,15 @@
         try {
             const res = await fetch(`{{ url('/marketing/planner/api/posts') }}/${postId}`);
             const post = await res.json();
-            // Save status + show delete button kur lejohet
+            // Save status + show delete button.
+            // Filtri me i lehtesuar -- shfaqet per cdo post qe NUK eshte
+            // ne nje terminale state (scheduled/publishing/published/failed)
+            // qe te kapim te gjitha rastet draft/pending_review/approved/etj.
+            // Backend permission gate (CONTENT_PLANNER_DELETE) vendos perfundimisht.
             composerState.status = post.status || null;
             const delBtn = document.getElementById('composerDeleteBtn');
-            if (delBtn && ['draft', 'pending_review', 'approved'].includes(post.status)) {
+            const noDeleteStatuses = ['scheduled', 'publishing', 'published', 'failed'];
+            if (delBtn && !noDeleteStatuses.includes(post.status)) {
                 delBtn.style.display = 'inline-flex';
             }
             document.getElementById('composerContent').value = post.content || '';
@@ -1057,17 +1062,8 @@
         } catch (e) { alert('Failed to save: ' + e.message); }
     }
 
-    // ── Delete ──
-    async function deletePost() {
-        if (!composerState.postId || !confirm('Delete this post?')) return;
-        try {
-            await fetch(`{{ url('/marketing/planner/api/posts') }}/${composerState.postId}`, {
-                method: 'DELETE', headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
-            });
-            closeComposer();
-            if (typeof refreshGrid === 'function') refreshGrid();
-        } catch (e) { alert('Delete failed: ' + e.message); }
-    }
+    // (deletePost() definohet me lart -- versioni i ri me confirmation,
+    // status gating, error handling, dhe fallback refresh.)
 
     // ── Feedback (Comments + Suggestions) ──
     //
