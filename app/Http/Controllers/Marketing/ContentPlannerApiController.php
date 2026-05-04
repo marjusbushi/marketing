@@ -190,6 +190,40 @@ class ContentPlannerApiController extends Controller
         $post = $this->postService->getPost($id);
         $payload = $post->toArray();
 
+        // Per video posts (Reels) qe jane publikuar ne IG, ContentMedia
+        // ruan vetem thumbnail JPG (jo file video). Per ta luajtur native ne
+        // modal, marrim media_url te fresket nga Meta Graph API. URL-ja vlen
+        // ~6 ore, ndaj cachohet 4 ore -- shmang rate-limit.
+        $isVideoPost = in_array(strtolower($post->content_type ?? ''), ['reel', 'video'], true)
+            || in_array(strtolower($post->meta_post_type ?? ''), ['reel', 'video'], true);
+        if ($post->platform_post_id && $isVideoPost) {
+            $payload['video_url'] = \Cache::remember(
+                "meta:media:video_url:{$post->platform_post_id}",
+                now()->addHours(4),
+                function () use ($post) {
+                    try {
+                        $api = app(\App\Services\Meta\MetaApiService::class);
+                        $resp = $api->getWithPageToken(
+                            $post->platform_post_id,
+                            ['fields' => 'media_url,media_type']
+                        );
+                        // Vetem nese eshte VIDEO -- Meta ndonjehere kthen
+                        // URL te thumbnail per IMAGE posts.
+                        if (($resp['media_type'] ?? '') === 'VIDEO') {
+                            return $resp['media_url'] ?? null;
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('Failed to fetch video URL from Meta', [
+                            'post_id' => $post->id,
+                            'platform_post_id' => $post->platform_post_id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                    return null;
+                }
+            );
+        }
+
         // Imported FB/IG posts mirror the metrics that live in
         // meta_post_insights. Attaching them here lets the post detail modal
         // show Reach/Likes/Comments/Saves without a second round-trip.

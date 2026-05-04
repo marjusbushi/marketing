@@ -836,6 +836,9 @@
                 scheduled_at: scheduled,
                 content_type: data.content_type || p.content_type || null,
                 meta_post_type: data.meta_post_type || p.meta_post_type || null,
+                // Per Reels te publikuar -- backend therret Meta Graph API
+                // dhe kthen URL te fresket te video-s (cached 4h).
+                video_url: data.video_url || null,
             },
         };
     }
@@ -853,13 +856,16 @@
             mime_type: m.is_video ? 'video/mp4' : 'image/jpeg',
         }));
         preview.index = 0;
-        // Per Reels/video posts ContentMedia ruan vetem thumbnail (Meta CDN
-        // video URLs skadojne -- s'mund t'i embedojme nativ). Zbulo nese
-        // posti eshte video me content_type/meta_post_type (sinjale me te
-        // sigurta se mime_type) dhe shfaq nje overlay "Hap ne Instagram"
-        // mbi thumbnail. Permalink-u kalohet nga API.
         preview.isVideoPost = isVideoPost(p);
         preview.permalink = p.permalink || null;
+        // Per Reels te publikuar, backend kthen URL te fresket te video-s
+        // nga Meta Graph API. Nese e ka, slide-i i pare luan video native;
+        // perndryshe biem ne fallback play-overlay -> hap permalink.
+        preview.videoUrl = p.video_url || null;
+        if (preview.videoUrl && preview.media.length > 0) {
+            preview.media[0].url = preview.videoUrl;
+            preview.media[0].mime_type = 'video/mp4';
+        }
         renderPreviewCarousel();
         ensurePreviewWired();
 
