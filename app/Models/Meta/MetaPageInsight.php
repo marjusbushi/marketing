@@ -38,6 +38,9 @@ class MetaPageInsight extends Model
 
     protected $table = 'meta_page_insights';
 
+    // Tabela ka vetem `synced_at`, jo Eloquent's created_at/updated_at.
+    public $timestamps = false;
+
     protected $fillable = [
         'page_id',
         'date',

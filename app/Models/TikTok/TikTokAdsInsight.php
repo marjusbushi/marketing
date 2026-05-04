@@ -51,6 +51,9 @@ class TikTokAdsInsight extends Model
 
     protected $table = 'tiktok_ads_insights';
 
+    // Tabela ka vetem `synced_at`, jo Eloquent's created_at/updated_at.
+    public $timestamps = false;
+
     protected $fillable = [
         'advertiser_id',
         'tiktok_campaign_id',

@@ -35,6 +35,9 @@ class MetaIgInsight extends Model
 
     protected $table = 'meta_ig_insights';
 
+    // Tabela ka vetem `synced_at`, jo Eloquent's created_at/updated_at.
+    public $timestamps = false;
+
     protected $fillable = [
         'ig_account_id',
         'date',

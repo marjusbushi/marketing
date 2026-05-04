@@ -1,0 +1,90 @@
+name: Fix Deploy + Sync (recovery)
+
+# Recovery i plote: pastron bootstrap/cache te prishur, refresh autoload,
+# rebuild caches, test, dhe nis backfill ne sfond me nohup.
+# Pa rrezik command injection -- vetem secrets dhe APP_PATH env.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-deploy-and-sync.yml'
+  workflow_dispatch:
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recovery + verify + backfill
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          command_timeout: 6m
+          script: |
+            set +e
+            cd "$APP_PATH"
+
+            echo "=== 1. Pull latest code ==="
+            git fetch origin main
+            git reset --hard origin/main
+            git log -1 --oneline
+
+            echo ""
+            echo "=== 2. Clean bootstrap/cache (route + config + services) ==="
+            rm -f bootstrap/cache/*.php
+            mkdir -p bootstrap/cache
+            ls -la bootstrap/cache/
+
+            echo ""
+            echo "=== 3. Refresh composer autoload (skip post-scripts) ==="
+            composer dump-autoload --optimize --no-scripts 2>&1 | tail -3
+
+            echo ""
+            echo "=== 4. Manually run package:discover (now safe) ==="
+            php artisan package:discover --ansi 2>&1 | tail -10
+
+            echo ""
+            echo "=== 5. Rebuild Laravel caches ==="
+            php artisan config:cache 2>&1 | tail -2
+            php artisan route:cache 2>&1 | tail -2
+            php artisan view:cache 2>&1 | tail -2
+
+            echo ""
+            echo "=== 6. Reflection: are sync methods available? ==="
+            php artisan tinker --no-interaction --execute='try { $r = new ReflectionClass(App\Models\Meta\MetaSyncLog::class); foreach (["start","markSuccess","markFailed"] as $m) echo "MetaSyncLog::$m: ".($r->hasMethod($m) ? "EXISTS" : "MISSING").PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage(); }'
+
+            echo ""
+            echo "=== 7. Confirm timestamps disabled where needed ==="
+            php artisan tinker --no-interaction --execute='foreach (["App\\\\Models\\\\Meta\\\\MetaIgInsight","App\\\\Models\\\\Meta\\\\MetaPageInsight","App\\\\Models\\\\Meta\\\\MetaAdsInsight","App\\\\Models\\\\Meta\\\\MetaPostInsight","App\\\\Models\\\\Meta\\\\MetaMessagingStat"] as $cls) { $m = new $cls; echo "$cls timestamps=".($m->usesTimestamps() ? "ON (BAD)" : "OFF (good)").PHP_EOL; }'
+
+            echo ""
+            echo "=== 8. Test IG sync (5min timeout) ==="
+            timeout 280 php artisan meta:sync --type=ig 2>&1 | tail -20
+            echo "(IG sync exit: $?)"
+
+            echo ""
+            echo "=== 9. Last 5 meta_sync_logs ==="
+            php artisan tinker --no-interaction --execute='try { foreach (DB::connection("dis")->table("meta_sync_logs")->orderByDesc("id")->limit(5)->get(["id","sync_type","data_type","status","records_synced","error_message","created_at"]) as $r) echo sprintf("#%d %s/%s %s rec=%d at=%s%s\n", $r->id, $r->sync_type, $r->data_type, $r->status, $r->records_synced, $r->created_at, $r->error_message ? " ERR=".substr($r->error_message,0,120) : ""); } catch (Throwable $e) { echo "EXC: ".$e->getMessage(); }'
+
+            echo ""
+            echo "=== 10. Restart queue worker + reload php-fpm if possible ==="
+            php artisan queue:restart 2>&1 | tail -2
+            sudo -n systemctl reload php8.4-fpm 2>/dev/null && echo "php-fpm reloaded" || sudo -n systemctl reload php-fpm 2>/dev/null && echo "php-fpm reloaded" || echo "(php-fpm reload skipped: no sudo)"
+
+            echo ""
+            echo "=== 11. Kick off full backfill batch in background ==="
+            mkdir -p storage/logs/cron-fix
+            STAMP=$(date -u +%Y%m%d-%H%M%S)
+            BG_LOG="storage/logs/cron-fix/full-backfill-$STAMP.log"
+            nohup bash -lc "set -x; cd '$APP_PATH'; php artisan content-planner:import-feed; php artisan meta:sync --type=ig; php artisan meta:sync --type=page; php artisan meta:sync --type=ads; php artisan meta:sync --type=messaging; php artisan meta:sync --type=posts; echo BATCH_DONE" > "$BG_LOG" 2>&1 &
+            echo "Backfill PID=$!, log=$BG_LOG"
+            sleep 3
+            pgrep -f "php artisan" -a | head -8 || echo "(no php artisan processes)"
+
+            echo ""
+            echo "=== DONE -- backfill running in background ==="

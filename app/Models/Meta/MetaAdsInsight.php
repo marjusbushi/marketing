@@ -43,6 +43,9 @@ class MetaAdsInsight extends Model
 
     protected $table = 'meta_ads_insights';
 
+    // Tabela ka vetem `synced_at`, jo Eloquent's created_at/updated_at.
+    public $timestamps = false;
+
     protected $fillable = [
         'meta_ad_account_id',
         'meta_campaign_id',
