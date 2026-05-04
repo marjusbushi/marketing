@@ -45,4 +45,40 @@ class TikTokSyncLog extends Model
             'error_details' => 'array',
         ];
     }
+
+    public static function start(string $syncType, string $dataType): self
+    {
+        return self::create([
+            'sync_type'      => $syncType,
+            'data_type'      => $dataType,
+            'status'         => 'running',
+            'records_synced' => 0,
+            'records_failed' => 0,
+            'api_calls_used' => 0,
+        ]);
+    }
+
+    public function markSuccess(int $records, int $apiCalls): void
+    {
+        $this->update([
+            'status'           => 'success',
+            'records_synced'   => $records,
+            'api_calls_used'   => $apiCalls,
+            'duration_seconds' => $this->elapsedSeconds(),
+        ]);
+    }
+
+    public function markFailed(string $error): void
+    {
+        $this->update([
+            'status'           => 'failed',
+            'error_message'    => $error,
+            'duration_seconds' => $this->elapsedSeconds(),
+        ]);
+    }
+
+    private function elapsedSeconds(): int
+    {
+        return max(0, (int) ($this->created_at?->diffInSeconds(now()) ?? 0));
+    }
 }
