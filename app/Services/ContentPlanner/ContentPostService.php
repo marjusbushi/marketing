@@ -470,7 +470,11 @@ class ContentPostService
     /**
      * Get a single post with all relations.
      */
-    public function getPost(int $id): ContentPost
+    // $id pranon string ose int -- Laravel route params vijne si string,
+    // dhe disa entry te grid-it perdorin composite ID si "db_draft_<n>"
+    // (DailyBasketPost) qe nuk korrespondon me ContentPost. Ketu trajtohen
+    // vetem ContentPost; per db_draft_ thirresi duhet te bej routing.
+    public function getPost($id): ContentPost
     {
         return ContentPost::with([
             'media',
