@@ -310,7 +310,8 @@
         if (!preset || preset === '') return;
         if (preset === 'custom') { customFromWrap.classList.remove('hidden'); customToWrap.classList.remove('hidden'); return; }
         customFromWrap.classList.add('hidden'); customToWrap.classList.add('hidden');
-        const today = new Date(), reportDay = new Date(today); reportDay.setDate(reportDay.getDate()-1);
+        // reportDay = today (perfshi diten e sotme me partial data nga sync hourly).
+        const today = new Date(), reportDay = new Date(today);
         let from, to;
         switch(preset) {
             case 'today': from=to=fmtD(today); break;

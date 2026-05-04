@@ -501,8 +501,8 @@
         customToWrap.classList.add('hidden');
 
         const today = new Date();
+        // reportDay = today (perfshi diten e sotme me partial data nga sync hourly).
         const reportDay = new Date(today);
-        reportDay.setDate(reportDay.getDate() - 1);
         let from, to;
         switch(preset) {
             case 'today': from = to = fmtD(today); break;

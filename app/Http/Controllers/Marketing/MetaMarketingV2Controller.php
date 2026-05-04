@@ -161,7 +161,9 @@ class MetaMarketingV2Controller extends Controller
 
     private function resolveRange(Request $request): array
     {
-        $defaultTo = Carbon::yesterday()->toDateString();
+        // `today()` jo `yesterday()` -- dashboard duhet te tregoje partial
+        // metrikat e dites se sotme; cron-i hourly i freskon gjate dites.
+        $defaultTo = Carbon::today()->toDateString();
         $defaultFrom = Carbon::now()->subDays(30)->toDateString();
 
         $from = (string) $request->get('from', $defaultFrom);
