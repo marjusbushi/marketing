@@ -158,48 +158,47 @@
     .pd-caption-wrap.is-capped + .pd-caption-hint { display: inline-flex; }
     .pd-hashtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
     .pd-hashtag { background: rgba(109,40,217,0.1); color: #6d28d9; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-    /* Performance metrics — Instagram-style: pa card boxes, layout i pastër
-       me dy kolona, numra te medhenj, labels te buta. Engagement rate
-       merr nje row te plote ne fund me theks special. */
-    .pd-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; }
+    /* Performance metrics — IG Insights mobile-style: list rows me ikone
+       te vogel + label majtas, numer i madh djathtas, ndarje subtile.
+       Pa card boxes, pa color noise -- vetem hierarki tipografike. */
+    .pd-metrics { display: flex; flex-direction: column; gap: 0; }
     .pd-metric {
-        padding: 14px 0;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 13px 2px;
         border-bottom: 1px solid #f1f5f9;
-        position: relative;
     }
-    /* Cdo metric e dyte (e djathta) ka padding-left qe te krijoje ndarje
-       vertikal ne mes te dy kolonave. Ndarja vetem visual, jo border. */
-    .pd-metric:nth-child(2n) { padding-left: 16px; }
-    .pd-metric:nth-child(2n+1) { padding-right: 16px; }
-    /* Heq border-bottom-in nga 2 rreshtat e fundit te grid-it. Per shkak
-       qe nuk dimë permasat, perdor :nth-last-child(-n+2) qe te kapim 2 te
-       fundit. */
-    .pd-metric:nth-last-child(-n+2) { border-bottom: none; }
-    .pd-metric .v {
-        font-size: 24px; font-weight: 700; color: #0f172a;
-        line-height: 1.1; letter-spacing: -0.02em;
-        font-feature-settings: 'tnum' 1, 'lnum' 1;
+    .pd-metric:last-child { border-bottom: none; }
+    .pd-metric .label-group {
+        display: flex; align-items: center; gap: 10px;
+        min-width: 0; flex: 1;
+    }
+    .pd-metric .icon {
+        flex-shrink: 0;
+        width: 18px; height: 18px;
+        display: flex; align-items: center; justify-content: center;
+        color: #94a3b8;
     }
     .pd-metric .l {
-        font-size: 11px; color: #94a3b8; margin-top: 4px;
-        text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500;
+        font-size: 13px; color: #334155; font-weight: 500;
+        letter-spacing: 0; text-transform: none;
+        margin: 0;
     }
-    /* Engagement rate — KPI derivuar, full-width row me theks. Merr klasë
-       `derived` ne JS dhe bllokon nth-child layout-in. */
+    .pd-metric .v {
+        font-size: 17px; font-weight: 700; color: #0f172a;
+        letter-spacing: -0.01em; line-height: 1;
+        font-feature-settings: 'tnum' 1, 'lnum' 1;
+        flex-shrink: 0;
+    }
+    /* Engagement rate -- ndarje me theksuar, ngjyre brand subtle ne numer. */
     .pd-metric.derived {
-        grid-column: 1 / -1;
-        margin-top: 10px;
-        padding: 14px 16px;
-        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-        border-radius: 10px;
+        margin-top: 6px;
+        padding-top: 14px;
+        border-top: 1px solid #e2e8f0;
         border-bottom: none;
-        display: flex; align-items: center; justify-content: space-between;
     }
-    .pd-metric.derived .v { font-size: 26px; color: #92400e; }
-    .pd-metric.derived .l { color: #b45309; margin-top: 0; font-weight: 600; }
-    /* Hide ikonat ne stil IG (s'i perdor nativisht). E ruajme ne DOM por jo
-       te dukshme, ne rast se duhet ti rikthejme. */
-    .pd-metric .icon { display: none; }
+    .pd-metric.derived .l { color: #475569; font-weight: 600; }
+    .pd-metric.derived .v { color: #6366f1; font-size: 19px; }
+    .pd-metric.derived .icon { color: #6366f1; }
     .pd-kv-list { display: flex; flex-direction: column; gap: 6px; }
     .pd-kv { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #e4e4e7; }
     .pd-kv:last-child { border-bottom: none; }
@@ -997,16 +996,26 @@
             cells.forEach(c => {
                 const cell = document.createElement('div');
                 cell.className = 'pd-metric ' + (c.cat || '');
+                // Left side: icon + label
+                const labelGroup = document.createElement('div');
+                labelGroup.className = 'label-group';
                 const iconWrap = document.createElement('span');
                 iconWrap.className = 'icon';
                 const iconEl = document.createElement('iconify-icon');
                 iconEl.setAttribute('icon', c.icon);
-                iconEl.setAttribute('width', '14');
+                iconEl.setAttribute('width', '16');
                 iconWrap.appendChild(iconEl);
-                cell.appendChild(iconWrap);
-                const v = document.createElement('div'); v.className = 'v'; v.textContent = c.v;
-                const l = document.createElement('div'); l.className = 'l'; l.textContent = c.l;
-                cell.appendChild(v); cell.appendChild(l);
+                const l = document.createElement('div');
+                l.className = 'l';
+                l.textContent = c.l;
+                labelGroup.appendChild(iconWrap);
+                labelGroup.appendChild(l);
+                // Right side: value
+                const v = document.createElement('div');
+                v.className = 'v';
+                v.textContent = c.v;
+                cell.appendChild(labelGroup);
+                cell.appendChild(v);
                 metricsGrid.appendChild(cell);
             });
         } else {
