@@ -261,8 +261,19 @@ class ContentPlannerApiController extends Controller
 
     public function deletePost($id): JsonResponse
     {
-        // Lookup me trashed=false eshte default; perfshi soft-deleted nese
-        // perdoren tek ContentPost (s'po e perdorin tani por mire ta jemi safe).
+        // Planner grid bashkon ContentPost (id integer) + DailyBasketPost
+        // (id me prefix 'db_draft_<n>'). Detect prefix dhe rendis te modeli
+        // i duhur. Shih DailyBasketGridService::199 ku ID-ja prodhohet.
+        if (is_string($id) && str_starts_with($id, 'db_draft_')) {
+            $rawId = (int) substr($id, 9);
+            $dbPost = \App\Models\DailyBasketPost::find($rawId);
+            if (!$dbPost) {
+                return response()->json(['message' => "Post-i nuk u gjet (id={$id})."], 404);
+            }
+            $dbPost->delete();
+            return response()->json(['message' => 'Post deleted.']);
+        }
+
         $post = ContentPost::find($id);
         if (!$post) {
             \Log::warning('deletePost: post not found', ['id_received' => $id, 'id_type' => gettype($id)]);
