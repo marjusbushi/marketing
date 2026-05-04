@@ -15,21 +15,22 @@
     .story-card .story-date { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.95); border-radius: 8px; padding: 4px 8px; text-align: center; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .story-card .story-platform { position: absolute; bottom: 10px; right: 10px; }
     .story-card .story-status { position: absolute; bottom: 10px; left: 10px; }
-    /* Delete affordance — hidden until hover so kartela mbetet e qet­ë.
-       Shfaqet vetëm për story-t pre-skedulim (status draft/pending/approved)
-       dhe asnjëherë për ato të importuara nga Meta. */
+    /* Delete affordance — gjithmone i dukshem qe butoni te jete i arritshem
+       edhe ne mobile (pa hover) dhe diskutueshem ne desktop pa pasur nevoje
+       te kalosh maus-in mbi kartele. Shfaqet vetem per story-t pre-skedulim
+       (status draft/pending/approved) dhe asnjehere per ato te importuara
+       nga Meta -- kontrolli gating eshte ne JS te canDelete. */
     .story-card .story-del {
         position: absolute; top: 8px; right: 8px;
-        width: 22px; height: 22px; border-radius: 50%;
-        border: none; background: rgba(255,255,255,0.95);
-        color: #475569; font-size: 14px; line-height: 1;
+        width: 24px; height: 24px; border-radius: 50%;
+        border: none; background: rgba(255,255,255,0.92);
+        color: #475569; font-size: 15px; line-height: 1;
         display: flex; align-items: center; justify-content: center;
-        cursor: pointer; opacity: 0;
-        transition: opacity 0.15s, background 0.15s, color 0.15s;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        cursor: pointer; opacity: 1;
+        transition: background 0.15s, color 0.15s, transform 0.1s;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.18);
     }
-    .story-card:hover .story-del { opacity: 1; }
-    .story-card .story-del:hover { background: #fee2e2; color: #dc2626; }
+    .story-card .story-del:hover { background: #fee2e2; color: #dc2626; transform: scale(1.05); }
     .story-new { flex-shrink: 0; width: 150px; height: 230px; border-radius: 14px; border: 2px dashed #e2e8f0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
     .story-new:hover { border-color: #6366f1; background: #f5f3ff; }
 
