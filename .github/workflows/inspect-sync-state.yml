@@ -1,0 +1,78 @@
+name: Inspect Sync State
+
+# Lexon gjendjen aktuale te server-it: crontab, procese, meta_sync_logs,
+# batch log nga fix-prod-scheduler, IG insights tables, dhe nje IG sync direkt.
+# Pa rrezik command injection -- vetem secrets dhe APP_PATH env var.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-sync-state.yml'
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quick inspection via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          command_timeout: 5m
+          script: |
+            set +e
+            cd "$APP_PATH"
+
+            echo "=== 1. Crontab tani ==="
+            crontab -l 2>&1
+
+            echo ""
+            echo "=== 2. Procese php aktive ==="
+            pgrep -f "php artisan" -a 2>/dev/null | head -10 || echo "(asnje proces)"
+
+            echo ""
+            echo "=== 3. Last 10 meta_sync_logs ==="
+            php artisan tinker --no-interaction --execute='try { $rows = DB::connection("dis")->table("meta_sync_logs")->orderByDesc("id")->limit(10)->get(["id","sync_type","data_type","status","records_synced","error_message","created_at"]); foreach ($rows as $r) echo sprintf("#%d %s/%s %s rec=%d at=%s%s\n", $r->id, $r->sync_type, $r->data_type, $r->status, $r->records_synced, $r->created_at, $r->error_message ? " ERR=".substr($r->error_message,0,150) : ""); } catch (Throwable $e) { echo "EXC: ".$e->getMessage(); }'
+
+            echo ""
+            echo "=== 4. Batch log nga fix-prod-scheduler ==="
+            ls -la storage/logs/cron-fix/ 2>/dev/null
+            for f in storage/logs/cron-fix/batch-*.log; do
+              if [ -f "$f" ]; then
+                echo ""
+                echo "--- $f ---"
+                wc -l "$f"
+                echo "[koka]"
+                head -20 "$f"
+                echo "[fundi]"
+                tail -50 "$f"
+              fi
+            done
+
+            echo ""
+            echo "=== 5. Laravel log: errors te fundit ==="
+            tail -300 storage/logs/laravel.log 2>/dev/null | grep -iE "ERROR|Exception|FAILED|graph\.facebook|OAuthException" | tail -15 || echo "(asnje error)"
+
+            echo ""
+            echo "=== 6. Tabelat e insights (kerko ne dis_db) ==="
+            php artisan tinker --no-interaction --execute='try { $rows = DB::connection("dis")->select("SHOW TABLES LIKE \"%insight%\""); foreach ($rows as $r) echo "TABLE: ".array_values((array) $r)[0].PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage(); }'
+
+            echo ""
+            echo "=== 7. Counts per insights table ==="
+            for tbl in meta_ig_insights meta_page_insights meta_ads_insights meta_post_insights instagram_insights ig_account_insights page_insights; do
+              php artisan tinker --no-interaction --execute='try { $c = DB::connection("dis")->table("'$tbl'")->count(); $l = DB::connection("dis")->table("'$tbl'")->latest("id")->first(); echo "'$tbl': count=$c"; if ($l) echo " latest_at=".($l->created_at ?? $l->updated_at ?? $l->date ?? "?"); echo PHP_EOL; } catch (Throwable $e) { }' 2>/dev/null
+            done
+
+            echo ""
+            echo "=== 8. Test IG sync direkt (max 3min) ==="
+            timeout 180 php artisan meta:sync --type=ig 2>&1 | tail -40
+            echo "(IG sync exit code: $?)"
+
+            echo ""
+            echo "=== DONE ==="
