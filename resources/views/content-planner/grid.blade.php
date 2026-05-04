@@ -498,7 +498,7 @@
                 else openComposer(p.id);
             };
             card.innerHTML = `
-                <img src="${props.thumbnail}" alt="" onerror="this.parentElement.style.background='#f1f5f9'">
+                <img src="${props.thumbnail}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.style.background='#f1f5f9'">
                 <div class="story-overlay"></div>
                 <div class="story-date">
                     <div class="text-[15px] font-bold text-slate-900 leading-none">${dt.day}</div>
@@ -784,7 +784,6 @@
 
         const overlay = document.getElementById('postPreviewOverlay');
         const mediaHost = document.getElementById('postPreviewMedia');
-        const captionEl = document.getElementById('postPreviewCaption');
 
         overlay.classList.add('open');
         overlay.setAttribute('aria-hidden', 'false');
@@ -792,36 +791,50 @@
 
         // Reset all the right-panel surfaces so a reopen never shows stale data.
         while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
-        captionEl.textContent = '';
-        const loader = document.createElement('div');
-        loader.style.cssText = 'color:rgba(255,255,255,0.55);font-size:12px;';
-        loader.textContent = 'Loading…';
-        mediaHost.appendChild(loader);
 
-        // External posts (synced from Meta / TikTok) already have everything
-        // we need cached from /feedPosts — no second fetch required. Planned
-        // posts still go through the old detail endpoint because it returns
-        // ordered media_items + scheduled_at + labels.
         const cached = Array.isArray(feedPostsCache)
             ? feedPostsCache.find(e => String(e.id) === String(postId))
             : null;
 
+        // Optimistic render -- ngarkojmë thumbnail-in nga cache menjehere
+        // qe modal-i te kete permbajtje vizuale ne <100ms. Pa kete, modal-i
+        // kerce nga "Loading..." (i vogel) -> media reale, duke krijuar
+        // flicker ne layout. Pas API response, render full do behet poshte
+        // qe upgrade-on me video real / metrics fresh.
+        if (cached && cached.extendedProps) {
+            renderPreviewDetail(cached, !!cached.extendedProps.is_external);
+        } else {
+            const loader = document.createElement('div');
+            loader.style.cssText = 'color:rgba(255,255,255,0.55);font-size:12px;';
+            loader.textContent = 'Loading…';
+            mediaHost.appendChild(loader);
+        }
+
         try {
             if (cached && cached.extendedProps && cached.extendedProps.is_external) {
-                renderPreviewDetail(cached, true);
-            } else {
-                const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
-                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const data = await res.json();
-                renderPreviewDetail(normalisePlanned(data, cached), false);
+                // Already rendered above; nothing to upgrade for external posts.
+                return;
             }
+            const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            // Upgrade nga thumbnail i shpejte -> video real + metrics te
+            // freskët. Render-i i dyte zëvendëson media dhe paneli i djathtë.
+            renderPreviewDetail(normalisePlanned(data, cached), false);
         } catch (e) {
-            while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
-            const err = document.createElement('div');
-            err.style.cssText = 'color:#fecaca;font-size:13px;';
-            err.textContent = 'Nuk u ngarkua posti: ' + (e.message || 'unknown error');
-            mediaHost.appendChild(err);
+            // Vetem nese s'kishim asgje te dukshme, shfaq error. Nese cache
+            // tashmë rendoi thumbnail, lere te jete -- user-i sheh thumb dhe
+            // metrika do mbeten ato qe kishte cache.
+            if (!cached) {
+                while (mediaHost.firstChild) mediaHost.removeChild(mediaHost.firstChild);
+                const err = document.createElement('div');
+                err.style.cssText = 'color:#fecaca;font-size:13px;';
+                err.textContent = 'Nuk u ngarkua posti: ' + (e.message || 'unknown error');
+                mediaHost.appendChild(err);
+            } else {
+                console.warn('Failed to upgrade post preview from API:', e);
+            }
         }
     }
 
