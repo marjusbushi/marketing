@@ -937,18 +937,21 @@
         if (p.metrics) {
             metricsSec.style.display = '';
             const m = p.metrics;
-            // [key, label, category, iconify-icon]. Renditja: discovery ->
-            // video -> engagement -> conversion -> derived.
+            // Vetem metrikat strategjike per content marketing -- jo zhurma:
+            //   - Reach: sizing audience (unique accounts)
+            //   - Video views: KPI per Reels (vetem video)
+            //   - Likes/Comments/Shares: engagement layer
+            //   - Saves: intent me te lartë (klient potencial)
+            //   - Engagement %: KPI derivuar, krahasueshem
+            // U hoqen: Impressions (duplikate Reach), Plays (duplikate Video
+            // views), Clicks (vague, jo actionable per organic posts).
             const candidates = [
                 ['reach',        'Reach',        'discovery',  'heroicons-outline:eye'],
-                ['impressions',  'Impressions',  'discovery',  'heroicons-outline:rectangle-stack'],
                 ['video_views',  'Video views',  'video',      'heroicons-outline:play-circle'],
-                ['plays',        'Plays',        'video',      'heroicons-outline:forward'],
                 ['likes',        'Likes',        'engagement', 'heroicons-outline:heart'],
                 ['comments',     'Comments',     'engagement', 'heroicons-outline:chat-bubble-left-ellipsis'],
                 ['shares',       'Shares',       'engagement', 'heroicons-outline:share'],
                 ['saves',        'Saves',        'engagement', 'heroicons-outline:bookmark'],
-                ['clicks',       'Clicks',       'conversion', 'heroicons-outline:cursor-arrow-rays'],
             ];
             const cells = candidates
                 .filter(([key]) => m[key] !== null && m[key] !== undefined)
