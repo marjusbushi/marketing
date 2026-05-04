@@ -42,7 +42,9 @@ class MetaSyncCommand extends Command
             if ($type) {
                 // Sync specific type
                 $from = $dateFrom ?? Carbon::now()->subDays(config('meta.daily_resync_days'))->toDateString();
-                $to = $dateTo ?? Carbon::yesterday()->toDateString();
+                // Perfshi diten e sotme qe dashboard-i te kete metrikat e fundit
+                // (Meta i kthen partial; cron-i hourly e freskon disa here ne dite).
+                $to = $dateTo ?? Carbon::today()->toDateString();
 
                 // `--full` combined with `--type=posts` switches the posts sync
                 // from incremental (30 days) to full-history backfill. Without

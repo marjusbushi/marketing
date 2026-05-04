@@ -25,7 +25,8 @@ class MetaSyncService
     {
         $resyncDays = config('meta.daily_resync_days', 7);
         $dateFrom = Carbon::now()->subDays($resyncDays)->toDateString();
-        $dateTo = Carbon::yesterday()->toDateString();
+        // Perfshi diten e sotme — partial data refreshohet nga cron-i hourly.
+        $dateTo = Carbon::today()->toDateString();
 
         return $this->sync('daily', $dateFrom, $dateTo);
     }
@@ -37,7 +38,7 @@ class MetaSyncService
     {
         $historyDays = config('meta.initial_history_days', 365);
         $dateFrom = Carbon::now()->subDays($historyDays)->toDateString();
-        $dateTo = Carbon::yesterday()->toDateString();
+        $dateTo = Carbon::today()->toDateString();
 
         return $this->sync('full', $dateFrom, $dateTo);
     }
