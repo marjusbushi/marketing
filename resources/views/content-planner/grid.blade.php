@@ -752,6 +752,8 @@
         startX: 0,
         currentDx: 0,
         width: 0,
+        isVideoPost: false,  // true kur posti eshte Reel/Video (per play overlay)
+        permalink: null,     // Instagram permalink per "Hap ne Instagram" button
     };
 
     async function openPostPreview(postId) {
@@ -851,6 +853,13 @@
             mime_type: m.is_video ? 'video/mp4' : 'image/jpeg',
         }));
         preview.index = 0;
+        // Per Reels/video posts ContentMedia ruan vetem thumbnail (Meta CDN
+        // video URLs skadojne -- s'mund t'i embedojme nativ). Zbulo nese
+        // posti eshte video me content_type/meta_post_type (sinjale me te
+        // sigurta se mime_type) dhe shfaq nje overlay "Hap ne Instagram"
+        // mbi thumbnail. Permalink-u kalohet nga API.
+        preview.isVideoPost = isVideoPost(p);
+        preview.permalink = p.permalink || null;
         renderPreviewCarousel();
         ensurePreviewWired();
 
