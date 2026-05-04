@@ -182,7 +182,10 @@ class ContentPlannerApiController extends Controller
         return response()->json($posts);
     }
 
-    public function getPost(int $id): JsonResponse
+    // $id pranon string ose int -- Laravel route params vijne si string,
+    // dhe disa ID kompozite (psh imported posts) kane prefix non-numeric.
+    // findOrFail() ben cast vetë per int auto-increment IDs.
+    public function getPost($id): JsonResponse
     {
         $post = $this->postService->getPost($id);
         $payload = $post->toArray();
@@ -256,7 +259,7 @@ class ContentPlannerApiController extends Controller
         return response()->json($post);
     }
 
-    public function deletePost(int $id): JsonResponse
+    public function deletePost($id): JsonResponse
     {
         $post = ContentPost::findOrFail($id);
         $this->postService->deletePost($post);
