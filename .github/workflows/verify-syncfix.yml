@@ -1,0 +1,66 @@
+name: Verify Sync Fix Deployed
+
+# Verifikon nese deploy-i ka instaluar metodat e reja te MetaSyncLog,
+# pastron cache-t Laravel + composer autoload, pastaj testin direkt.
+# Pa rrezik command injection -- vetem secrets dhe APP_PATH env.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-syncfix.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify + clear caches + test
+        uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          envs: APP_PATH
+          command_timeout: 5m
+          script: |
+            set +e
+            cd "$APP_PATH"
+
+            echo "=== 1. Git: which commit is deployed ==="
+            git log -1 --oneline
+            git log --oneline -5
+
+            echo ""
+            echo "=== 2. File on disk: methods present? ==="
+            stat app/Models/Meta/MetaSyncLog.php | head -5
+            grep -nE "public (static )?function (start|markSuccess|markFailed)" app/Models/Meta/MetaSyncLog.php || echo "NO METHODS FOUND"
+            echo ""
+            echo "Last 30 lines of file:"
+            tail -30 app/Models/Meta/MetaSyncLog.php
+
+            echo ""
+            echo "=== 3. Composer autoload refresh ==="
+            composer dump-autoload --optimize 2>&1 | tail -5
+
+            echo ""
+            echo "=== 4. Laravel cache purge ==="
+            php artisan optimize:clear 2>&1 | tail -10
+
+            echo ""
+            echo "=== 5. Reflection: methods in autoloaded class ==="
+            php artisan tinker --no-interaction --execute='try { $r = new ReflectionClass(App\Models\Meta\MetaSyncLog::class); echo "file=".$r->getFileName().PHP_EOL; foreach (["start","markSuccess","markFailed"] as $m) echo "$m: ".($r->hasMethod($m) ? "EXISTS" : "MISSING").PHP_EOL; } catch (Throwable $e) { echo "EXC: ".$e->getMessage(); }'
+
+            echo ""
+            echo "=== 6. Direct test: create + mark + delete ==="
+            php artisan tinker --no-interaction --execute='try { $log = App\Models\Meta\MetaSyncLog::start("test_cron_fix","test"); echo "created id=".$log->id.PHP_EOL; $log->markSuccess(0,0); echo "markSuccess OK".PHP_EOL; $log->delete(); echo "TEST PASSED".PHP_EOL; } catch (Throwable $e) { echo "TEST FAILED: ".get_class($e).": ".$e->getMessage().PHP_EOL; }'
+
+            echo ""
+            echo "=== 7. Re-config:cache + try meta:sync --type=ig ==="
+            php artisan config:cache 2>&1 | tail -3
+            timeout 60 php artisan meta:sync --type=ig 2>&1 | tail -15
+
+            echo ""
+            echo "=== DONE ==="
