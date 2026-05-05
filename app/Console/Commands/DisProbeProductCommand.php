@@ -32,6 +32,27 @@ class DisProbeProductCommand extends Command
 
         $this->info("Probing DIS for needle={$needle} in [{$start} … {$end}]");
 
+        // ─── Source A: searchItemGroups (the rich endpoint DIS UI uses) ───
+        $this->newLine();
+        $this->line('── A) searchItemGroups (likely rich shape) ──────────');
+        try {
+            $matches = $dis->searchItemGroups($needle);
+            if (empty($matches)) {
+                $this->warn('searchItemGroups returned 0 matches for "'.$needle.'"');
+            } else {
+                foreach ($matches as $m) {
+                    $this->line('Top-level keys: '.implode(', ', array_keys($m)));
+                    $this->line(json_encode($m, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                    $this->newLine();
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->warn('searchItemGroups failed: '.$e->getMessage());
+        }
+
+        // ─── Source B: getWeek (the endpoint Marketing app reads) ──────────
+        $this->newLine();
+        $this->line('── B) getWeek (what Marketing actually consumes) ────');
         try {
             $weeks = $dis->listWeekSummaries($start, $end);
         } catch (\Throwable $e) {
@@ -68,12 +89,10 @@ class DisProbeProductCommand extends Command
 
         $this->newLine();
         if ($hits === 0) {
-            $this->warn("No match for {$needle} across ".count($weeks).' weeks. Try widening --months-back / --months-forward.');
-
-            return self::FAILURE;
+            $this->warn("No match in getWeek across ".count($weeks).' weeks. (Source A above is the more complete endpoint.)');
+        } else {
+            $this->info("getWeek matched {$hits} occurrence(s). Compare A vs B above to see which fields are missing.");
         }
-
-        $this->info("Found {$hits} occurrence(s).");
 
         return self::SUCCESS;
     }
