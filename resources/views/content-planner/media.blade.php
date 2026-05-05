@@ -875,12 +875,67 @@
     }
 
     function renderPagination(data) {
+        // Windowed pager: « ‹ 1 … (cur-1) [cur] (cur+1) … last › »  +  "Faqe X / Y"
+        // Used on the Media grid where a folder can hold thousands of items
+        // (e.g. /imported has ~1900) — rendering one button per page would
+        // print 60+ buttons.
         const el = document.getElementById('mediaPagination');
-        if (data.last_page<=1) { el.innerHTML=''; return; }
-        let html = `<button class="px-2.5 py-1 border border-slate-200 rounded-md bg-white text-xs text-slate-500 hover:border-primary-500" ${data.current_page<=1?'disabled':''} onclick="refreshMedia(${data.current_page-1})">Prev</button>`;
-        for (let i=1;i<=data.last_page;i++) html+=`<button class="px-2.5 py-1 border rounded-md text-xs ${i===data.current_page?'bg-primary-600 text-white border-primary-600':'border-slate-200 bg-white text-slate-500 hover:border-primary-500'}" onclick="refreshMedia(${i})">${i}</button>`;
-        html+=`<button class="px-2.5 py-1 border border-slate-200 rounded-md bg-white text-xs text-slate-500 hover:border-primary-500" ${data.current_page>=data.last_page?'disabled':''} onclick="refreshMedia(${data.current_page+1})">Next</button>`;
-        el.innerHTML=html;
+        while (el.firstChild) el.removeChild(el.firstChild);
+        const last = data.last_page || 1;
+        if (last <= 1) return;
+        const cur = data.current_page || 1;
+
+        const inactive = 'px-2.5 py-1 border rounded-md text-xs border-slate-200 bg-white text-slate-500 hover:border-primary-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200';
+        const active = 'px-2.5 py-1 border rounded-md text-xs bg-primary-600 text-white border-primary-600';
+
+        function navBtn(label, page, disabled, title) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = inactive;
+            b.textContent = label;
+            if (title) b.title = title;
+            if (disabled) b.disabled = true;
+            else b.addEventListener('click', () => refreshMedia(page));
+            return b;
+        }
+        function pageBtn(page) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = page === cur ? active : inactive;
+            b.textContent = String(page);
+            if (page !== cur) b.addEventListener('click', () => refreshMedia(page));
+            return b;
+        }
+        function ellipsis() {
+            const s = document.createElement('span');
+            s.className = 'px-1 py-1 text-xs text-slate-400 select-none';
+            s.textContent = '…';
+            return s;
+        }
+
+        el.appendChild(navBtn('«', 1, cur <= 1, 'Faqja e parë'));
+        el.appendChild(navBtn('‹', cur - 1, cur <= 1, 'Faqja e mëparshme'));
+
+        // Build a small window of pages around `cur`, always including 1 and last.
+        const window = new Set([1, last]);
+        for (let i = cur - 1; i <= cur + 1; i++) {
+            if (i >= 1 && i <= last) window.add(i);
+        }
+        const pages = Array.from(window).sort((a, b) => a - b);
+        let prev = 0;
+        for (const p of pages) {
+            if (p - prev > 1) el.appendChild(ellipsis());
+            el.appendChild(pageBtn(p));
+            prev = p;
+        }
+
+        el.appendChild(navBtn('›', cur + 1, cur >= last, 'Faqja tjetër'));
+        el.appendChild(navBtn('»', last, cur >= last, 'Faqja e fundit'));
+
+        const tag = document.createElement('span');
+        tag.className = 'ml-2 text-xs text-slate-500 self-center tabular-nums';
+        tag.textContent = `Faqe ${cur} / ${last}`;
+        el.appendChild(tag);
     }
 
     async function deleteMedia(id) {
