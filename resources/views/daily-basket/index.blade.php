@@ -3850,10 +3850,10 @@
             coverBtn.type = 'button';
             coverBtn.className = 'db-media-cover-btn';
             coverBtn.dataset.mediaId = String(media.id);
-            coverBtn.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(15,23,42,0.78);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);z-index:5;';
+            coverBtn.style.cssText = 'position:absolute;top:6px;left:6px;background:rgba(15,23,42,0.75);color:#fff;border:none;border-radius:5px;padding:3px 7px;font-size:10px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:3px;backdrop-filter:blur(4px);z-index:5;line-height:1;';
             const ic = document.createElement('iconify-icon');
             ic.setAttribute('icon', 'heroicons-outline:photo');
-            ic.setAttribute('width', '12');
+            ic.setAttribute('width', '10');
             coverBtn.appendChild(ic);
             const lbl = document.createElement('span');
             lbl.textContent = media.cover_path ? 'Cover ✓' : 'Cover';
@@ -4689,6 +4689,36 @@
             },
         });
     };
+
+    // Cover picker save → update the in-memory media + re-render the
+    // selected post sheet so the new cover shows as the <video> poster.
+    // We sit inside the IIFE so we can call findPostById + renderSheet
+    // directly. Tries to mutate post.media in place (fast) and falls
+    // back to a full sheet rebuild when the post is currently selected
+    // (so the user sees the change without reloading the day).
+    window.addEventListener('flare:cover-updated', (e) => {
+        if (!e || !e.detail) return;
+        const { mediaId, coverPath, coverUrl, thumbnailUrl } = e.detail;
+        let touchedPost = null;
+        for (const day of (state.days || [])) {
+            for (const post of (day.posts || [])) {
+                for (const m of (post.media || [])) {
+                    if (String(m.id) === String(mediaId)) {
+                        m.cover_path = coverPath || null;
+                        m.cover_url = coverUrl || null;
+                        if (thumbnailUrl) m.thumbnail_url = thumbnailUrl;
+                        touchedPost = post;
+                    }
+                }
+            }
+        }
+        document.querySelectorAll('.db-media-cover-btn[data-media-id="' + String(mediaId) + '"] span').forEach(s => {
+            s.textContent = coverPath ? 'Cover ✓' : 'Cover';
+        });
+        if (touchedPost && state.selectedPostId === touchedPost.id) {
+            renderSheet(touchedPost);
+        }
+    });
 })();
 </script>
 
@@ -4696,49 +4726,7 @@
 @include('content-planner._partials.media-picker-modal')
 
 {{-- Reel cover picker — shared partial, also used by the planner composer.
-     Communicates back via the `flare:cover-updated` window event. --}}
+     The actual flare:cover-updated listener lives INSIDE the daily-basket
+     IIFE above so it can re-render the post sheet via renderSheet. --}}
 @include('content-planner._partials.cover-picker-modal')
-<script>
-    // When the cover picker saves, refresh the matching post.media entry
-    // in the in-memory state and update every visible Cover button label
-    // without re-rendering the full sheet (preserves video playback +
-    // scroll position on the post detail surface).
-    window.addEventListener('flare:cover-updated', (e) => {
-        if (!e || !e.detail) return;
-        const { mediaId, coverPath, coverUrl, thumbnailUrl } = e.detail;
-        try {
-            const days = (window.state && state.days) || [];
-            for (const day of days) {
-                for (const post of (day.posts || [])) {
-                    for (const m of (post.media || [])) {
-                        if (String(m.id) === String(mediaId)) {
-                            m.cover_path = coverPath || null;
-                            m.cover_url = coverUrl || null;
-                            if (thumbnailUrl) m.thumbnail_url = thumbnailUrl;
-                        }
-                    }
-                }
-            }
-        } catch (err) { /* state shape may differ — best-effort only */ }
-
-        document.querySelectorAll('.db-media-cover-btn[data-media-id="' + String(mediaId) + '"] span').forEach(s => {
-            s.textContent = coverPath ? 'Cover ✓' : 'Cover';
-        });
-
-        // Refresh the live <video> poster so the user sees the new cover
-        // immediately (no page reload). Pause + reset currentTime + reload
-        // forces the browser to repaint the poster instead of keeping the
-        // last frame on screen.
-        const newPoster = coverUrl || thumbnailUrl || '';
-        document.querySelectorAll('video.db-media-video[data-media-id="' + String(mediaId) + '"]').forEach(v => {
-            try {
-                if (newPoster) v.poster = newPoster;
-                else v.removeAttribute('poster');
-                v.pause();
-                v.currentTime = 0;
-                v.load();
-            } catch (err) { /* ignore */ }
-        });
-    });
-</script>
 @endsection

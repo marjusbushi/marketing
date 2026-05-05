@@ -765,10 +765,10 @@
             coverBtn.type = 'button';
             coverBtn.className = 'cp-cover-btn';
             coverBtn.dataset.mediaId = String(media.id || '');
-            coverBtn.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(15,23,42,0.78);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);z-index:5;';
+            coverBtn.style.cssText = 'position:absolute;top:6px;right:6px;background:rgba(15,23,42,0.75);color:#fff;border:none;border-radius:5px;padding:3px 7px;font-size:10px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:3px;backdrop-filter:blur(4px);z-index:5;line-height:1;';
             const ic = document.createElement('iconify-icon');
             ic.setAttribute('icon', 'heroicons-outline:photo');
-            ic.setAttribute('width', '12');
+            ic.setAttribute('width', '10');
             coverBtn.appendChild(ic);
             const lbl = document.createElement('span');
             lbl.textContent = media.cover_path ? 'Cover ✓' : 'Cover';
