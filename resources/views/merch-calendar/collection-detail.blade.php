@@ -330,9 +330,34 @@
         return fallback;
     }
 
-    const STOCK_KEYS = ['total_stock', 'stock_total', 'stock', 'quantity', 'total_qty'];
-    const SOLD_KEYS  = ['total_sold', 'sold_total', 'sold_qty', 'sales_total'];
-    const VAR_KEYS   = ['variations_count', 'variation_count', 'items_count', 'variants_count'];
+    // Same as pickNum but skips zero/negative — needed for prices because
+    // DIS returns `pricelist_price: 0` when the item isn't on a discount
+    // pricelist, and we want to fall through to `rate` instead.
+    function pickPositive(obj, keys, fallback = 0) {
+        if (!obj) return fallback;
+        for (const k of keys) {
+            if (k in obj) {
+                const n = Number(obj[k]);
+                if (Number.isFinite(n) && n > 0) return n;
+            }
+        }
+        return fallback;
+    }
+
+    const STOCK_KEYS    = ['total_stock', 'available_stock', 'stock_total', 'available_qty', 'stock', 'quantity', 'total_qty'];
+    const SOLD_KEYS     = ['total_sold', 'sold_total', 'sold_qty', 'sales_total', 'distributed', 'sold'];
+    const VAR_KEYS      = ['variations_count', 'variants_count', 'variation_count', 'variants', 'items_count'];
+    const BASE_PRICE_KEYS = ['rate', 'avg_price', 'price', 'unit_price'];
+    const LIST_PRICE_KEYS = ['pricelist_price'];
+
+    // Resolve the effective selling price + original (base) price for a
+    // product. DIS model: `rate` = base, `pricelist_price` = active discount.
+    function resolvePrice(g) {
+        const base = pickPositive(g, BASE_PRICE_KEYS);
+        const list = pickPositive(g, LIST_PRICE_KEYS);
+        const hasDiscount = list > 0 && base > 0 && list < base;
+        return { base, list, finalPrice: hasDiscount ? list : base, hasDiscount };
+    }
 
     function proxyImg(url) {
         if (!url) return null;
@@ -613,9 +638,10 @@
     function buildCard(g, realIdx) {
         const cls = g.classification || 'plotesues';
         const cs = classStyles[cls] || classStyles.plotesues;
-        const hasDiscount = g.pricelist_price && g.avg_price && Number(g.pricelist_price) < Number(g.avg_price);
-        const discount = hasDiscount ? calcDiscount(g.avg_price, g.pricelist_price) : 0;
-        const finalPrice = hasDiscount ? g.pricelist_price : g.avg_price;
+        const priceInfo = resolvePrice(g);
+        const hasDiscount = priceInfo.hasDiscount;
+        const discount = hasDiscount ? calcDiscount(priceInfo.base, priceInfo.list) : 0;
+        const finalPrice = priceInfo.finalPrice;
 
         const card = el('div', 'cd-card');
         card.setAttribute('data-group-id', String(Number(g.id)));
@@ -675,8 +701,8 @@
 
         const priceLeft = document.createElement('div');
         if (hasDiscount) {
-            priceLeft.appendChild(el('span', 'cd-price discount', fmtLek(g.pricelist_price)));
-            priceLeft.appendChild(el('span', 'cd-old-price', fmtLek(g.avg_price)));
+            priceLeft.appendChild(el('span', 'cd-price discount', fmtLek(priceInfo.list)));
+            priceLeft.appendChild(el('span', 'cd-old-price', fmtLek(priceInfo.base)));
         } else {
             priceLeft.appendChild(el('span', 'cd-price', fmtLek(finalPrice)));
         }
@@ -913,10 +939,11 @@
 
         const cls = g.classification || 'plotesues';
         const cs = classStyles[cls] || classStyles.plotesues;
-        const hasDiscount = g.pricelist_price && g.avg_price && Number(g.pricelist_price) < Number(g.avg_price);
-        const discount = hasDiscount ? calcDiscount(g.avg_price, g.pricelist_price) : 0;
+        const priceInfo = resolvePrice(g);
+        const hasDiscount = priceInfo.hasDiscount;
+        const discount = hasDiscount ? calcDiscount(priceInfo.base, priceInfo.list) : 0;
         const stkQty = pickNum(g, STOCK_KEYS);
-        const stockValue = stkQty * ((hasDiscount ? g.pricelist_price : g.avg_price) || 0);
+        const stockValue = stkQty * priceInfo.finalPrice;
 
         const inner = document.getElementById('cdModalInner');
         clearChildren(inner);
@@ -984,11 +1011,11 @@
 
         const priceBlock = document.createElement('div');
         priceBlock.style.cssText = 'flex-shrink:0; padding-right:12px; border-right:1px solid #e2e8f0;';
-        const priceTop = el('div', null, fmtLek(hasDiscount ? g.pricelist_price : g.avg_price));
+        const priceTop = el('div', null, fmtLek(priceInfo.finalPrice));
         priceTop.style.cssText = `font-size:17px; font-weight:800; line-height:1; color:${hasDiscount ? '#dc2626' : '#0f172a'};`;
         priceBlock.appendChild(priceTop);
         if (hasDiscount) {
-            const old = el('span', 'cd-old-price', fmtLek(g.avg_price));
+            const old = el('span', 'cd-old-price', fmtLek(priceInfo.base));
             old.style.fontSize = '10px';
             priceBlock.appendChild(old);
         }

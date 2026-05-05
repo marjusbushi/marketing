@@ -1904,7 +1904,18 @@
         meta.className = 'db-p-meta';
         const metaParts = [];
         if (p.sku) metaParts.push(p.sku);
-        if (p.price) metaParts.push(Math.round(p.price).toLocaleString('sq-AL') + ' L');
+        if (p.price) {
+            // When pricelist beats base, show "590 L (nga 790 L)" so the
+            // marketing team sees the actual selling price + the original.
+            if (p.has_discount && p.base_price && p.base_price > p.price) {
+                metaParts.push(
+                    Math.round(p.price).toLocaleString('sq-AL') + ' L (nga ' +
+                    Math.round(p.base_price).toLocaleString('sq-AL') + ' L)'
+                );
+            } else {
+                metaParts.push(Math.round(p.price).toLocaleString('sq-AL') + ' L');
+            }
+        }
         metaParts.push((p.stock || 0) + ' pcs');
         if (Number(p.sold) > 0) metaParts.push(Number(p.sold) + ' shitur');
         meta.textContent = metaParts.join(' · ');

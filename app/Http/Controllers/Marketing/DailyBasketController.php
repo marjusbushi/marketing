@@ -45,15 +45,33 @@ class DailyBasketController extends Controller
      * Read the first key from $row that holds a numeric value (int, float,
      * or numeric string). Returns null when none of the candidates exist
      * with usable data — caller decides the fallback. Lets us tolerate
-     * DIS schema renames without a one-line cascade everywhere.
+     * DIS schema renames without a one-line cascade everywhere. Returns
+     * float so decimal prices survive; cast to int at the call site for
+     * counts.
      */
-    private static function firstNumeric(array $row, array $candidates): ?int
+    private static function firstNumeric(array $row, array $candidates): ?float
     {
         foreach ($candidates as $key) {
             if (! array_key_exists($key, $row)) continue;
             $v = $row[$key];
-            if (is_int($v) || is_float($v)) return (int) $v;
-            if (is_string($v) && is_numeric($v)) return (int) $v;
+            if (is_int($v) || is_float($v)) return (float) $v;
+            if (is_string($v) && is_numeric($v)) return (float) $v;
+        }
+        return null;
+    }
+
+    /**
+     * Same as firstNumeric, but skips 0 / negative values. Used for prices —
+     * DIS often returns `pricelist_price: 0` when the product isn't on a
+     * discount pricelist, in which case we want to fall through to `rate`
+     * instead of treating 0 as the price.
+     */
+    private static function firstPositive(array $row, array $candidates): ?float
+    {
+        foreach ($candidates as $key) {
+            if (! array_key_exists($key, $row)) continue;
+            $v = $row[$key];
+            if (is_numeric($v) && (float) $v > 0) return (float) $v;
         }
         return null;
     }
@@ -408,7 +426,11 @@ class DailyBasketController extends Controller
 
         $products = array_map(function ($p) use ($pivotCountByProduct) {
             $id = (int) ($p['id'] ?? 0);
-            $price = (float) ($p['pricelist_price'] ?? $p['avg_price'] ?? 0);
+            // base_price + effective_price + has_discount were already
+            // resolved in loadCollectionProducts (`rate` vs `pricelist_price`).
+            $base = (float) ($p['base_price'] ?? 0);
+            $price = (float) ($p['effective_price'] ?? $base);
+            $hasDiscount = (bool) ($p['has_discount'] ?? false);
             $stock = (int) ($p['total_stock'] ?? 0);
             $sold  = (int) ($p['total_sold'] ?? 0);
             $postsCount = (int) ($pivotCountByProduct[$id] ?? 0);
@@ -425,6 +447,8 @@ class DailyBasketController extends Controller
                 'sku' => $p['code'] ?? null,
                 'thumbnail_url' => $p['image_url'] ?? null,
                 'price' => round($price, 2),
+                'base_price' => round($base, 2),
+                'has_discount' => $hasDiscount,
                 'stock' => $stock,
                 'sold' => $sold,
                 'total_value' => round($price * $stock, 2),
@@ -497,8 +521,17 @@ class DailyBasketController extends Controller
                 // known synonyms before giving up. If none of them resolve
                 // to a numeric value, log so the next run of
                 // `dis:probe-product` shows what DIS actually sent.
-                $stock = self::firstNumeric($g, ['total_stock', 'stock_total', 'stock', 'quantity', 'total_qty']);
-                $sold  = self::firstNumeric($g, ['total_sold', 'sold_total', 'sold_qty', 'sales_total']);
+                $stock = self::firstNumeric($g, ['total_stock', 'available_stock', 'stock_total', 'available_qty', 'stock', 'quantity', 'total_qty']);
+                $sold  = self::firstNumeric($g, ['total_sold', 'sold_total', 'sold_qty', 'sales_total', 'distributed', 'sold']);
+
+                // DIS pricing model:
+                //   `rate`             = base/list price (what the item is normally sold at)
+                //   `pricelist_price`  = discounted price when the item sits on an active pricelist
+                //   `avg_price`        = average across variants (if they have different rates)
+                // Effective price = pricelist (if set & lower) else base.
+                $base = self::firstPositive($g, ['rate', 'avg_price', 'price', 'unit_price']) ?? 0.0;
+                $list = self::firstPositive($g, ['pricelist_price']) ?? 0.0;
+                $effective = ($list > 0 && $base > 0 && $list < $base) ? $list : $base;
                 if ($stock === null) {
                     \Log::warning('daily_basket: missing stock field for item_group', [
                         'item_group_id' => $g['id'] ?? null,
@@ -515,6 +548,9 @@ class DailyBasketController extends Controller
                     'image_url' => $g['image_url'] ?? null,
                     'avg_price' => $g['avg_price'] ?? null,
                     'pricelist_price' => $g['pricelist_price'] ?? null,
+                    'base_price' => $base,             // pre-discount, what `rate` shows in DIS UI
+                    'effective_price' => $effective,   // what we charge today (pricelist if discounted)
+                    'has_discount' => ($list > 0 && $base > 0 && $list < $base),
                     'classification' => $g['classification'] ?? null,
                     'total_stock' => $stock ?? 0,
                     'total_sold' => $sold ?? 0,
