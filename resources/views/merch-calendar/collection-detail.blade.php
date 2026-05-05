@@ -56,7 +56,15 @@
 
     /* Toolbar */
     .cd-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-    .cd-toolbar-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .cd-toolbar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .cd-search {
+        font-size: 12px; padding: 6px 10px; border-radius: 6px;
+        border: 1px solid #e2e8f0; background: #fff; color: #0f172a;
+        min-width: 220px;
+    }
+    .cd-search::placeholder { color: #94a3b8; }
+    .cd-search:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+    .cd-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .cd-filter-btn { padding: 6px 12px; font-size: 12px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; transition: all 0.1s; }
     .cd-filter-btn:hover:not(.active) { background: #f8fafc; }
     .cd-filter-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
@@ -222,8 +230,13 @@
 
     {{-- Toolbar --}}
     <div class="cd-toolbar">
-        <div class="cd-toolbar-left" id="cdFilterBar">
-            {{-- Rendered by JS --}}
+        <div class="cd-toolbar-left">
+            <input type="search" class="cd-search" id="cdSearch"
+                placeholder="Kërko emër, kod, vendor, kategori…"
+                aria-label="Kërko produkt" autocomplete="off" />
+            <div class="cd-filters" id="cdFilterBar">
+                {{-- Rendered by JS --}}
+            </div>
         </div>
         <div class="cd-toolbar-right">
             <span id="cdShownLabel">0 produkte</span>
@@ -275,6 +288,7 @@
 
     let collectionData = COLLECTION;
     let currentFilter  = 'all';
+    let currentSearch  = '';
     let viewMode       = (() => {
         try { return localStorage.getItem('cd-view-mode') === 'list' ? 'list' : 'grid'; }
         catch (_) { return 'grid'; }
@@ -415,8 +429,24 @@
         });
     }
 
+    // Apply free-text search against name + code + vendor + category.
+    // Empty query → returns the input unchanged (no filtering).
+    function applySearch(groups, query) {
+        const q = (query || '').trim().toLowerCase();
+        if (!q) return groups;
+        return groups.filter(g => {
+            const haystack = [
+                g.name, g.code, g.vendor_name, g.category_name,
+            ].map(v => String(v || '').toLowerCase());
+            return haystack.some(s => s.includes(q));
+        });
+    }
+
     function renderFilterBar() {
-        const groups = collectionData?.item_groups || [];
+        // Counts reflect the current search so user understands what each
+        // chip would yield with the active query.
+        const allGroups = collectionData?.item_groups || [];
+        const groups = applySearch(allGroups, currentSearch);
         const classCount = {};
         groups.forEach(g => {
             const cls = g.classification || 'plotesues';
@@ -446,9 +476,10 @@
 
     function renderProducts() {
         const allGroups = collectionData?.item_groups || [];
+        const searched = applySearch(allGroups, currentSearch);
         const groups = currentFilter === 'all'
-            ? allGroups
-            : allGroups.filter(g => (g.classification || 'plotesues') === currentFilter);
+            ? searched
+            : searched.filter(g => (g.classification || 'plotesues') === currentFilter);
 
         const total = groups.length;
         const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -476,8 +507,12 @@
         }
 
         if (!total) {
-            const empty = el('div', 'cd-empty',
-                allGroups.length === 0 ? 'Asnjë produkt në këtë koleksion.' : 'Asnjë produkt me këtë klasifikim.');
+            const emptyMsg = allGroups.length === 0
+                ? 'Asnjë produkt në këtë koleksion.'
+                : (currentSearch
+                    ? 'Asnjë produkt nuk përputhet me kërkimin.'
+                    : 'Asnjë produkt me këtë klasifikim.');
+            const empty = el('div', 'cd-empty', emptyMsg);
             grid.appendChild(empty);
             renderPagination(total, totalPages);
             return;
@@ -991,6 +1026,18 @@
     const pageSizeSelect = document.getElementById('cdPageSize');
     pageSizeSelect.value = String(pageSize);
     pageSizeSelect.addEventListener('change', (e) => setPageSize(e.target.value));
+
+    // Search — re-renders chips (counts) + grid; resets to first page so
+    // the user immediately sees results instead of an empty middle page.
+    const searchInput = document.getElementById('cdSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value;
+            currentPage = 1;
+            renderFilterBar();
+            renderProducts();
+        });
+    }
 
     renderNotes();
     renderStats();
