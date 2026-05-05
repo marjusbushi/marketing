@@ -3826,39 +3826,31 @@
         if (media.is_video) {
             const posterUrl = media.cover_url || media.thumbnail_url || '';
 
-            // Paint the cover as a CSS background on the slot itself.
-            // Every previous attempt that put an <img> or <video> child
-            // inside the slot rendered pure black for the user — almost
-            // certainly because the slot is a flex column and the
-            // children were getting their dimensions collapsed despite
-            // explicit position:absolute / 100%. Background-image on the
-            // slot can't be hidden by flex layout, video compositing,
-            // or sibling stacking. Tested directly in the browser.
-            if (posterUrl) {
-                const safe = String(posterUrl).replace(/"/g, '%22');
-                tile.style.backgroundImage = 'url("' + safe + '")';
-                tile.style.backgroundSize = 'contain';
-                tile.style.backgroundRepeat = 'no-repeat';
-                tile.style.backgroundPosition = 'center';
-                tile.style.backgroundColor = '#000';
-                tile.dataset.coverMediaId = String(media.id);
+            // Strip the flex column layout the slot inherits from the
+            // upload-empty state — that's what was collapsing every
+            // previous child element to zero size. With block display
+            // and aspect-ratio still in effect, a plain <img> with
+            // width/height 100% fills the slot exactly.
+            tile.style.display = 'block';
+            tile.style.padding = '0';
+            tile.style.background = '#000';
 
-                // Probe so a fetch failure surfaces instead of looking
-                // like the picker silently broke.
-                const probe = new Image();
-                probe.onerror = () => console.warn('[cover] poster failed to load', posterUrl);
-                probe.src = posterUrl;
+            if (posterUrl) {
+                const img = document.createElement('img');
+                img.src = posterUrl;
+                img.alt = '';
+                img.style.cssText = 'width:100%; height:100%; object-fit:contain; display:block;';
+                img.dataset.mediaId = String(media.id);
+                img.onerror = () => { console.warn('[cover] image failed', posterUrl); };
+                tile.appendChild(img);
 
                 const badge = document.createElement('div');
                 badge.style.cssText = 'position:absolute; bottom:8px; right:8px; background:rgba(15,23,42,0.78); color:#fff; padding:3px 7px; border-radius:5px; font-size:10px; font-weight:600; pointer-events:none; z-index:1;';
                 badge.textContent = '▶ Video';
                 tile.appendChild(badge);
             } else {
-                // No cover/thumb yet — slate placeholder so the tile
-                // doesn't read as broken.
-                tile.style.backgroundColor = '#1f2937';
                 const placeholder = document.createElement('div');
-                placeholder.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.55); font-size:11px;';
+                placeholder.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.55); font-size:11px; background:#1f2937;';
                 placeholder.textContent = 'Video pa cover';
                 tile.appendChild(placeholder);
             }
