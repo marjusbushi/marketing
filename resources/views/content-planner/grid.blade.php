@@ -1187,7 +1187,29 @@
             }
             return actions;
         }
-        // Planned-post actions
+        // Daily-basket drafts have their own edit surface (reference URL,
+        // production notes, product links). The composer doesn't model
+        // those, so route the edit back to /marketing/daily-basket where
+        // the full flow lives. Loading the composer with a db_draft_* id
+        // would 404 against /api/posts and surface as an empty editor.
+        if (p.is_draft_basket) {
+            return [
+                {
+                    kind: 'primary',
+                    label: 'Edito te Shporta Ditore',
+                    onClick: () => {
+                        const base = '{{ route('marketing.daily-basket.index') }}';
+                        const qs = new URLSearchParams();
+                        if (p.distribution_week_id) qs.set('week', p.distribution_week_id);
+                        if (p.basket_date) qs.set('date', p.basket_date);
+                        if (p.db_post_id) qs.set('post', p.db_post_id);
+                        closePostPreview();
+                        window.location.href = base + (qs.toString() ? ('?' + qs.toString()) : '');
+                    },
+                },
+            ];
+        }
+        // Planned-post actions (ContentPost rows)
         return [
             { kind: 'primary', label: 'Edito brief', onClick: () => editFromPreview() },
         ];
