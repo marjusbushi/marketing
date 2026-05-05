@@ -314,6 +314,26 @@
 
     // ─── Helpers ───────────────────────────────────────
 
+    // Pick the first numeric value from `obj` across `keys`. Returns 0 when
+    // none resolve — lets the UI tolerate DIS schema renames (stock_total,
+    // total_stock, stock, quantity…) without code edits.
+    function pickNum(obj, keys, fallback = 0) {
+        if (!obj) return fallback;
+        for (const k of keys) {
+            if (k in obj) {
+                const v = obj[k];
+                if (v === null || v === undefined || v === '') continue;
+                const n = Number(v);
+                if (!Number.isNaN(n)) return n;
+            }
+        }
+        return fallback;
+    }
+
+    const STOCK_KEYS = ['total_stock', 'stock_total', 'stock', 'quantity', 'total_qty'];
+    const SOLD_KEYS  = ['total_sold', 'sold_total', 'sold_qty', 'sales_total'];
+    const VAR_KEYS   = ['variations_count', 'variation_count', 'items_count', 'variants_count'];
+
     function proxyImg(url) {
         if (!url) return null;
         if (url.startsWith('https://web-cdn.zeroabsolute.com/')) {
@@ -381,7 +401,12 @@
     function renderStats() {
         const stats = collectionData?.stats || {};
         const groups = collectionData?.item_groups || [];
-        const totalSold = groups.reduce((acc, g) => acc + Number(g.total_sold || 0), 0);
+        // Sum across products using defensive key lookup so a DIS rename
+        // doesn't silently zero out the collection-level totals.
+        const totalSold  = groups.reduce((acc, g) => acc + pickNum(g, SOLD_KEYS), 0);
+        const totalStock = stats.total_stock != null
+            ? Number(stats.total_stock)
+            : groups.reduce((acc, g) => acc + pickNum(g, STOCK_KEYS), 0);
 
         const classCount = { best_seller: 0, karrem: 0, fashion: 0, plotesues: 0 };
         groups.forEach(g => {
@@ -394,7 +419,7 @@
 
         const cells = [
             { lbl: 'Grupe produktesh', val: String(stats.total_groups || groups.length || 0) },
-            { lbl: 'Stok total',       val: (stats.total_stock || 0).toLocaleString('sq-AL'), sub: 'copë' },
+            { lbl: 'Stok total',       val: totalStock.toLocaleString('sq-AL'), sub: 'copë' },
             { lbl: 'Vlera stokut',     val: fmtLek(stats.total_stock_value) },
             { lbl: 'Shitur',           val: String(totalSold), success: totalSold > 0 },
             { lbl: 'Range çmimi',
@@ -658,12 +683,13 @@
         priceRow.appendChild(priceLeft);
 
         const stock = el('div', 'cd-stock');
-        stock.appendChild(document.createTextNode(
-            Number(g.variations_count || 0) + ' var · ' + Number(g.total_stock || 0) + ' stk'
-        ));
-        if (g.total_sold) {
+        const stkVar = pickNum(g, VAR_KEYS);
+        const stkQty = pickNum(g, STOCK_KEYS);
+        const stkSold = pickNum(g, SOLD_KEYS);
+        stock.appendChild(document.createTextNode(stkVar + ' var · ' + stkQty + ' stk'));
+        if (stkSold > 0) {
             stock.appendChild(el('br'));
-            stock.appendChild(el('span', 'cd-sold', Number(g.total_sold) + ' shitur'));
+            stock.appendChild(el('span', 'cd-sold', stkSold + ' shitur'));
         }
         priceRow.appendChild(stock);
 
@@ -889,7 +915,8 @@
         const cs = classStyles[cls] || classStyles.plotesues;
         const hasDiscount = g.pricelist_price && g.avg_price && Number(g.pricelist_price) < Number(g.avg_price);
         const discount = hasDiscount ? calcDiscount(g.avg_price, g.pricelist_price) : 0;
-        const stockValue = (g.total_stock || 0) * ((hasDiscount ? g.pricelist_price : g.avg_price) || 0);
+        const stkQty = pickNum(g, STOCK_KEYS);
+        const stockValue = stkQty * ((hasDiscount ? g.pricelist_price : g.avg_price) || 0);
 
         const inner = document.getElementById('cdModalInner');
         clearChildren(inner);
@@ -969,11 +996,13 @@
 
         const statsWrap = document.createElement('div');
         statsWrap.style.cssText = 'display:flex; gap:10px; padding-left:12px; flex:1; justify-content:space-around;';
+        const modalSold = pickNum(g, SOLD_KEYS);
+        const modalVar  = pickNum(g, VAR_KEYS);
         [
-            { v: Number(g.total_stock || 0),       lbl: 'Stok',   color: '#0f172a' },
-            { v: Number(g.total_sold || 0),        lbl: 'Shitur', color: g.total_sold ? '#22c55e' : '#94a3b8' },
-            { v: Number(g.variations_count || 0),  lbl: 'Var',    color: '#0f172a' },
-            { v: fmtLek(stockValue),               lbl: 'Vlerë',  color: '#166534', small: true },
+            { v: stkQty,                          lbl: 'Stok',   color: '#0f172a' },
+            { v: modalSold,                       lbl: 'Shitur', color: modalSold > 0 ? '#22c55e' : '#94a3b8' },
+            { v: modalVar,                        lbl: 'Var',    color: '#0f172a' },
+            { v: fmtLek(stockValue),              lbl: 'Vlerë',  color: '#166534', small: true },
         ].forEach(s => {
             const cell = document.createElement('div');
             cell.style.textAlign = 'center';
