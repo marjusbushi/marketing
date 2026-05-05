@@ -4692,16 +4692,16 @@
 
     // Cover picker save → update the in-memory media + re-render the
     // selected post sheet so the new cover shows as the <video> poster.
-    // We sit inside the IIFE so we can call findPostById + renderSheet
-    // directly. Tries to mutate post.media in place (fast) and falls
-    // back to a full sheet rebuild when the post is currently selected
-    // (so the user sees the change without reloading the day).
+    // Posts live under state.kanban.columns[].posts[] (NOT state.days
+    // which only carries day-level totals). Walk the kanban — same
+    // shape findPostById uses.
     window.addEventListener('flare:cover-updated', (e) => {
         if (!e || !e.detail) return;
         const { mediaId, coverPath, coverUrl, thumbnailUrl } = e.detail;
         let touchedPost = null;
-        for (const day of (state.days || [])) {
-            for (const post of (day.posts || [])) {
+        const columns = state.kanban?.columns || [];
+        for (const col of columns) {
+            for (const post of (col.posts || [])) {
                 for (const m of (post.media || [])) {
                     if (String(m.id) === String(mediaId)) {
                         m.cover_path = coverPath || null;
