@@ -66,8 +66,11 @@ class DailyBasketController extends Controller
         $end   = $request->input('end',   now()->addMonths(2)->endOfMonth()->toDateString());
 
         $cacheKey = 'daily_basket:collection_list:'.$start.':'.$end;
+        if ($request->boolean('fresh')) {
+            Cache::forget($cacheKey);
+        }
 
-        $weeks = Cache::remember($cacheKey, 300, function () use ($start, $end) {
+        $weeks = Cache::remember($cacheKey, 60, function () use ($start, $end) {
             try {
                 return $this->disApi->listWeeks($start, $end);
             } catch (\Throwable $e) {
@@ -324,11 +327,14 @@ class DailyBasketController extends Controller
      * A single round-trip avoids N+1 queries from the frontend when the
      * user attaches/detaches products and the rail re-fetches.
      */
-    public function coverage(DailyBasket $basket): JsonResponse
+    public function coverage(Request $request, DailyBasket $basket): JsonResponse
     {
         $basket->load(['posts' => fn ($q) => $q]);
 
-        $collectionProducts = $this->loadCollectionProducts($basket->distribution_week_id);
+        // ?fresh=1 bypasses the 60s cache so a manual refresh always pulls
+        // the latest stock/value/assignments from DIS.
+        $bypassCache = $request->boolean('fresh');
+        $collectionProducts = $this->loadCollectionProducts($basket->distribution_week_id, $bypassCache);
 
         $postIds = $basket->posts->pluck('id')->all();
         $pivotCountByProduct = empty($postIds)
@@ -441,16 +447,22 @@ class DailyBasketController extends Controller
 
     /**
      * Fetch the item_groups of a DIS distribution_week, shaped for the
-     * product picker UI. Cached 5 minutes.
+     * product picker UI. Cached 60 seconds — short TTL keeps stock/value
+     * fresh while still absorbing the burst of identical reads that happen
+     * when the rail re-renders. Pass $bypassCache=true to forge a brand-new
+     * read (used by the manual "Rifresko" button + write hooks).
      *
      * Returns an empty array (plus logs) on DIS errors — the basket UI
      * stays usable even when DIS is unreachable.
      */
-    private function loadCollectionProducts(int $distributionWeekId): array
+    private function loadCollectionProducts(int $distributionWeekId, bool $bypassCache = false): array
     {
         $cacheKey = 'daily_basket:collection_products:'.$distributionWeekId;
+        if ($bypassCache) {
+            Cache::forget($cacheKey);
+        }
 
-        return Cache::remember($cacheKey, 300, function () use ($distributionWeekId) {
+        return Cache::remember($cacheKey, 60, function () use ($distributionWeekId) {
             try {
                 $week = $this->disApi->getWeek($distributionWeekId);
             } catch (\Throwable $e) {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\DisApiClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class MerchCalendarController extends Controller
@@ -217,6 +218,8 @@ class MerchCalendarController extends Controller
             $validated['is_primary'] ?? true,
         );
 
+        $this->invalidateBasketCache($weekId);
+
         return response()->json($result);
     }
 
@@ -227,7 +230,20 @@ class MerchCalendarController extends Controller
     {
         $result = $this->disApi->removeGroupDate($weekId, $groupId, $dateId);
 
+        $this->invalidateBasketCache($weekId);
+
         return response()->json($result);
+    }
+
+    /**
+     * Drop the Daily Basket cache entries that depend on this week so the
+     * next /coverage request reads the freshly-saved DIS state instead of
+     * a stale snapshot. Without this invalidation, products assigned via
+     * Merch Calendar would not appear in Shporta Ditore for up to 60s.
+     */
+    private function invalidateBasketCache(int $weekId): void
+    {
+        Cache::forget('daily_basket:collection_products:'.$weekId);
     }
 
     /**

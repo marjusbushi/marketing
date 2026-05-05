@@ -434,6 +434,24 @@
         color: var(--db-text-2); cursor: pointer; max-width: 120px;
     }
     .db-rail-filter:focus { outline: none; border-color: var(--db-text); }
+    .db-rail-hdr-tools { display: flex; align-items: center; gap: 6px; }
+    .db-rail-refresh {
+        width: 22px; height: 22px; border-radius: 50%;
+        border: 1px solid var(--db-border); background: #fff;
+        color: var(--db-text-2); font-size: 13px; line-height: 1;
+        cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+        transition: background 0.15s, transform 0.15s;
+    }
+    .db-rail-refresh:hover:not([disabled]) { background: var(--db-accent-soft); }
+    .db-rail-refresh[disabled] { opacity: 0.6; cursor: progress; }
+    .db-rail-refresh.spinning { animation: db-spin 0.7s linear infinite; }
+    @keyframes db-spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+    }
+    .db-rail-hdr-stamp {
+        font-size: 10px; color: var(--db-text-3); margin-top: 2px;
+    }
     .db-rail-search {
         width: 100%; margin-top: 8px;
         font-size: 11px; padding: 5px 8px; border-radius: 5px;
@@ -1193,18 +1211,23 @@
             <div class="db-rail-hdr">
                 <div class="db-rail-hdr-top">
                     <div class="db-rail-hdr-title">📦 Shporta e ditës</div>
-                    <select class="db-rail-filter" id="dbRailFilter" aria-label="Filtro produktet">
-                        <option value="all">Të gjitha</option>
-                        <option value="uncovered">Të pambuluara</option>
-                        <option value="karrem">Karrem</option>
-                        <option value="fashion">Fashion</option>
-                        <option value="plotesues">Plotesues</option>
-                        <option value="best_seller">Best Seller</option>
-                    </select>
+                    <div class="db-rail-hdr-tools">
+                        <button type="button" class="db-rail-refresh" id="dbRailRefresh"
+                            title="Rifresko nga DIS" aria-label="Rifresko nga DIS">↻</button>
+                        <select class="db-rail-filter" id="dbRailFilter" aria-label="Filtro produktet">
+                            <option value="all">Të gjitha</option>
+                            <option value="uncovered">Të pambuluara</option>
+                            <option value="karrem">Karrem</option>
+                            <option value="fashion">Fashion</option>
+                            <option value="plotesues">Plotesues</option>
+                            <option value="best_seller">Best Seller</option>
+                        </select>
+                    </div>
                 </div>
                 <input type="search" class="db-rail-search" id="dbRailSearch"
                     placeholder="Kërko emër, SKU ose grup…" aria-label="Kërko produkt" autocomplete="off" />
                 <div class="db-rail-hdr-sub" id="dbRailSub">—</div>
+                <div class="db-rail-hdr-stamp" id="dbRailStamp"></div>
             </div>
             <div class="db-rail-cov-bar" id="dbRailCovBar">—</div>
             <div class="db-rail-list" id="dbRailList">
@@ -1664,15 +1687,19 @@
     // fetch is in flight, the stale response could land last and clobber
     // the current day's rail. We capture the basketId at call time and
     // bail on mismatch after the promise resolves.
-    async function loadCoverage(basketId) {
+    async function loadCoverage(basketId, force = false) {
         if (!basketId) return;
         const pendingBasketId = num(basketId);
+        const url = '/marketing/daily-basket/api/baskets/' + pendingBasketId
+            + '/coverage' + (force ? '?fresh=1' : '');
         try {
-            const data = await apiGet('/marketing/daily-basket/api/baskets/' + pendingBasketId + '/coverage');
+            const data = await apiGet(url);
             if (num(state.kanban?.basket?.id) !== pendingBasketId) return; // stale
             state.coverage = data;
+            state.coverageFetchedAt = Date.now();
             renderSummary(data);
             renderRail(data);
+            renderRailStamp();
         } catch (e) {
             if (num(state.kanban?.basket?.id) !== pendingBasketId) return; // stale
             // Non-fatal — keep the board usable even if coverage fails.
@@ -1680,6 +1707,17 @@
             renderSummary(null);
             renderRail(null);
         }
+    }
+
+    function renderRailStamp() {
+        const el = document.getElementById('dbRailStamp');
+        if (!el) return;
+        if (!state.coverageFetchedAt) { el.textContent = ''; return; }
+        const d = new Date(state.coverageFetchedAt);
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        el.textContent = 'Rifreskuar: ' + hh + ':' + mm + ':' + ss;
     }
 
     function renderSummary(coverage) {
@@ -4440,6 +4478,23 @@
         document.getElementById('dbRailSearch').addEventListener('input', (e) => {
             railState.search = e.target.value;
             if (state.coverage) renderRail(state.coverage);
+        });
+
+        // Rail refresh — bypasses Laravel cache (?fresh=1) so the user
+        // immediately sees DIS-side changes (stock, value, new product
+        // assignments from Merch Calendar). Spinner during in-flight.
+        document.getElementById('dbRailRefresh').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const basketId = state.kanban?.basket?.id;
+            if (!basketId) return;
+            btn.disabled = true;
+            btn.classList.add('spinning');
+            try {
+                await loadCoverage(basketId, true);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('spinning');
+            }
         });
 
         // (The legacy #dbFieldPlatforms wiring lived in the edit modal; that
