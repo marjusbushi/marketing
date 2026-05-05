@@ -3824,55 +3824,52 @@
         }
 
         if (media.is_video) {
-            const video = document.createElement('video');
-            video.className = 'db-media-video';
-            video.src = media.url;
-            // poster is the browser-native fallback; we ALSO render an
-            // explicit <img> overlay below because Chrome routinely
-            // ignores poster once metadata loads and shows the first
-            // video frame instead — which for many CapCut intros is
-            // black, defeating the whole point of picking a cover.
             const posterUrl = media.cover_url || media.thumbnail_url || '';
-            if (posterUrl) video.poster = posterUrl;
-            video.controls = true;
-            video.playsInline = true;
-            video.preload = 'metadata';
-            video.setAttribute('controls', '');
-            video.setAttribute('playsinline', '');
-            video.dataset.mediaId = String(media.id);
-            tile.appendChild(video);
 
-            // Visible cover overlay — sits above the video, hides on
-            // click and triggers playback. After play it stays gone for
-            // the rest of the session (mirrors IG / TikTok feed cards).
-            // Use background-image rather than a child <img> so the
-            // image always centers/contains correctly inside the slot
-            // regardless of flex / aspect-ratio quirks.
+            // Image-first render. <video> creates a hardware-accelerated
+            // layer that's been observed to occlude sibling overlays even
+            // with z-index. Mount a plain <img> for the cover and only
+            // swap in <video> on user click — mirrors IG / TikTok feed.
             if (posterUrl) {
-                const overlay = document.createElement('div');
-                overlay.className = 'db-media-cover-overlay';
-                overlay.dataset.mediaId = String(media.id);
-                const safeUrl = String(posterUrl).replace(/"/g, '%22');
-                overlay.style.cssText = 'position:absolute; inset:0; background:#000 url("' + safeUrl + '") center/contain no-repeat; cursor:pointer; z-index:1;';
+                const img = document.createElement('img');
+                img.className = 'db-media-video';
+                img.src = posterUrl;
+                img.alt = '';
+                img.style.cssText = 'cursor:pointer;';
+                img.dataset.mediaId = String(media.id);
+                img.onerror = () => { console.warn('[cover] image failed to load', posterUrl); };
+                tile.appendChild(img);
 
                 const playIcon = document.createElement('div');
+                playIcon.className = 'db-media-play-icon';
                 playIcon.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; color:rgba(255,255,255,0.92); font-size:48px; text-shadow:0 2px 10px rgba(0,0,0,0.55);';
                 playIcon.textContent = '▶';
-                overlay.appendChild(playIcon);
+                tile.appendChild(playIcon);
 
-                // Probe the URL so a CDN / CORS / 404 failure surfaces in
-                // the console instead of looking like the picker is broken.
-                const probe = new Image();
-                probe.onerror = () => {
-                    console.warn('[cover-overlay] poster failed to load', posterUrl);
-                };
-                probe.src = posterUrl;
-
-                overlay.addEventListener('click', () => {
-                    overlay.remove();
-                    video.play().catch(() => { /* autoplay policy may block; user already clicked so should be fine */ });
+                img.addEventListener('click', () => {
+                    const video = document.createElement('video');
+                    video.className = 'db-media-video';
+                    video.src = media.url;
+                    video.poster = posterUrl;
+                    video.controls = true;
+                    video.playsInline = true;
+                    video.preload = 'metadata';
+                    video.autoplay = true;
+                    video.dataset.mediaId = String(media.id);
+                    tile.replaceChild(video, img);
+                    playIcon.remove();
+                    video.play().catch(() => {});
                 });
-                tile.appendChild(overlay);
+            } else {
+                // No cover/thumb — mount <video> directly.
+                const video = document.createElement('video');
+                video.className = 'db-media-video';
+                video.src = media.url;
+                video.controls = true;
+                video.playsInline = true;
+                video.preload = 'metadata';
+                video.dataset.mediaId = String(media.id);
+                tile.appendChild(video);
             }
 
             // Cover picker — same flow as the planner composer. Posts to
