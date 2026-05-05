@@ -3845,20 +3845,29 @@
             // Visible cover overlay — sits above the video, hides on
             // click and triggers playback. After play it stays gone for
             // the rest of the session (mirrors IG / TikTok feed cards).
+            // Use background-image rather than a child <img> so the
+            // image always centers/contains correctly inside the slot
+            // regardless of flex / aspect-ratio quirks.
             if (posterUrl) {
                 const overlay = document.createElement('div');
                 overlay.className = 'db-media-cover-overlay';
                 overlay.dataset.mediaId = String(media.id);
-                overlay.style.cssText = 'position:absolute; inset:0; background:#000; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center;';
-                const overlayImg = document.createElement('img');
-                overlayImg.src = posterUrl;
-                overlayImg.alt = '';
-                overlayImg.style.cssText = 'width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;';
-                overlay.appendChild(overlayImg);
+                const safeUrl = String(posterUrl).replace(/"/g, '%22');
+                overlay.style.cssText = 'position:absolute; inset:0; background:#000 url("' + safeUrl + '") center/contain no-repeat; cursor:pointer; z-index:1;';
+
                 const playIcon = document.createElement('div');
                 playIcon.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; color:rgba(255,255,255,0.92); font-size:48px; text-shadow:0 2px 10px rgba(0,0,0,0.55);';
                 playIcon.textContent = '▶';
                 overlay.appendChild(playIcon);
+
+                // Probe the URL so a CDN / CORS / 404 failure surfaces in
+                // the console instead of looking like the picker is broken.
+                const probe = new Image();
+                probe.onerror = () => {
+                    console.warn('[cover-overlay] poster failed to load', posterUrl);
+                };
+                probe.src = posterUrl;
+
                 overlay.addEventListener('click', () => {
                     overlay.remove();
                     video.play().catch(() => { /* autoplay policy may block; user already clicked so should be fine */ });
