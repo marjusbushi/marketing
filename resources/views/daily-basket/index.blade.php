@@ -434,6 +434,14 @@
         color: var(--db-text-2); cursor: pointer; max-width: 120px;
     }
     .db-rail-filter:focus { outline: none; border-color: var(--db-text); }
+    .db-rail-search {
+        width: 100%; margin-top: 8px;
+        font-size: 11px; padding: 5px 8px; border-radius: 5px;
+        border: 1px solid var(--db-border); background: #fff;
+        color: var(--db-text); box-sizing: border-box;
+    }
+    .db-rail-search::placeholder { color: var(--db-text-3); }
+    .db-rail-search:focus { outline: none; border-color: var(--db-text); }
 
     /* Rail product card */
     .db-p-card {
@@ -456,7 +464,52 @@
         background: var(--db-accent-soft);
     }
     .db-p-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .db-p-thumb.zoomable { cursor: zoom-in; }
+    .db-p-thumb.zoomable:hover { box-shadow: 0 0 0 2px var(--db-text); }
     .db-p-body { flex: 1; min-width: 0; }
+
+    /* Lightbox preview për thumb-in e produktit */
+    .db-lightbox {
+        position: fixed; inset: 0; z-index: 9999;
+        background: rgba(0, 0, 0, 0.78);
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+        animation: db-lightbox-fade 0.15s ease-out;
+        cursor: zoom-out;
+    }
+    @keyframes db-lightbox-fade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .db-lightbox-frame {
+        max-width: 92vw; max-height: 92vh;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        cursor: default;
+    }
+    .db-lightbox-img {
+        max-width: 92vw; max-height: 82vh;
+        object-fit: contain;
+        border-radius: 8px; background: #1a1a1a;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+    .db-lightbox-caption {
+        color: #fff; font-size: 13px; font-weight: 500;
+        max-width: 92vw; text-align: center;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+    .db-lightbox-caption .meta {
+        color: rgba(255, 255, 255, 0.7); font-weight: 400;
+        font-size: 11px; margin-top: 3px;
+    }
+    .db-lightbox-close {
+        position: absolute; top: 16px; right: 20px;
+        width: 32px; height: 32px; border-radius: 50%;
+        border: none; background: rgba(255, 255, 255, 0.12);
+        color: #fff; font-size: 18px; line-height: 1; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        transition: background 0.15s;
+    }
+    .db-lightbox-close:hover { background: rgba(255, 255, 255, 0.22); }
     .db-p-name {
         font-size: 12px; font-weight: 600; color: var(--db-text);
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1149,6 +1202,8 @@
                         <option value="best_seller">Best Seller</option>
                     </select>
                 </div>
+                <input type="search" class="db-rail-search" id="dbRailSearch"
+                    placeholder="Kërko emër, SKU ose grup…" aria-label="Kërko produkt" autocomplete="off" />
                 <div class="db-rail-hdr-sub" id="dbRailSub">—</div>
             </div>
             <div class="db-rail-cov-bar" id="dbRailCovBar">—</div>
@@ -1694,6 +1749,7 @@
     // Rail UI state — filter + highlighted product for cross-grid selection.
     const railState = {
         filter: 'all',              // all | uncovered | karrem | fashion | plotesues | best_seller
+        search: '',                 // free-text query: matches name + sku + tags (case-insensitive)
         highlightedProductId: null, // click-to-highlight: mirrors .selected on the p-card
     };
 
@@ -1724,12 +1780,22 @@
 
         list.textContent = '';
 
-        // Apply filter BEFORE rendering. "uncovered" uses the posts_count
-        // field; classification filters use the first tag.
+        // Apply dropdown filter + free-text search (AND). Search matches against
+        // name, sku, and any tag — case-insensitive substring.
+        const q = (railState.search || '').trim().toLowerCase();
         const filtered = (coverage.products || []).filter(p => {
-            if (railState.filter === 'all') return true;
-            if (railState.filter === 'uncovered') return (p.posts_count || 0) === 0;
-            return (p.tags || []).includes(railState.filter);
+            // Dropdown gate
+            if (railState.filter === 'uncovered') {
+                if ((p.posts_count || 0) !== 0) return false;
+            } else if (railState.filter !== 'all') {
+                if (!(p.tags || []).includes(railState.filter)) return false;
+            }
+            // Search gate
+            if (q === '') return true;
+            const name = (p.name || '').toLowerCase();
+            const sku = (p.sku || '').toString().toLowerCase();
+            const tags = (p.tags || []).map(t => String(t).toLowerCase());
+            return name.includes(q) || sku.includes(q) || tags.some(t => t.includes(q));
         });
 
         if (filtered.length === 0) {
@@ -1772,10 +1838,19 @@
             img.loading = 'lazy';
             img.onerror = () => {
                 img.remove();
+                thumb.classList.remove('zoomable');
                 thumb.style.background = 'hsl(' + hueFor(p.name || p.item_group_id) + ', 55%, 55%)';
                 thumb.textContent = (p.name || '?').charAt(0).toUpperCase();
             };
             thumb.appendChild(img);
+            // Klikimi mbi foton hap lightbox preview — stop propagation që të mos
+            // trigger-ohet edhe toggle-i i highlight-it për kartën.
+            thumb.classList.add('zoomable');
+            thumb.title = 'Kliko për preview';
+            thumb.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openProductLightbox(p);
+            });
         } else {
             thumb.style.background = 'hsl(' + hueFor(p.name || p.item_group_id) + ', 55%, 55%)';
             thumb.textContent = (p.name || '?').charAt(0).toUpperCase();
@@ -1817,6 +1892,66 @@
         card.addEventListener('dragend', () => card.classList.remove('dragging'));
 
         return card;
+    }
+
+    // Lightbox preview për thumb-in e produktit. Sfond i errët, klik backdrop
+    // ose Esc e mbyll. Vetëm një instance në çdo kohë (mbyll versionin paraardhës
+    // përpara hapjes së ri).
+    function openProductLightbox(p) {
+        if (!p || !p.thumbnail_url) return;
+        // Mbyll çdo lightbox ekzistues që të mos stack-ohet.
+        document.querySelectorAll('.db-lightbox').forEach((el) => el.remove());
+
+        const overlay = document.createElement('div');
+        overlay.className = 'db-lightbox';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', p.name || 'Preview produkt');
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'db-lightbox-close';
+        closeBtn.setAttribute('aria-label', 'Mbyll preview');
+        closeBtn.textContent = '×';
+
+        const frame = document.createElement('div');
+        frame.className = 'db-lightbox-frame';
+
+        const img = document.createElement('img');
+        img.className = 'db-lightbox-img';
+        img.src = proxyCdnUrl(p.thumbnail_url);
+        img.alt = p.name || '';
+
+        const cap = document.createElement('div');
+        cap.className = 'db-lightbox-caption';
+        cap.textContent = p.name || '—';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        const metaParts = [];
+        if (p.sku) metaParts.push(p.sku);
+        if (p.price) metaParts.push(Math.round(p.price).toLocaleString('sq-AL') + ' L');
+        if (typeof p.stock !== 'undefined') metaParts.push((p.stock || 0) + ' pcs');
+        meta.textContent = metaParts.join(' · ');
+        if (metaParts.length) cap.appendChild(meta);
+
+        frame.append(img, cap);
+        overlay.append(closeBtn, frame);
+
+        // Frame click: don't close (only backdrop closes).
+        frame.addEventListener('click', (e) => e.stopPropagation());
+
+        const close = () => {
+            overlay.remove();
+            document.removeEventListener('keydown', onKey);
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') close();
+        };
+        overlay.addEventListener('click', close);   // backdrop click
+        closeBtn.addEventListener('click', close);
+        document.addEventListener('keydown', onKey);
+
+        document.body.appendChild(overlay);
     }
 
     // Click-to-highlight: marks the rail card as .selected and adds
@@ -3531,7 +3666,7 @@
             preview.textContent = '';
             preview.classList.toggle('empty', !url);
             if (!url) {
-                preview.textContent = 'Guard-i i Fazës 1 kërkon një reference para prodhimit';
+                preview.textContent = 'Guard-i i Fazës 1 kërkon URL ose shënime referencë para prodhimit';
                 return;
             }
             let host;
@@ -4298,6 +4433,12 @@
         // Rail filter — re-renders immediately; doesn't refetch coverage.
         document.getElementById('dbRailFilter').addEventListener('change', (e) => {
             railState.filter = e.target.value;
+            if (state.coverage) renderRail(state.coverage);
+        });
+
+        // Rail search — same client-side filter pattern as the dropdown.
+        document.getElementById('dbRailSearch').addEventListener('input', (e) => {
+            railState.search = e.target.value;
             if (state.coverage) renderRail(state.coverage);
         });
 
