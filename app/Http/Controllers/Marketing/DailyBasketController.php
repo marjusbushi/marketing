@@ -592,8 +592,12 @@ class DailyBasketController extends Controller
      */
     public function syncProducts(Request $request, DailyBasketPost $post): JsonResponse
     {
+        // `present` (not `required`) so removing the last product on a post
+        // sends `product_ids: []` and clears the pivot. `required` rejects
+        // empty arrays, which broke the chip's × button when only one
+        // product was attached.
         $validated = $request->validate([
-            'product_ids' => 'required|array',
+            'product_ids' => 'present|array',
             'product_ids.*' => 'integer',
             'hero_product_id' => 'nullable|integer',
         ]);
