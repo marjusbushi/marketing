@@ -627,13 +627,12 @@
 
         const hoverHtml = `<div class="feed-hover"></div>`;
 
-        // Click routing:
-        //   - draft basket tile → deep-link to daily-basket at the right day
-        //     (edit flow lives there; composer modal is only for ContentPost)
-        //   - everything else → shared in-app detail modal
-        const clickFn = isDraftBasket
-            ? `openBasketDraft(${p.db_post_id}, ${p.distribution_week_id}, '${p.basket_date}')`
-            : `openPostPreview('${String(event.id).replace(/'/g, "\\'")}')`;
+        // Click routing: every tile (including daily-basket drafts) opens the
+        // in-app preview modal. The cached extendedProps already carries
+        // media_items + caption + status, so the modal renders without an
+        // API roundtrip (openPostPreview short-circuits the fetch when the
+        // cached entry is_draft_basket — same pattern as is_external).
+        const clickFn = `openPostPreview('${String(event.id).replace(/'/g, "\\'")}')`;
 
         return `<div class="${tileClasses}" ${dataAttr} onclick="${clickFn}">
             ${stageBadgeHtml}
@@ -826,8 +825,10 @@
         }
 
         try {
-            if (cached && cached.extendedProps && cached.extendedProps.is_external) {
-                // Already rendered above; nothing to upgrade for external posts.
+            if (cached && cached.extendedProps && (cached.extendedProps.is_external || cached.extendedProps.is_draft_basket)) {
+                // External posts (already published on Meta) and daily-basket
+                // drafts (not a ContentPost row) don't have a /api/posts/{id}
+                // record to fetch — the cache is the only source of truth.
                 return;
             }
             const url = `{{ url('/marketing/planner/api/posts') }}/${encodeURIComponent(postId)}`;
