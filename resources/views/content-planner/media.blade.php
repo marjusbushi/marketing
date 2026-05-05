@@ -156,15 +156,16 @@
          onclick="document.getElementById('fileInput').click()">
         <iconify-icon icon="heroicons-outline:cloud-arrow-up" width="36" class="text-slate-300 mx-auto block"></iconify-icon>
         <p class="text-sm text-slate-600 mt-3 font-medium">Drop files here or <span class="text-primary-600 font-semibold">browse</span></p>
-        <p class="text-[11px] text-slate-400 mt-1">Images up to 50MB · Videos up to 500MB · MP4, MOV, AVI, MKV, WEBM, M4V, HEIC, etj.</p>
+        <p class="text-[11px] text-slate-400 mt-1">Images up to 50MB · Videos up to 500MB · pranojmë çdo format të zakonshëm (HEIC, RAW, MOV, MKV, WEBM, MTS, etj.)</p>
         {{-- accept lists both MIME wildcards AND explicit extensions because
              Windows + Chrome occasionally hides files (e.g. .mov, .heic) when
              only the wildcard is provided — the OS reports a quirky / generic
              mime that does not match video/* or image/*. The server validator
-             is the source of truth (extension-first); this attribute only
-             filters what the picker shows. --}}
+             (extension-first) is the source of truth; this attribute only
+             filters what the picker shows. List MUST stay in sync with
+             config/content-planner.php allowed_*_types. --}}
         <input id="fileInput" type="file" multiple class="hidden" onchange="handleFiles(this.files)"
-               accept="image/*,video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v,.flv,.wmv,.3gp,.mpg,.mpeg,.mts,.m2ts,.ts,.ogv,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.bmp,.tiff,.tif,.avif">
+               accept="image/*,video/*,.jpg,.jpeg,.jpe,.jfif,.pjpeg,.pjp,.png,.apng,.gif,.webp,.avif,.avifs,.heic,.heif,.heics,.heifs,.bmp,.dib,.tiff,.tif,.ico,.cur,.svg,.svgz,.ai,.eps,.raw,.cr2,.cr3,.crw,.nef,.nrw,.arw,.srf,.sr2,.dng,.orf,.raf,.rw2,.rwl,.srw,.pef,.ptx,.x3f,.mrw,.kdc,.dcr,.erf,.mef,.3fr,.iiq,.fff,.mos,.psd,.psb,.xcf,.exr,.hdr,.jp2,.jpx,.j2k,.j2c,.mp4,.m4v,.m4p,.mp4v,.mov,.qt,.avi,.divx,.xvid,.mkv,.mk3d,.webm,.flv,.f4v,.f4p,.swf,.wmv,.asf,.3gp,.3g2,.3gpp,.3gpp2,.mpg,.mpeg,.mpe,.m1v,.m2v,.mp2,.mpv,.m2p,.mts,.m2ts,.ts,.tts,.mod,.tod,.mxf,.ogv,.ogg,.ogm,.vob,.ifo,.rm,.rmvb,.dv,.dvr-ms,.wtv,.nsv,.yuv">
     </div>
 
     {{-- Upload progress (multi-file, real %) --}}

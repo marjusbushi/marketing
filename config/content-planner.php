@@ -29,14 +29,72 @@ return [
     // Direct photo upload ceiling (Rruga C). Social-first exports are
     // typically 1-5 MB; 50 MB gives head-room for Retina/PDF export prints.
     'photo_max_size_mb' => (int) env('MARKETING_PHOTO_MAX_SIZE_MB', 50),
-    // Permissive whitelist — library accepts anything common; publish step
-    // re-validates against Meta requirements. Includes HEIC/HEIF (iPhone),
-    // AVIF/BMP/TIFF (pro), plus all common web image formats.
-    'allowed_image_types' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff', 'tif', 'avif'],
-    // Permissive whitelist — library accepts anything common. Meta (FB/IG)
-    // prefers MP4 (H.264 + AAC); other containers are stored as-is and may
-    // be transcoded by Meta's ingest pipeline at publish time.
-    'allowed_video_types' => ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'flv', 'wmv', '3gp', 'mpg', 'mpeg', 'mts', 'm2ts', 'ts', 'ogv'],
+    // Maximum-permissive whitelist — library accepts anything that looks
+    // like an image or video. Thumbnail / probe may not work for every
+    // exotic format, but the file is preserved as-is. The publish step
+    // re-validates against Meta requirements before sending to FB/IG.
+    'allowed_image_types' => [
+        // JPEG family
+        'jpg', 'jpeg', 'jpe', 'jfif', 'pjpeg', 'pjp',
+        // PNG
+        'png', 'apng',
+        // GIF
+        'gif',
+        // Modern web
+        'webp', 'avif', 'avifs',
+        // HEIC / HEIF (iPhone defaults)
+        'heic', 'heif', 'heics', 'heifs',
+        // Bitmap
+        'bmp', 'dib',
+        // TIFF
+        'tiff', 'tif',
+        // Icons
+        'ico', 'cur',
+        // Vector
+        'svg', 'svgz', 'ai', 'eps',
+        // Camera RAW (Canon, Nikon, Sony, Adobe, Olympus, Fuji, Panasonic,
+        // Samsung, Pentax, Sigma, Minolta, Kodak, Epson, Mamiya, Hasselblad,
+        // Phase One)
+        'raw', 'cr2', 'cr3', 'crw', 'nef', 'nrw', 'arw', 'srf', 'sr2',
+        'dng', 'orf', 'raf', 'rw2', 'rwl', 'srw', 'pef', 'ptx', 'x3f',
+        'mrw', 'kdc', 'dcr', 'erf', 'mef', '3fr', 'iiq', 'fff', 'mos',
+        // Source / editor files
+        'psd', 'psb', 'xcf',
+        // HDR
+        'exr', 'hdr',
+        // JPEG 2000
+        'jp2', 'jpx', 'j2k', 'j2c',
+    ],
+    'allowed_video_types' => [
+        // MP4 family
+        'mp4', 'm4v', 'm4p', 'mp4v',
+        // QuickTime
+        'mov', 'qt',
+        // AVI + codec-tagged variants
+        'avi', 'divx', 'xvid',
+        // Matroska
+        'mkv', 'mk3d',
+        // WebM
+        'webm',
+        // Flash
+        'flv', 'f4v', 'f4p', 'swf',
+        // Windows Media
+        'wmv', 'asf',
+        // Mobile
+        '3gp', '3g2', '3gpp', '3gpp2',
+        // MPEG
+        'mpg', 'mpeg', 'mpe', 'm1v', 'm2v', 'mp2', 'mpv', 'm2p',
+        // Broadcast / AVCHD
+        'mts', 'm2ts', 'ts', 'tts', 'mod', 'tod', 'mxf',
+        // Theora / Ogg
+        'ogv', 'ogg', 'ogm',
+        // DVD
+        'vob', 'ifo',
+        // RealMedia
+        'rm', 'rmvb',
+        // Other
+        'dv', 'dvr-ms', 'wtv', 'nsv', 'yuv',
+    ],
     'thumbnail_width' => 400,
     'thumbnail_quality' => 80,
 
