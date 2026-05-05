@@ -747,6 +747,10 @@
         el.style.cssText = 'width:100%;display:block;' + (isVideo ? '' : 'pointer-events:none;');
         if (isVideo) {
             el.muted = true; el.autoplay = true; el.loop = true; el.playsInline = true;
+            const posterUrl = media.cover_url || media.thumbnail_url || '';
+            if (posterUrl) el.poster = posterUrl;
+            el.dataset.mediaId = String(media.id || '');
+            el.classList.add('cp-slide-video');
         } else {
             el.alt = '';
             el.draggable = false;
@@ -2019,6 +2023,15 @@
         // (preserves the user's current carousel index + video playback state).
         document.querySelectorAll('.cp-cover-btn[data-media-id="' + String(mediaId) + '"] span').forEach(s => {
             s.textContent = coverPath ? 'Cover ✓' : 'Cover';
+        });
+        // Live-update the slide video poster so the new cover shows up
+        // before the user replays the carousel.
+        const newPoster = coverUrl || thumbnailUrl || '';
+        document.querySelectorAll('video.cp-slide-video[data-media-id="' + String(mediaId) + '"]').forEach(v => {
+            try {
+                if (newPoster) v.poster = newPoster;
+                else v.removeAttribute('poster');
+            } catch (err) { /* ignore */ }
         });
     }
 </script>

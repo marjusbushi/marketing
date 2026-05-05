@@ -3827,6 +3827,12 @@
             const video = document.createElement('video');
             video.className = 'db-media-video';
             video.src = media.url;
+            // poster shows BEFORE first play. Cover wins over thumbnail
+            // so the picker's frame is visible right where the user
+            // expects (the post sheet preview). After play/seek the
+            // browser shows the live frame, which is fine.
+            const posterUrl = media.cover_url || media.thumbnail_url || '';
+            if (posterUrl) video.poster = posterUrl;
             // Detail view — user wants full playback: native controls + audio.
             // Keep playsInline so it doesn't enter fullscreen on mobile taps.
             video.controls = true;
@@ -3834,6 +3840,7 @@
             video.preload = 'metadata';
             video.setAttribute('controls', '');
             video.setAttribute('playsinline', '');
+            video.dataset.mediaId = String(media.id);
             tile.appendChild(video);
 
             // Cover picker — same flow as the planner composer. Posts to
@@ -4716,6 +4723,21 @@
 
         document.querySelectorAll('.db-media-cover-btn[data-media-id="' + String(mediaId) + '"] span').forEach(s => {
             s.textContent = coverPath ? 'Cover ✓' : 'Cover';
+        });
+
+        // Refresh the live <video> poster so the user sees the new cover
+        // immediately (no page reload). Pause + reset currentTime + reload
+        // forces the browser to repaint the poster instead of keeping the
+        // last frame on screen.
+        const newPoster = coverUrl || thumbnailUrl || '';
+        document.querySelectorAll('video.db-media-video[data-media-id="' + String(mediaId) + '"]').forEach(v => {
+            try {
+                if (newPoster) v.poster = newPoster;
+                else v.removeAttribute('poster');
+                v.pause();
+                v.currentTime = 0;
+                v.load();
+            } catch (err) { /* ignore */ }
         });
     });
 </script>
