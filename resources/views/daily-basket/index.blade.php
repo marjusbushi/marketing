@@ -3827,14 +3827,13 @@
             const video = document.createElement('video');
             video.className = 'db-media-video';
             video.src = media.url;
-            // poster shows BEFORE first play. Cover wins over thumbnail
-            // so the picker's frame is visible right where the user
-            // expects (the post sheet preview). After play/seek the
-            // browser shows the live frame, which is fine.
+            // poster is the browser-native fallback; we ALSO render an
+            // explicit <img> overlay below because Chrome routinely
+            // ignores poster once metadata loads and shows the first
+            // video frame instead — which for many CapCut intros is
+            // black, defeating the whole point of picking a cover.
             const posterUrl = media.cover_url || media.thumbnail_url || '';
             if (posterUrl) video.poster = posterUrl;
-            // Detail view — user wants full playback: native controls + audio.
-            // Keep playsInline so it doesn't enter fullscreen on mobile taps.
             video.controls = true;
             video.playsInline = true;
             video.preload = 'metadata';
@@ -3842,6 +3841,30 @@
             video.setAttribute('playsinline', '');
             video.dataset.mediaId = String(media.id);
             tile.appendChild(video);
+
+            // Visible cover overlay — sits above the video, hides on
+            // click and triggers playback. After play it stays gone for
+            // the rest of the session (mirrors IG / TikTok feed cards).
+            if (posterUrl) {
+                const overlay = document.createElement('div');
+                overlay.className = 'db-media-cover-overlay';
+                overlay.dataset.mediaId = String(media.id);
+                overlay.style.cssText = 'position:absolute; inset:0; background:#000; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center;';
+                const overlayImg = document.createElement('img');
+                overlayImg.src = posterUrl;
+                overlayImg.alt = '';
+                overlayImg.style.cssText = 'width:100%; height:100%; object-fit:contain; display:block; pointer-events:none;';
+                overlay.appendChild(overlayImg);
+                const playIcon = document.createElement('div');
+                playIcon.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; color:rgba(255,255,255,0.92); font-size:48px; text-shadow:0 2px 10px rgba(0,0,0,0.55);';
+                playIcon.textContent = '▶';
+                overlay.appendChild(playIcon);
+                overlay.addEventListener('click', () => {
+                    overlay.remove();
+                    video.play().catch(() => { /* autoplay policy may block; user already clicked so should be fine */ });
+                });
+                tile.appendChild(overlay);
+            }
 
             // Cover picker — same flow as the planner composer. Posts to
             // /api/media/{id}/cover; the picker partial dispatches a
