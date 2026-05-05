@@ -41,6 +41,23 @@ class DailyBasketController extends Controller
         private ContentPostService $contentPostService,
     ) {}
 
+    /**
+     * Read the first key from $row that holds a numeric value (int, float,
+     * or numeric string). Returns null when none of the candidates exist
+     * with usable data — caller decides the fallback. Lets us tolerate
+     * DIS schema renames without a one-line cascade everywhere.
+     */
+    private static function firstNumeric(array $row, array $candidates): ?int
+    {
+        foreach ($candidates as $key) {
+            if (! array_key_exists($key, $row)) continue;
+            $v = $row[$key];
+            if (is_int($v) || is_float($v)) return (int) $v;
+            if (is_string($v) && is_numeric($v)) return (int) $v;
+        }
+        return null;
+    }
+
     // ─── Page views ──────────────────────────────────────────
 
     /**
@@ -393,6 +410,7 @@ class DailyBasketController extends Controller
             $id = (int) ($p['id'] ?? 0);
             $price = (float) ($p['pricelist_price'] ?? $p['avg_price'] ?? 0);
             $stock = (int) ($p['total_stock'] ?? 0);
+            $sold  = (int) ($p['total_sold'] ?? 0);
             $postsCount = (int) ($pivotCountByProduct[$id] ?? 0);
 
             $tags = [];
@@ -408,6 +426,7 @@ class DailyBasketController extends Controller
                 'thumbnail_url' => $p['image_url'] ?? null,
                 'price' => round($price, 2),
                 'stock' => $stock,
+                'sold' => $sold,
                 'total_value' => round($price * $stock, 2),
                 'tags' => $tags,
                 'posts_count' => $postsCount,
@@ -473,29 +492,46 @@ class DailyBasketController extends Controller
 
             $groups = $week['item_groups'] ?? [];
 
-            return array_map(fn ($g) => [
-                'id' => (int) ($g['id'] ?? 0),
-                'code' => $g['code'] ?? null,
-                'name' => $g['name'] ?? 'Unnamed',
-                'vendor_name' => $g['vendor_name'] ?? null,
-                'image_url' => $g['image_url'] ?? null,
-                'avg_price' => $g['avg_price'] ?? null,
-                'pricelist_price' => $g['pricelist_price'] ?? null,
-                'classification' => $g['classification'] ?? null,
-                'total_stock' => $g['total_stock'] ?? 0,
-                // Per-day assignments — empty array when the product has no
-                // caktime yet. Frontend (#1137 panorama) filters by selected
-                // day; modali i postit i injoron (sheh gjithcka — orientim, jo
-                // kufizim). Fallback logjik kalon te frontend.
-                'assigned_dates' => array_values(array_map(
-                    fn ($a) => [
-                        'id' => (int) ($a['id'] ?? 0),
-                        'date' => $a['date'] ?? null,
-                        'is_primary' => (bool) ($a['is_primary'] ?? false),
-                    ],
-                    $g['assigned_dates'] ?? []
-                )),
-            ], $groups);
+            return array_map(function ($g) {
+                // Stock field has shifted shape historically: try a few
+                // known synonyms before giving up. If none of them resolve
+                // to a numeric value, log so the next run of
+                // `dis:probe-product` shows what DIS actually sent.
+                $stock = self::firstNumeric($g, ['total_stock', 'stock_total', 'stock', 'quantity', 'total_qty']);
+                $sold  = self::firstNumeric($g, ['total_sold', 'sold_total', 'sold_qty', 'sales_total']);
+                if ($stock === null) {
+                    \Log::warning('daily_basket: missing stock field for item_group', [
+                        'item_group_id' => $g['id'] ?? null,
+                        'code' => $g['code'] ?? null,
+                        'available_keys' => array_keys($g),
+                    ]);
+                }
+
+                return [
+                    'id' => (int) ($g['id'] ?? 0),
+                    'code' => $g['code'] ?? null,
+                    'name' => $g['name'] ?? 'Unnamed',
+                    'vendor_name' => $g['vendor_name'] ?? null,
+                    'image_url' => $g['image_url'] ?? null,
+                    'avg_price' => $g['avg_price'] ?? null,
+                    'pricelist_price' => $g['pricelist_price'] ?? null,
+                    'classification' => $g['classification'] ?? null,
+                    'total_stock' => $stock ?? 0,
+                    'total_sold' => $sold ?? 0,
+                    // Per-day assignments — empty array when the product has no
+                    // caktime yet. Frontend (#1137 panorama) filters by selected
+                    // day; modali i postit i injoron (sheh gjithcka — orientim, jo
+                    // kufizim). Fallback logjik kalon te frontend.
+                    'assigned_dates' => array_values(array_map(
+                        fn ($a) => [
+                            'id' => (int) ($a['id'] ?? 0),
+                            'date' => $a['date'] ?? null,
+                            'is_primary' => (bool) ($a['is_primary'] ?? false),
+                        ],
+                        $g['assigned_dates'] ?? []
+                    )),
+                ];
+            }, $groups);
         });
     }
 

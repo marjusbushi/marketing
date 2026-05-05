@@ -1906,6 +1906,7 @@
         if (p.sku) metaParts.push(p.sku);
         if (p.price) metaParts.push(Math.round(p.price).toLocaleString('sq-AL') + ' L');
         metaParts.push((p.stock || 0) + ' pcs');
+        if (Number(p.sold) > 0) metaParts.push(Number(p.sold) + ' shitur');
         meta.textContent = metaParts.join(' · ');
         body.append(name, meta);
         card.appendChild(body);
@@ -1969,6 +1970,7 @@
         if (p.sku) metaParts.push(p.sku);
         if (p.price) metaParts.push(Math.round(p.price).toLocaleString('sq-AL') + ' L');
         if (typeof p.stock !== 'undefined') metaParts.push((p.stock || 0) + ' pcs');
+        if (Number(p.sold) > 0) metaParts.push(Number(p.sold) + ' shitur');
         meta.textContent = metaParts.join(' · ');
         if (metaParts.length) cap.appendChild(meta);
 
