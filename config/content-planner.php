@@ -29,8 +29,14 @@ return [
     // Direct photo upload ceiling (Rruga C). Social-first exports are
     // typically 1-5 MB; 50 MB gives head-room for Retina/PDF export prints.
     'photo_max_size_mb' => (int) env('MARKETING_PHOTO_MAX_SIZE_MB', 50),
-    'allowed_image_types' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    'allowed_video_types' => ['mp4', 'mov', 'avi'],
+    // Permissive whitelist — library accepts anything common; publish step
+    // re-validates against Meta requirements. Includes HEIC/HEIF (iPhone),
+    // AVIF/BMP/TIFF (pro), plus all common web image formats.
+    'allowed_image_types' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff', 'tif', 'avif'],
+    // Permissive whitelist — library accepts anything common. Meta (FB/IG)
+    // prefers MP4 (H.264 + AAC); other containers are stored as-is and may
+    // be transcoded by Meta's ingest pipeline at publish time.
+    'allowed_video_types' => ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'flv', 'wmv', '3gp', 'mpg', 'mpeg', 'mts', 'm2ts', 'ts', 'ogv'],
     'thumbnail_width' => 400,
     'thumbnail_quality' => 80,
 

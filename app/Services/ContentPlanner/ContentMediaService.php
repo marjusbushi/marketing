@@ -2,6 +2,7 @@
 
 namespace App\Services\ContentPlanner;
 
+use App\Jobs\ProcessMediaUploadJob;
 use App\Models\Content\ContentMedia;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
@@ -37,60 +38,61 @@ class ContentMediaService
     {
         $this->validateUpload($file);
 
-        $uuid = (string) Str::uuid();
+        // Capture metadata BEFORE we move the file (move can leave the
+        // UploadedFile in a state where these calls return wrong values).
+        $mime = (string) $file->getMimeType();
+        $size = (int) $file->getSize();
+        $originalName = (string) $file->getClientOriginalName();
         $extension = strtolower($file->getClientOriginalExtension());
+
+        $uuid = (string) Str::uuid();
         $filename = $uuid . '.' . $extension;
         $folderPath = 'content-planner/media/' . now()->format('Y/m');
         $path = $folderPath . '/' . $filename;
 
-        // putFileAs streams from the temp upload to the target disk, so we
-        // never load 500 MB videos into memory. Returns the stored path.
-        Storage::disk($this->disk)->putFileAs($folderPath, $file, $filename);
+        // Move the file to local staging first. The deferred processing
+        // job (ffmpeg / Imagick) reads from this staging path so it
+        // doesn't have to re-download the file from R2 — saves ~5-30 s
+        // for big videos. storeAs creates the dir, uses rename when the
+        // tmp upload lives on the same fs as storage/app. Job deletes
+        // the staging file when done.
+        $stagingPath = $file->storeAs('upload-staging', $filename, 'local');
+        $stagingFullPath = Storage::disk('local')->path($stagingPath);
 
-        $width = null;
-        $height = null;
-        $thumbnailPath = null;
-        $duration = null;
-        $mime = $file->getMimeType();
+        // Upload to R2 from the staging file. putFileAs streams to S3 so
+        // we never load 500 MB into memory.
+        Storage::disk($this->disk)->putFileAs(
+            $folderPath,
+            new \Illuminate\Http\File($stagingFullPath),
+            $filename,
+        );
 
-        if ($this->isImage($mime)) {
-            try {
-                $imageSize = getimagesize($file->getPathname());
-                if ($imageSize) {
-                    $width = $imageSize[0];
-                    $height = $imageSize[1];
-                }
-                $thumbnailPath = $this->generateThumbnail($file, $path);
-            } catch (\Throwable $e) {
-                Log::warning('Image thumbnail generation failed', ['path' => $path, 'error' => $e->getMessage()]);
-            }
-        } elseif ($this->isVideo($mime)) {
-            $probe = $this->probeVideo($file->getPathname());
-            $width = $probe['width'] ?? null;
-            $height = $probe['height'] ?? null;
-            $duration = $probe['duration'] ?? null;
-            $thumbnailPath = $this->generateVideoThumbnail($file, $path);
-        }
-
-        $folder = $overrides['folder'] ?? $this->classifyFolder($mime, $width, $height);
+        $folder = $overrides['folder'] ?? $this->classifyFolder($mime, null, null);
         $stage = $overrides['stage'] ?? 'raw';
 
-        return ContentMedia::create([
+        $media = ContentMedia::create([
             'uuid' => $uuid,
             'user_id' => $userId,
             'filename' => $filename,
-            'original_filename' => $file->getClientOriginalName(),
+            'original_filename' => $originalName,
             'disk' => $this->disk,
             'path' => $path,
             'mime_type' => $mime,
-            'size_bytes' => $file->getSize(),
-            'width' => $width,
-            'height' => $height,
-            'duration_seconds' => $duration,
-            'thumbnail_path' => $thumbnailPath,
+            'size_bytes' => $size,
+            'width' => null,
+            'height' => null,
+            'duration_seconds' => null,
+            'thumbnail_path' => null,
             'folder' => $folder,
             'stage' => in_array($stage, ContentMedia::STAGES, true) ? $stage : 'raw',
         ]);
+
+        // Defer ffmpeg/Imagick to the queue. Worker picks it up immediately
+        // (queue=default), reads the staging file, probes + generates thumb,
+        // updates this row, deletes staging.
+        ProcessMediaUploadJob::dispatch($media->id, $stagingPath);
+
+        return $media;
     }
 
     /**
@@ -105,8 +107,16 @@ class ContentMediaService
         $sizeBytes = (int) $file->getSize();
         $sizeMb = $sizeBytes / 1048576;
 
-        if ($this->isImage($mime)) {
-            if (! in_array($extension, $this->allowedImageTypes, true)) {
+        // Type detection: extension wins because mime can be empty / wrong on
+        // .heic, .mts, .mkv (browser detects as application/octet-stream).
+        // Mime is used as a tie-breaker only when extension is unknown.
+        $isImageByExt = in_array($extension, $this->allowedImageTypes, true);
+        $isVideoByExt = in_array($extension, $this->allowedVideoTypes, true);
+        $isImageByMime = $this->isImage($mime);
+        $isVideoByMime = $this->isVideo($mime);
+
+        if ($isImageByExt || ($isImageByMime && ! $isVideoByExt)) {
+            if (! $isImageByExt) {
                 throw new \InvalidArgumentException(
                     "Format i papranuar: .{$extension}. Lejohen: " . implode(', ', $this->allowedImageTypes) . '.'
                 );
@@ -119,8 +129,8 @@ class ContentMediaService
             return;
         }
 
-        if ($this->isVideo($mime)) {
-            if (! in_array($extension, $this->allowedVideoTypes, true)) {
+        if ($isVideoByExt || $isVideoByMime) {
+            if (! $isVideoByExt) {
                 throw new \InvalidArgumentException(
                     "Format video i papranuar: .{$extension}. Lejohen: " . implode(', ', $this->allowedVideoTypes) . '.'
                 );
@@ -130,12 +140,8 @@ class ContentMediaService
                     sprintf('Video është %.1f MB; maksimumi i lejuar është %d MB.', $sizeMb, $this->videoMaxSizeMb)
                 );
             }
-            // .mov / .avi may need server-side transcoding before Meta accepts them.
-            // Meta prefers MP4 (H.264 + AAC). Warn but don't block — Meta's own
-            // ingest pipeline transcodes most containers; we surface failures at
-            // publish time if Meta refuses the file.
             if ($extension !== 'mp4') {
-                Log::info('Non-MP4 video uploaded; Meta may transcode or reject', [
+                Log::info('Non-MP4 video uploaded; Meta may transcode or reject at publish', [
                     'extension' => $extension,
                     'mime' => $mime,
                 ]);
@@ -144,7 +150,7 @@ class ContentMediaService
         }
 
         throw new \InvalidArgumentException(
-            "Tipi i skedarit nuk pranohet: {$mime}. Vetëm foto ose video lejohen."
+            "Tipi i skedarit nuk pranohet: .{$extension} ({$mime}). Vetëm foto ose video lejohen."
         );
     }
 

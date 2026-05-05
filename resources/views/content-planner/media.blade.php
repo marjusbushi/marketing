@@ -156,16 +156,17 @@
          onclick="document.getElementById('fileInput').click()">
         <iconify-icon icon="heroicons-outline:cloud-arrow-up" width="36" class="text-slate-300 mx-auto block"></iconify-icon>
         <p class="text-sm text-slate-600 mt-3 font-medium">Drop files here or <span class="text-primary-600 font-semibold">browse</span></p>
-        <p class="text-[11px] text-slate-400 mt-1">Images up to 25MB · Videos up to 500MB (MP4, MOV, AVI, WEBM)</p>
+        <p class="text-[11px] text-slate-400 mt-1">Images up to 50MB · Videos up to 500MB · MP4, MOV, AVI, MKV, WEBM, M4V, HEIC, etj.</p>
         <input id="fileInput" type="file" accept="image/*,video/*" multiple class="hidden" onchange="handleFiles(this.files)">
     </div>
 
-    {{-- Upload progress --}}
-    <div id="uploadProgress" class="hidden">
-        <div class="bg-primary-50 rounded-lg px-4 py-3 flex items-center gap-3">
-            <div class="w-5 h-5 border-[3px] border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-            <span id="uploadProgressText" class="text-xs font-medium text-primary-700">Uploading...</span>
+    {{-- Upload progress (multi-file, real %) --}}
+    <div id="uploadProgress" class="hidden bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+        <div class="flex items-center justify-between">
+            <span id="uploadSummary" class="text-xs font-semibold text-slate-700">Uploading…</span>
+            <button type="button" onclick="dismissCompletedUploads()" class="text-[11px] text-slate-400 hover:text-slate-700">Pastro të kryera</button>
         </div>
+        <div id="uploadList" class="space-y-1.5 max-h-[260px] overflow-y-auto"></div>
     </div>
 
     {{-- Layout: sidebar + main --}}
@@ -360,25 +361,307 @@
 
     function handleDrop(event) { event.preventDefault(); document.getElementById('uploadZone').classList.remove('border-primary-400','bg-primary-50/30'); handleFiles(event.dataTransfer.files); }
 
-    async function handleFiles(files) {
-        const progress = document.getElementById('uploadProgress');
-        const progressText = document.getElementById('uploadProgressText');
-        progress.classList.remove('hidden');
-        for (let i = 0; i < files.length; i++) {
-            progressText.textContent = `Uploading ${i+1}/${files.length}: ${files[i].name}`;
-            const formData = new FormData();
-            formData.append('file', files[i]);
-            // Auto-attach selected products + collection (Media Library v3).
-            Array.from(uploadProducts.values()).forEach(p => formData.append('item_group_ids[]', p.id));
-            if (uploadCollection) formData.append('distribution_week_id', uploadCollection.id);
-            try {
-                const res = await fetch('{{ route("marketing.planner.api.media.upload") }}', { method:'POST', headers:{'X-CSRF-TOKEN':'{{ csrf_token() }}','Accept':'application/json'}, body:formData });
-                if (!res.ok) { const err = await res.text(); alert('Upload failed for '+files[i].name); }
-            } catch(e) { alert('Upload failed: '+e.message); }
+    // ─────────────────────────────────────────────────────────────
+    // Upload pipeline: parallel pool of 3 XHRs with real-time progress
+    // (% / MB-s / ETA / cancel). Server defers ffmpeg + thumbnail to a
+    // queue job, so the upload-zone reply arrives as soon as R2 acks
+    // the file. We refresh the grid + poll for ~30 s afterwards to pick
+    // up the thumbnails as the worker finishes them.
+    // ─────────────────────────────────────────────────────────────
+    const UPLOAD_POOL = 3;
+    const UPLOAD_URL = '{{ route("marketing.planner.api.media.upload") }}';
+    const UPLOAD_CSRF = '{{ csrf_token() }}';
+    let uploadQueue = [];
+    let pollTimer = null;
+    let pollDeadline = 0;
+
+    function handleFiles(filesLike) {
+        const incoming = Array.from(filesLike).map(f => ({
+            id: 'u_' + Math.random().toString(36).slice(2, 9),
+            file: f,
+            name: f.name,
+            size: f.size,
+            loaded: 0,
+            status: 'queued',
+            startedAt: 0,
+            xhr: null,
+            error: null,
+            attachedProducts: Array.from(uploadProducts.values()).map(p => p.id),
+            attachedCollection: uploadCollection ? uploadCollection.id : null,
+        }));
+        if (!incoming.length) return;
+
+        uploadQueue = uploadQueue.filter(x => x.status === 'uploading' || x.status === 'queued');
+        uploadQueue.push(...incoming);
+        document.getElementById('uploadProgress').classList.remove('hidden');
+        renderUploadList();
+        runUploadPool();
+    }
+
+    function dismissCompletedUploads() {
+        uploadQueue = uploadQueue.filter(x => x.status === 'uploading' || x.status === 'queued' || x.status === 'failed');
+        renderUploadList();
+        renderSummary();
+        if (!uploadQueue.length) document.getElementById('uploadProgress').classList.add('hidden');
+    }
+
+    function runUploadPool() {
+        const inFlight = uploadQueue.filter(x => x.status === 'uploading').length;
+        let toStart = Math.max(0, UPLOAD_POOL - inFlight);
+        for (const item of uploadQueue) {
+            if (toStart <= 0) break;
+            if (item.status !== 'queued') continue;
+            startUpload(item);
+            toStart--;
         }
-        progress.classList.add('hidden');
+        renderSummary();
+    }
+
+    function startUpload(item) {
+        item.status = 'uploading';
+        item.startedAt = Date.now();
+        renderRow(item);
+        renderSummary();
+
+        const xhr = new XMLHttpRequest();
+        item.xhr = xhr;
+        const fd = new FormData();
+        fd.append('file', item.file);
+        item.attachedProducts.forEach(id => fd.append('item_group_ids[]', id));
+        if (item.attachedCollection) fd.append('distribution_week_id', item.attachedCollection);
+
+        xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            item.loaded = e.loaded;
+            item.size = e.total || item.size;
+            renderRow(item);
+            renderSummary();
+        };
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                item.status = 'done';
+                item.loaded = item.size;
+            } else {
+                item.status = 'failed';
+                item.error = parseUploadError(xhr) || ('Server returned ' + xhr.status);
+            }
+            renderRow(item);
+            renderSummary();
+            onUploadFinished();
+        };
+        xhr.onerror = () => {
+            item.status = 'failed';
+            item.error = 'Lidhja u ndërpre';
+            renderRow(item);
+            renderSummary();
+            onUploadFinished();
+        };
+        xhr.onabort = () => {
+            item.status = 'cancelled';
+            renderRow(item);
+            renderSummary();
+            onUploadFinished();
+        };
+
+        xhr.open('POST', UPLOAD_URL);
+        xhr.setRequestHeader('X-CSRF-TOKEN', UPLOAD_CSRF);
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.send(fd);
+    }
+
+    function parseUploadError(xhr) {
+        try {
+            const r = JSON.parse(xhr.responseText);
+            if (r && r.message) return r.message;
+            if (r && r.errors) return Object.values(r.errors).flat().join(' ');
+        } catch (e) {}
+        return null;
+    }
+
+    function cancelUpload(id) {
+        const item = uploadQueue.find(x => x.id === id);
+        if (!item) return;
+        if (item.status === 'uploading' && item.xhr) {
+            item.xhr.abort();
+        } else if (item.status === 'queued') {
+            item.status = 'cancelled';
+            renderRow(item);
+            renderSummary();
+            onUploadFinished();
+        }
+    }
+
+    function onUploadFinished() {
+        runUploadPool();
+        const stillBusy = uploadQueue.some(x => x.status === 'uploading' || x.status === 'queued');
+        if (stillBusy) return;
+
         refreshMedia();
         refreshFolders();
+        startThumbPoll();
+
+        setTimeout(() => {
+            uploadQueue = uploadQueue.filter(x => x.status !== 'done' && x.status !== 'cancelled');
+            renderUploadList();
+            renderSummary();
+            if (!uploadQueue.length) document.getElementById('uploadProgress').classList.add('hidden');
+        }, 4000);
+    }
+
+    function startThumbPoll() {
+        pollDeadline = Date.now() + 30000;
+        if (pollTimer) return;
+        pollTimer = setInterval(() => {
+            if (Date.now() > pollDeadline) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+                return;
+            }
+            refreshMedia();
+        }, 3000);
+    }
+
+    function renderUploadList() {
+        const list = document.getElementById('uploadList');
+        while (list.firstChild) list.removeChild(list.firstChild);
+        for (const item of uploadQueue) {
+            list.appendChild(buildRowEl(item));
+        }
+    }
+
+    function renderRow(item) {
+        const list = document.getElementById('uploadList');
+        const existing = list.querySelector(`[data-uid="${item.id}"]`);
+        const fresh = buildRowEl(item);
+        if (existing) existing.replaceWith(fresh);
+        else list.appendChild(fresh);
+    }
+
+    function renderSummary() {
+        const total = uploadQueue.length;
+        const done = uploadQueue.filter(x => x.status === 'done').length;
+        const failed = uploadQueue.filter(x => x.status === 'failed').length;
+        const inflight = uploadQueue.filter(x => x.status === 'uploading' || x.status === 'queued').length;
+        const sumBytes = uploadQueue.reduce((acc, x) => acc + (x.size || 0), 0);
+        const sumLoaded = uploadQueue.reduce((acc, x) => acc + (x.loaded || 0), 0);
+        const pct = sumBytes > 0 ? Math.round((sumLoaded / sumBytes) * 100) : 0;
+        const summary = document.getElementById('uploadSummary');
+        let txt;
+        if (inflight > 0) {
+            txt = `Po ngarkohet ${done + 1}/${total} · ${pct}%${failed ? ' · ' + failed + ' dështuar' : ''}`;
+        } else if (total > 0) {
+            txt = `${done}/${total} u ngarkuan${failed ? ' · ' + failed + ' dështuar' : ''}`;
+        } else {
+            txt = 'Uploading…';
+        }
+        summary.textContent = txt;
+    }
+
+    function buildRowEl(item) {
+        const row = document.createElement('div');
+        row.className = 'upload-row';
+        row.dataset.uid = item.id;
+
+        const inner = document.createElement('div');
+        inner.className = 'flex items-center gap-2';
+        row.appendChild(inner);
+
+        const main = document.createElement('div');
+        main.className = 'flex-1 min-w-0';
+        inner.appendChild(main);
+
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between gap-2 mb-1';
+        main.appendChild(header);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'text-xs font-medium text-slate-700 truncate';
+        nameSpan.title = item.name;
+        nameSpan.textContent = item.name;
+        header.appendChild(nameSpan);
+
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'text-[10px] text-slate-500 shrink-0 tabular-nums';
+        statusSpan.textContent = uploadStatusText(item);
+        header.appendChild(statusSpan);
+
+        const barWrap = document.createElement('div');
+        barWrap.className = 'h-1.5 bg-slate-200 rounded-full overflow-hidden';
+        main.appendChild(barWrap);
+
+        const pct = item.size > 0 ? Math.min(100, Math.round((item.loaded / item.size) * 100)) : 0;
+        const barColor = item.status === 'failed' ? 'bg-red-500'
+            : item.status === 'cancelled' ? 'bg-slate-400'
+            : item.status === 'done' ? 'bg-emerald-500'
+            : 'bg-primary-600';
+        const bar = document.createElement('div');
+        bar.className = `h-full ${barColor} rounded-full transition-all duration-150`;
+        bar.style.width = pct + '%';
+        barWrap.appendChild(bar);
+
+        if (item.status === 'failed' && item.error) {
+            const errDiv = document.createElement('div');
+            errDiv.className = 'text-[10px] text-red-600 mt-1 truncate';
+            errDiv.title = item.error;
+            errDiv.textContent = item.error;
+            main.appendChild(errDiv);
+        }
+
+        const cancelable = item.status === 'queued' || item.status === 'uploading';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'shrink-0 w-6 h-6 flex items-center justify-center rounded ' + (cancelable ? 'text-slate-400 hover:text-red-500 hover:bg-red-50' : 'text-slate-300 cursor-default');
+        if (cancelable) {
+            cancelBtn.title = 'Anulo';
+            cancelBtn.addEventListener('click', () => cancelUpload(item.id));
+        } else {
+            cancelBtn.disabled = true;
+        }
+        const xIcon = document.createElement('iconify-icon');
+        xIcon.setAttribute('icon', 'heroicons-outline:x-mark');
+        xIcon.setAttribute('width', '14');
+        cancelBtn.appendChild(xIcon);
+        inner.appendChild(cancelBtn);
+
+        return row;
+    }
+
+    function uploadStatusText(item) {
+        if (item.status === 'queued') return 'Në pritje…';
+        if (item.status === 'cancelled') return 'Anuluar';
+        if (item.status === 'failed') return 'Dështoi';
+        if (item.status === 'done') return 'Përfundoi · ' + fmtBytes(item.size);
+        const pct = item.size > 0 ? Math.round((item.loaded / item.size) * 100) : 0;
+        const elapsed = (Date.now() - item.startedAt) / 1000;
+        let speedTxt = '—';
+        let etaTxt = '—';
+        if (elapsed > 0.4 && item.loaded > 0) {
+            const bps = item.loaded / elapsed;
+            speedTxt = fmtRate(bps);
+            const remaining = (item.size - item.loaded) / bps;
+            etaTxt = fmtDuration(remaining);
+        }
+        return `${pct}% · ${fmtBytes(item.loaded)} / ${fmtBytes(item.size)} · ${speedTxt} · ${etaTxt}`;
+    }
+
+    function fmtBytes(b) {
+        if (!b && b !== 0) return '—';
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+        if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+        return (b/1073741824).toFixed(2) + ' GB';
+    }
+
+    function fmtRate(bps) {
+        if (bps < 1048576) return (bps/1024).toFixed(0) + ' KB/s';
+        return (bps/1048576).toFixed(1) + ' MB/s';
+    }
+
+    function fmtDuration(s) {
+        if (!isFinite(s) || s < 0) return '—';
+        if (s < 60) return Math.ceil(s) + 's';
+        if (s < 3600) return Math.floor(s/60) + 'm ' + Math.ceil(s%60) + 's';
+        return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
     }
 
     // ── Upload-zone product + collection selectors ──
