@@ -428,8 +428,16 @@ class DailyBasketController extends Controller
             $id = (int) ($p['id'] ?? 0);
             // base_price + effective_price + has_discount were already
             // resolved in loadCollectionProducts (`rate` vs `pricelist_price`).
+            // Fall back to the legacy fields so unit tests and any caller
+            // that hands us a raw DIS shape still get a meaningful price.
             $base = (float) ($p['base_price'] ?? 0);
-            $price = (float) ($p['effective_price'] ?? $base);
+            $price = (float) ($p['effective_price'] ?? 0);
+            if ($price === 0.0) {
+                $price = (float) ($p['pricelist_price'] ?? $p['avg_price'] ?? $p['rate'] ?? 0);
+            }
+            if ($base === 0.0) {
+                $base = $price;
+            }
             $hasDiscount = (bool) ($p['has_discount'] ?? false);
             $stock = (int) ($p['total_stock'] ?? 0);
             $sold  = (int) ($p['total_sold'] ?? 0);
