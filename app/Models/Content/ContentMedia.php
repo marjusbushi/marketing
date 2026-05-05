@@ -29,6 +29,7 @@ class ContentMedia extends Model
         'duration_seconds',
         'thumbnail_path',
         'cover_path',
+        'cover_timestamp_ms',
         'alt_text',
         'folder',
         'stage',

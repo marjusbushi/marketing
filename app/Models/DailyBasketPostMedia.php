@@ -31,6 +31,7 @@ class DailyBasketPostMedia extends Model
         'duration_seconds',
         'thumbnail_path',
         'cover_path',
+        'cover_timestamp_ms',
         'sort_order',
     ];
 
@@ -39,6 +40,7 @@ class DailyBasketPostMedia extends Model
         'width' => 'integer',
         'height' => 'integer',
         'duration_seconds' => 'integer',
+        'cover_timestamp_ms' => 'integer',
         'sort_order' => 'integer',
     ];
 

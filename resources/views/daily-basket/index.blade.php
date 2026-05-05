@@ -3834,9 +3834,10 @@
             tile.style.background = '#000';
 
             // Mirror the grid preview-modal pattern: muted + autoplay
-            // + loop + native controls + playsinline. Browsers allow
-            // autoplay only when muted, which is fine for an editing
-            // surface — the user can unmute via the controls.
+            // + loop + native controls + playsinline. Plus, when the
+            // user picked a frame at timestamp T, seek to T BEFORE
+            // play starts so the preview opens on the same frame Meta
+            // will use as the Reel cover (thumb_offset).
             const video = document.createElement('video');
             video.className = 'db-media-video';
             video.src = media.url;
@@ -3854,9 +3855,26 @@
             video.setAttribute('controls', '');
             video.dataset.mediaId = String(media.id);
             video.style.cssText = 'width:100%; height:100%; display:block; object-fit:contain; background:#000;';
+            const startMs = Number(media.cover_timestamp_ms);
+            const startSec = isFinite(startMs) && startMs > 0 ? startMs / 1000 : 0;
             video.addEventListener('loadedmetadata', () => {
+                if (startSec > 0 && isFinite(video.duration) && startSec < video.duration) {
+                    try { video.currentTime = startSec; } catch (e) { /* seek not supported yet */ }
+                }
                 video.play().catch(() => { /* autoplay policy edge cases */ });
             });
+            // Loop back to the cover offset instead of frame 0 so every
+            // replay starts on the picked frame.
+            if (startSec > 0) {
+                video.loop = false;
+                video.removeAttribute('loop');
+                video.addEventListener('ended', () => {
+                    try {
+                        video.currentTime = startSec;
+                        video.play().catch(() => {});
+                    } catch (e) { /* ignore */ }
+                });
+            }
             tile.appendChild(video);
 
             // Cover picker — same flow as the planner composer. Posts to
@@ -4713,7 +4731,7 @@
     // shape findPostById uses.
     window.addEventListener('flare:cover-updated', (e) => {
         if (!e || !e.detail) return;
-        const { mediaId, coverPath, coverUrl, thumbnailUrl } = e.detail;
+        const { mediaId, coverPath, coverUrl, coverTimestampMs, thumbnailUrl } = e.detail;
         let touchedPost = null;
         const columns = state.kanban?.columns || [];
         for (const col of columns) {
@@ -4722,6 +4740,7 @@
                     if (String(m.id) === String(mediaId)) {
                         m.cover_path = coverPath || null;
                         m.cover_url = coverUrl || null;
+                        m.cover_timestamp_ms = coverTimestampMs ?? null;
                         if (thumbnailUrl) m.thumbnail_url = thumbnailUrl;
                         touchedPost = post;
                     }

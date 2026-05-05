@@ -62,6 +62,7 @@
     (function () {
         let mediaId = null;
         let stagedDataUrl = null;
+        let stagedTimestampMs = null;  // millisecond offset for thumb_offset → Meta
         let stagedFile = null;
         let hasExistingCover = false;
         // Per-invocation endpoint pair. Defaults to the planner endpoint;
@@ -155,6 +156,10 @@
                 ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
                 stagedDataUrl = dataUrl;
+                // Capture the exact playback offset — used both for local
+                // <video>.currentTime in the post sheet AND as `thumb_offset`
+                // sent to Meta IG so the live Reel starts on the same frame.
+                stagedTimestampMs = Math.max(0, Math.round(v.currentTime * 1000));
                 stagedFile = null;
                 document.getElementById('coverFramePreviewImg').src = dataUrl;
                 document.getElementById('coverFramePreview').style.display = 'block';
@@ -184,6 +189,8 @@
             }
             stagedFile = file;
             stagedDataUrl = null;
+            // Custom upload — no source-video timestamp.
+            stagedTimestampMs = null;
             const reader = new FileReader();
             reader.onload = (ev) => {
                 document.getElementById('coverUploadPreviewImg').src = ev.target.result;
@@ -211,7 +218,10 @@
                             'Accept': 'application/json',
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ frame_data_url: stagedDataUrl }),
+                        body: JSON.stringify({
+                            frame_data_url: stagedDataUrl,
+                            frame_timestamp_ms: stagedTimestampMs,
+                        }),
                     });
                 } else if (stagedFile) {
                     const fd = new FormData();
@@ -240,6 +250,7 @@
                         mediaId: data.id,
                         coverPath: data.cover_path,
                         coverUrl: data.cover_url,
+                        coverTimestampMs: data.cover_timestamp_ms ?? null,
                         thumbnailUrl: data.thumbnail_url,
                     },
                 }));
@@ -270,6 +281,7 @@
                         mediaId: data.id,
                         coverPath: null,
                         coverUrl: null,
+                        coverTimestampMs: null,
                         thumbnailUrl: data.thumbnail_url,
                     },
                 }));

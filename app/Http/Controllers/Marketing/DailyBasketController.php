@@ -1264,6 +1264,7 @@ class DailyBasketController extends Controller
             'thumbnail_url' => $media->thumbnail_url,
             'cover_path' => $media->cover_path,
             'cover_url' => $media->cover_url,
+            'cover_timestamp_ms' => $media->cover_timestamp_ms,
             'is_video' => $media->is_video,
             'mime_type' => $media->mime_type,
             'size_bytes' => $media->size_bytes,
@@ -1294,8 +1295,9 @@ class DailyBasketController extends Controller
         }
 
         $data = $request->validate([
-            'frame_data_url' => 'nullable|string|max:12000000',
-            'cover'          => 'nullable|file|mimes:jpg,jpeg,png|max:8192',
+            'frame_data_url'    => 'nullable|string|max:12000000',
+            'frame_timestamp_ms' => 'nullable|integer|min:0|max:86400000',
+            'cover'             => 'nullable|file|mimes:jpg,jpeg,png|max:8192',
         ]);
 
         $hasFrame = ! empty($data['frame_data_url']);
@@ -1306,6 +1308,8 @@ class DailyBasketController extends Controller
             ], 422);
         }
 
+        $timestampMs = $hasFrame ? ($data['frame_timestamp_ms'] ?? null) : null;
+
         try {
             $coverPath = $hasFrame
                 ? $this->storeBasketCoverFromDataUrl($media, $data['frame_data_url'])
@@ -1315,13 +1319,16 @@ class DailyBasketController extends Controller
         }
 
         $oldCover = $media->cover_path;
-        $media->update(['cover_path' => $coverPath]);
+        $media->update([
+            'cover_path' => $coverPath,
+            'cover_timestamp_ms' => $timestampMs,
+        ]);
 
         if ($oldCover && $oldCover !== $coverPath) {
             try { Storage::disk($media->disk ?: 'public')->delete($oldCover); } catch (\Throwable $e) { /* leave for GC */ }
         }
 
-        $this->mirrorBasketCoverToContentMedia($media, $coverPath);
+        $this->mirrorBasketCoverToContentMedia($media, $coverPath, $timestampMs);
 
         $media = $media->fresh();
 
@@ -1329,6 +1336,7 @@ class DailyBasketController extends Controller
             'id' => $media->id,
             'cover_path' => $media->cover_path,
             'cover_url' => $media->cover_url,
+            'cover_timestamp_ms' => $media->cover_timestamp_ms,
             'thumbnail_url' => $media->thumbnail_url,
         ]);
     }
@@ -1343,9 +1351,9 @@ class DailyBasketController extends Controller
         if ($media->cover_path) {
             try { Storage::disk($media->disk ?: 'public')->delete($media->cover_path); } catch (\Throwable $e) { /* leave for GC */ }
         }
-        $media->update(['cover_path' => null]);
+        $media->update(['cover_path' => null, 'cover_timestamp_ms' => null]);
 
-        $this->mirrorBasketCoverToContentMedia($media, null);
+        $this->mirrorBasketCoverToContentMedia($media, null, null);
 
         $media = $media->fresh();
 
@@ -1353,6 +1361,7 @@ class DailyBasketController extends Controller
             'id' => $media->id,
             'cover_path' => null,
             'cover_url' => null,
+            'cover_timestamp_ms' => null,
             'thumbnail_url' => $media->thumbnail_url,
         ]);
     }
@@ -1404,12 +1413,15 @@ class DailyBasketController extends Controller
      * the IG publish path (which reads ContentMedia.cover_path) picks
      * up the user's choice without a separate handoff step.
      */
-    private function mirrorBasketCoverToContentMedia(DailyBasketPostMedia $media, ?string $coverPath): void
+    private function mirrorBasketCoverToContentMedia(DailyBasketPostMedia $media, ?string $coverPath, ?int $timestampMs): void
     {
         if (! $media->path) return;
         try {
             ContentMedia::where('path', $media->path)
-                ->update(['cover_path' => $coverPath]);
+                ->update([
+                    'cover_path' => $coverPath,
+                    'cover_timestamp_ms' => $timestampMs,
+                ]);
         } catch (\Throwable $e) {
             // Best-effort mirror — the basket-side cover still works.
         }

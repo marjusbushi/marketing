@@ -138,6 +138,12 @@ class InstagramPublishService implements PlatformPublisherInterface
             // the URL to be Meta-internal — we bounce the cover through FB the
             // same way we bounce video / photo. Stories don't expose cover_url
             // on the API; only REELS and VIDEO do.
+            //
+            // When the cover came from a frame inside the video (the picker
+            // stored the timestamp), also send `thumb_offset` so Meta uses
+            // that exact frame as the playback-start cover, not just the
+            // grid thumbnail. This is what makes the Reel actually OPEN on
+            // the user's chosen frame instead of the video's frame 0.
             if ($params['media_type'] !== 'STORIES' && $media->cover_path) {
                 try {
                     $coverCdnUrl = $fbCdn->uploadCoverAndGetCdnUrl($media);
@@ -150,6 +156,9 @@ class InstagramPublishService implements PlatformPublisherInterface
                         'error' => MetaErrorSanitizer::redact($e->getMessage()),
                     ]);
                 }
+            }
+            if ($params['media_type'] !== 'STORIES' && $media->cover_timestamp_ms !== null) {
+                $params['thumb_offset'] = (int) $media->cover_timestamp_ms;
             }
         } else {
             if ($contentType === 'story') {
@@ -206,6 +215,9 @@ class InstagramPublishService implements PlatformPublisherInterface
                             'error' => MetaErrorSanitizer::redact($e->getMessage()),
                         ]);
                     }
+                }
+                if ($item->cover_timestamp_ms !== null) {
+                    $params['thumb_offset'] = (int) $item->cover_timestamp_ms;
                 }
             } else {
                 $params['image_url'] = $cdnUrl;

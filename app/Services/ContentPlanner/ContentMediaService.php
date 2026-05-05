@@ -104,7 +104,7 @@ class ContentMediaService
      * Returns the refreshed media row so the controller can include the
      * new `cover_url` in its JSON reply.
      */
-    public function setCoverFromBase64(ContentMedia $media, string $dataUrl): ContentMedia
+    public function setCoverFromBase64(ContentMedia $media, string $dataUrl, ?int $timestampMs = null): ContentMedia
     {
         if (! preg_match('#^data:image/(jpe?g|png);base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $m)) {
             throw new \InvalidArgumentException('Cover dataUrl duhet të jetë JPG ose PNG (data:image/...;base64,...).');
@@ -121,7 +121,7 @@ class ContentMediaService
             throw new \InvalidArgumentException('Cover është më i madh se 8 MB.');
         }
 
-        return $this->storeCoverBytes($media, $bytes, $ext);
+        return $this->storeCoverBytes($media, $bytes, $ext, $timestampMs);
     }
 
     /**
@@ -145,7 +145,8 @@ class ContentMediaService
             throw new \InvalidArgumentException('Cover nuk u lexua nga disku.');
         }
 
-        return $this->storeCoverBytes($media, $bytes, $ext === 'jpeg' ? 'jpg' : $ext);
+        // Custom upload — no source-video timestamp.
+        return $this->storeCoverBytes($media, $bytes, $ext === 'jpeg' ? 'jpg' : $ext, null);
     }
 
     /**
@@ -162,11 +163,11 @@ class ContentMediaService
                 Log::info('Cover delete failed (will be GC\'d eventually)', ['path' => $media->cover_path, 'error' => $e->getMessage()]);
             }
         }
-        $media->update(['cover_path' => null]);
+        $media->update(['cover_path' => null, 'cover_timestamp_ms' => null]);
         return $media->fresh();
     }
 
-    protected function storeCoverBytes(ContentMedia $media, string $bytes, string $ext): ContentMedia
+    protected function storeCoverBytes(ContentMedia $media, string $bytes, string $ext, ?int $timestampMs = null): ContentMedia
     {
         $disk = $media->disk ?: $this->disk;
         $coverDir = 'content-planner/covers/' . now()->format('Y/m');
@@ -175,7 +176,10 @@ class ContentMediaService
         Storage::disk($disk)->put($coverPath, $bytes);
 
         $oldCover = $media->cover_path;
-        $media->update(['cover_path' => $coverPath]);
+        $media->update([
+            'cover_path' => $coverPath,
+            'cover_timestamp_ms' => $timestampMs,
+        ]);
 
         if ($oldCover) {
             try {

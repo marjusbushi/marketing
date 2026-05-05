@@ -539,8 +539,9 @@ class ContentPlannerApiController extends Controller
         }
 
         $data = $request->validate([
-            'frame_data_url' => 'nullable|string|max:12000000', // ~9 MB base64 ceiling
-            'cover'          => 'nullable|file|mimes:jpg,jpeg,png|max:8192', // 8 MB
+            'frame_data_url'     => 'nullable|string|max:12000000', // ~9 MB base64 ceiling
+            'frame_timestamp_ms' => 'nullable|integer|min:0|max:86400000', // ≤ 24h, sane upper bound
+            'cover'              => 'nullable|file|mimes:jpg,jpeg,png|max:8192', // 8 MB
         ]);
 
         $hasFrame = ! empty($data['frame_data_url']);
@@ -553,7 +554,11 @@ class ContentPlannerApiController extends Controller
 
         try {
             if ($hasFrame) {
-                $media = $this->mediaService->setCoverFromBase64($media, $data['frame_data_url']);
+                $media = $this->mediaService->setCoverFromBase64(
+                    $media,
+                    $data['frame_data_url'],
+                    $data['frame_timestamp_ms'] ?? null,
+                );
             } else {
                 $media = $this->mediaService->setCoverFromUpload($media, $request->file('cover'));
             }
@@ -562,11 +567,12 @@ class ContentPlannerApiController extends Controller
         }
 
         return response()->json([
-            'id'         => $media->id,
-            'cover_path' => $media->cover_path,
-            'cover_url'  => $media->cover_url,
+            'id'                 => $media->id,
+            'cover_path'         => $media->cover_path,
+            'cover_url'          => $media->cover_url,
+            'cover_timestamp_ms' => $media->cover_timestamp_ms,
             // thumbnail_url now points at the cover (cover wins over thumb)
-            'thumbnail_url' => $media->thumbnail_url,
+            'thumbnail_url'      => $media->thumbnail_url,
         ]);
     }
 
@@ -576,10 +582,11 @@ class ContentPlannerApiController extends Controller
         $media = $this->mediaService->clearCover($media);
 
         return response()->json([
-            'id' => $media->id,
-            'cover_path' => null,
-            'cover_url' => null,
-            'thumbnail_url' => $media->thumbnail_url,
+            'id'                 => $media->id,
+            'cover_path'         => null,
+            'cover_url'          => null,
+            'cover_timestamp_ms' => null,
+            'thumbnail_url'      => $media->thumbnail_url,
         ]);
     }
 
