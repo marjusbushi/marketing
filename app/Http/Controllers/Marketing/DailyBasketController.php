@@ -515,7 +515,10 @@ class DailyBasketController extends Controller
 
         return Cache::remember($cacheKey, 60, function () use ($distributionWeekId) {
             try {
-                $week = $this->disApi->getWeek($distributionWeekId);
+                // getWeekEnriched re-fetches incomplete item_groups via
+                // searchItemGroups so products that look "0 var · 0 stk"
+                // in the raw weeks endpoint still get real stock/variants.
+                $week = $this->disApi->getWeekEnriched($distributionWeekId);
             } catch (\Throwable $e) {
                 report($e);
 

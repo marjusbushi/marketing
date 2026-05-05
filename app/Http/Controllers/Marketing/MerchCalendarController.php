@@ -45,7 +45,10 @@ class MerchCalendarController extends Controller
     public function collectionDetail(int $id): View
     {
         try {
-            $collection = $this->disApi->getWeek($id);
+            // Use the enriched variant so item_groups whose stock/variants
+            // are missing from /weeks/{id} get back-filled via searchItemGroups
+            // (the same source DIS UI uses on /management/items/items-grouped).
+            $collection = $this->disApi->getWeekEnriched($id);
         } catch (\RuntimeException $e) {
             abort($e->getCode() === 404 ? 404 : 502, $e->getMessage());
         }

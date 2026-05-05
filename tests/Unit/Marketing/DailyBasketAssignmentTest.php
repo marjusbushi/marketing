@@ -93,7 +93,7 @@ class DailyBasketAssignmentTest extends TestCase
     public function test_show_handles_dis_api_failure_gracefully(): void
     {
         $disApi = Mockery::mock(DisApiClient::class);
-        $disApi->shouldReceive('getWeek')
+        $disApi->shouldReceive('getWeekEnriched')
             ->once()
             ->with(99)
             ->andThrow(new RuntimeException('DIS down'));
@@ -133,7 +133,7 @@ class DailyBasketAssignmentTest extends TestCase
     private function invokeLoadCollectionProducts(int $weekId, array $weekPayload): array
     {
         $disApi = Mockery::mock(DisApiClient::class);
-        $disApi->shouldReceive('getWeek')
+        $disApi->shouldReceive('getWeekEnriched')
             ->once()
             ->with($weekId)
             ->andReturn($weekPayload);

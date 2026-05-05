@@ -226,6 +226,110 @@ class DisApiClient
     }
 
     /**
+     * Get a distribution week and back-fill any item_groups that arrive
+     * with missing stock / variants / price by re-fetching them through
+     * `searchItemGroups`, which the DIS UI uses for `/management/items/items-grouped`
+     * and tends to carry the richer shape. Falls back silently to whatever
+     * getWeek returned if the secondary endpoint fails.
+     *
+     * Why this matters: in production we observe item_groups that show
+     * `0 var · 0 stk · 0 L` in marketing while DIS UI shows real numbers —
+     * the merch-calendar/weeks endpoint omits those columns for items
+     * with certain inventory statuses ("Distributed", etc.). This method
+     * patches around that without waiting on a DIS-side API change.
+     */
+    public function getWeekEnriched(int $id): array
+    {
+        $week = $this->getWeek($id);
+        $groups = $week['item_groups'] ?? [];
+        if (empty($groups)) {
+            return $week;
+        }
+
+        $needsEnrichment = function (array $g): bool {
+            $stock = self::pickNum($g, ['total_stock', 'available_stock', 'stock_total', 'available_qty', 'stock', 'quantity', 'total_qty']);
+            $variants = self::pickNum($g, ['variations_count', 'variants_count', 'variation_count', 'variants', 'items_count']);
+            $base = self::pickPositive($g, ['rate', 'avg_price', 'price', 'unit_price', 'pricelist_price']);
+
+            return ($stock <= 0 && $variants <= 0) || $base <= 0;
+        };
+
+        $enriched = [];
+        foreach ($groups as $g) {
+            if (! $needsEnrichment($g)) {
+                $enriched[] = $g;
+                continue;
+            }
+
+            $code = (string) ($g['code'] ?? '');
+            $id = (string) ($g['id'] ?? '');
+            $needle = $code !== '' ? $code : $id;
+            if ($needle === '') {
+                $enriched[] = $g;
+                continue;
+            }
+
+            try {
+                $matches = $this->searchItemGroups($needle);
+            } catch (\Throwable $e) {
+                report($e);
+                $enriched[] = $g;
+                continue;
+            }
+
+            $match = null;
+            foreach ($matches as $m) {
+                if ((string) ($m['id'] ?? '') === $id || (string) ($m['code'] ?? '') === $code) {
+                    $match = $m;
+                    break;
+                }
+            }
+
+            if ($match === null) {
+                $enriched[] = $g;
+                continue;
+            }
+
+            // Fields from $match fill in missing/zero values in $g.
+            // Existing non-empty fields in $g win — preserves whatever
+            // getWeek already produced (assigned_dates especially).
+            foreach ($match as $key => $value) {
+                if (! array_key_exists($key, $g) || $g[$key] === null || $g[$key] === '' || $g[$key] === 0 || $g[$key] === '0') {
+                    $g[$key] = $value;
+                }
+            }
+            $enriched[] = $g;
+        }
+
+        $week['item_groups'] = $enriched;
+
+        return $week;
+    }
+
+    /**
+     * Helpers used by getWeekEnriched. Numeric pick across keys.
+     */
+    private static function pickNum(array $row, array $keys): float
+    {
+        foreach ($keys as $k) {
+            if (! array_key_exists($k, $row)) continue;
+            $v = $row[$k];
+            if (is_numeric($v)) return (float) $v;
+        }
+        return 0.0;
+    }
+
+    private static function pickPositive(array $row, array $keys): float
+    {
+        foreach ($keys as $k) {
+            if (! array_key_exists($k, $row)) continue;
+            $v = $row[$k];
+            if (is_numeric($v) && (float) $v > 0) return (float) $v;
+        }
+        return 0.0;
+    }
+
+    /**
      * Create a new distribution week.
      */
     public function createWeek(array $data): array
