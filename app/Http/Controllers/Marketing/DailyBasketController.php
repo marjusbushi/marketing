@@ -1177,8 +1177,8 @@ class DailyBasketController extends Controller
     private function cannotLeave(DailyBasketPost $post, DailyBasketPostStage $stage): ?string
     {
         return match ($stage) {
-            DailyBasketPostStage::PLANNING => empty($post->reference_url)
-                ? 'Duhet një reference para se të kalojmë në prodhim.'
+            DailyBasketPostStage::PLANNING => (empty($post->reference_url) && empty($post->reference_notes))
+                ? 'Duhet një reference (URL ose shënime) para se të kalojmë në prodhim.'
                 : null,
 
             DailyBasketPostStage::EDITING => empty($post->caption)
