@@ -3825,53 +3825,32 @@
 
         if (media.is_video) {
             const posterUrl = media.cover_url || media.thumbnail_url || '';
-            console.log('[cover] buildMediaTile video', { mediaId: media.id, posterUrl, cover_url: media.cover_url, thumbnail_url: media.thumbnail_url });
 
-            // Image-first render. <video> creates a hardware-accelerated
-            // layer that's been observed to occlude sibling overlays even
-            // with z-index. Mount a plain <img> for the cover and only
-            // swap in <video> on user click — mirrors IG / TikTok feed.
+            // Render as a static <img> always — no click-to-play swap, no
+            // <video> element. Eliminates every interaction between the
+            // picker save and the heavy <video> compositing layer that
+            // kept showing pure black. Users who actually want to *play*
+            // the video click through to the planner preview modal.
             if (posterUrl) {
                 const img = document.createElement('img');
-                img.className = 'db-media-video';
                 img.src = posterUrl;
                 img.alt = '';
-                img.style.cssText = 'cursor:pointer; background:#000;';
+                img.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:block; background:#000;';
                 img.dataset.mediaId = String(media.id);
-                img.onload = () => console.log('[cover] image LOADED', posterUrl, img.naturalWidth + 'x' + img.naturalHeight);
-                img.onerror = (ev) => console.warn('[cover] image FAILED to load', posterUrl, ev);
+                img.onerror = () => { console.warn('[cover] image failed to load', posterUrl); };
                 tile.appendChild(img);
 
-                const playIcon = document.createElement('div');
-                playIcon.className = 'db-media-play-icon';
-                playIcon.style.cssText = 'position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; color:rgba(255,255,255,0.92); font-size:48px; text-shadow:0 2px 10px rgba(0,0,0,0.55);';
-                playIcon.textContent = '▶';
-                tile.appendChild(playIcon);
-
-                img.addEventListener('click', () => {
-                    const video = document.createElement('video');
-                    video.className = 'db-media-video';
-                    video.src = media.url;
-                    video.poster = posterUrl;
-                    video.controls = true;
-                    video.playsInline = true;
-                    video.preload = 'metadata';
-                    video.autoplay = true;
-                    video.dataset.mediaId = String(media.id);
-                    tile.replaceChild(video, img);
-                    playIcon.remove();
-                    video.play().catch(() => {});
-                });
+                const badge = document.createElement('div');
+                badge.style.cssText = 'position:absolute; bottom:8px; right:8px; background:rgba(15,23,42,0.78); color:#fff; padding:3px 7px; border-radius:5px; font-size:10px; font-weight:600; pointer-events:none; z-index:1;';
+                badge.textContent = '▶ Video';
+                tile.appendChild(badge);
             } else {
-                // No cover/thumb — mount <video> directly.
-                const video = document.createElement('video');
-                video.className = 'db-media-video';
-                video.src = media.url;
-                video.controls = true;
-                video.playsInline = true;
-                video.preload = 'metadata';
-                video.dataset.mediaId = String(media.id);
-                tile.appendChild(video);
+                // No cover/thumb yet — show a placeholder slate so the
+                // tile isn't empty.
+                const placeholder = document.createElement('div');
+                placeholder.style.cssText = 'position:absolute; inset:0; background:#1f2937; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.55); font-size:11px;';
+                placeholder.textContent = 'Video pa cover';
+                tile.appendChild(placeholder);
             }
 
             // Cover picker — same flow as the planner composer. Posts to
