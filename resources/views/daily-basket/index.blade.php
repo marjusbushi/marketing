@@ -3827,33 +3827,37 @@
             const posterUrl = media.cover_url || media.thumbnail_url || '';
 
             // Strip the flex column layout the slot inherits from the
-            // upload-empty state — that's what was collapsing every
-            // previous child element to zero size. With block display
-            // and aspect-ratio still in effect, a plain <img> with
-            // width/height 100% fills the slot exactly.
+            // upload-empty state so a child <video> has a real height
+            // (aspect-ratio gives the derived value once flex is gone).
             tile.style.display = 'block';
             tile.style.padding = '0';
             tile.style.background = '#000';
 
-            if (posterUrl) {
-                const img = document.createElement('img');
-                img.src = posterUrl;
-                img.alt = '';
-                img.style.cssText = 'width:100%; height:100%; object-fit:contain; display:block;';
-                img.dataset.mediaId = String(media.id);
-                img.onerror = () => { console.warn('[cover] image failed', posterUrl); };
-                tile.appendChild(img);
-
-                const badge = document.createElement('div');
-                badge.style.cssText = 'position:absolute; bottom:8px; right:8px; background:rgba(15,23,42,0.78); color:#fff; padding:3px 7px; border-radius:5px; font-size:10px; font-weight:600; pointer-events:none; z-index:1;';
-                badge.textContent = '▶ Video';
-                tile.appendChild(badge);
-            } else {
-                const placeholder = document.createElement('div');
-                placeholder.style.cssText = 'width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,0.55); font-size:11px; background:#1f2937;';
-                placeholder.textContent = 'Video pa cover';
-                tile.appendChild(placeholder);
-            }
+            // Mirror the grid preview-modal pattern: muted + autoplay
+            // + loop + native controls + playsinline. Browsers allow
+            // autoplay only when muted, which is fine for an editing
+            // surface — the user can unmute via the controls.
+            const video = document.createElement('video');
+            video.className = 'db-media-video';
+            video.src = media.url;
+            if (posterUrl) video.poster = posterUrl;
+            video.muted = true;
+            video.autoplay = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.controls = true;
+            video.preload = 'metadata';
+            video.setAttribute('muted', '');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('loop', '');
+            video.setAttribute('playsinline', '');
+            video.setAttribute('controls', '');
+            video.dataset.mediaId = String(media.id);
+            video.style.cssText = 'width:100%; height:100%; display:block; object-fit:contain; background:#000;';
+            video.addEventListener('loadedmetadata', () => {
+                video.play().catch(() => { /* autoplay policy edge cases */ });
+            });
+            tile.appendChild(video);
 
             // Cover picker — same flow as the planner composer. Posts to
             // /api/media/{id}/cover; the picker partial dispatches a
