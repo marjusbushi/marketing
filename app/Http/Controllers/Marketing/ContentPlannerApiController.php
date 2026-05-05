@@ -518,6 +518,71 @@ class ContentPlannerApiController extends Controller
         return response()->json(['message' => 'Media deleted.']);
     }
 
+    /**
+     * Set / replace the cover for a video media item. Two modes:
+     *
+     *   - `frame_data_url`: base64 data URL produced by canvas.toDataURL on
+     *     a HTMLVideoElement seeked to the user's chosen timestamp. This
+     *     is what the in-composer slider uses.
+     *   - `cover` (multipart file): a polished cover image the user
+     *     prepared in Photoshop/Canva.
+     *
+     * Either field may be sent — never both. Returns the refreshed media
+     * row so the UI can swap thumbnails immediately.
+     */
+    public function setMediaCover(Request $request, int $id): JsonResponse
+    {
+        $media = ContentMedia::findOrFail($id);
+
+        if (! str_starts_with((string) $media->mime_type, 'video/')) {
+            return response()->json(['message' => 'Cover-i mund të vendoset vetëm te video.'], 422);
+        }
+
+        $data = $request->validate([
+            'frame_data_url' => 'nullable|string|max:12000000', // ~9 MB base64 ceiling
+            'cover'          => 'nullable|file|mimes:jpg,jpeg,png|max:8192', // 8 MB
+        ]);
+
+        $hasFrame = ! empty($data['frame_data_url']);
+        $hasFile = $request->hasFile('cover');
+        if ($hasFrame === $hasFile) {
+            return response()->json([
+                'message' => 'Dërgo OSE një frame_data_url, OSE një file cover — jo të dyja, jo asnjë.',
+            ], 422);
+        }
+
+        try {
+            if ($hasFrame) {
+                $media = $this->mediaService->setCoverFromBase64($media, $data['frame_data_url']);
+            } else {
+                $media = $this->mediaService->setCoverFromUpload($media, $request->file('cover'));
+            }
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'id'         => $media->id,
+            'cover_path' => $media->cover_path,
+            'cover_url'  => $media->cover_url,
+            // thumbnail_url now points at the cover (cover wins over thumb)
+            'thumbnail_url' => $media->thumbnail_url,
+        ]);
+    }
+
+    public function clearMediaCover(int $id): JsonResponse
+    {
+        $media = ContentMedia::findOrFail($id);
+        $media = $this->mediaService->clearCover($media);
+
+        return response()->json([
+            'id' => $media->id,
+            'cover_path' => null,
+            'cover_url' => null,
+            'thumbnail_url' => $media->thumbnail_url,
+        ]);
+    }
+
     // ── Media folders (Media Library v2) ──
 
     public function listMediaFolders(): JsonResponse

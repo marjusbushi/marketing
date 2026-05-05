@@ -133,6 +133,24 @@ class InstagramPublishService implements PlatformPublisherInterface
         if (str_starts_with((string) $media->mime_type, 'video/')) {
             $params['media_type'] = $contentType === 'reel' ? 'REELS' : ($contentType === 'story' ? 'STORIES' : 'VIDEO');
             $params['video_url'] = $cdnUrl;
+
+            // Custom cover (user picked a frame or uploaded one). Meta requires
+            // the URL to be Meta-internal — we bounce the cover through FB the
+            // same way we bounce video / photo. Stories don't expose cover_url
+            // on the API; only REELS and VIDEO do.
+            if ($params['media_type'] !== 'STORIES' && $media->cover_path) {
+                try {
+                    $coverCdnUrl = $fbCdn->uploadCoverAndGetCdnUrl($media);
+                    if ($coverCdnUrl) {
+                        $params['cover_url'] = $coverCdnUrl;
+                    }
+                } catch (\Throwable $e) {
+                    \Log::warning('IG cover bounce failed; falling back to auto-cover', [
+                        'media_id' => $media->id,
+                        'error' => MetaErrorSanitizer::redact($e->getMessage()),
+                    ]);
+                }
+            }
         } else {
             if ($contentType === 'story') {
                 $params['media_type'] = 'STORIES';
@@ -176,6 +194,19 @@ class InstagramPublishService implements PlatformPublisherInterface
             if ($isVideo) {
                 $params['media_type'] = 'VIDEO';
                 $params['video_url'] = $cdnUrl;
+                if ($item->cover_path) {
+                    try {
+                        $coverCdnUrl = $fbCdn->uploadCoverAndGetCdnUrl($item);
+                        if ($coverCdnUrl) {
+                            $params['cover_url'] = $coverCdnUrl;
+                        }
+                    } catch (\Throwable $e) {
+                        \Log::warning('IG carousel-child cover bounce failed; auto-cover', [
+                            'media_id' => $item->id,
+                            'error' => MetaErrorSanitizer::redact($e->getMessage()),
+                        ]);
+                    }
+                }
             } else {
                 $params['image_url'] = $cdnUrl;
             }

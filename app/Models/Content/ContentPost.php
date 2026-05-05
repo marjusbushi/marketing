@@ -156,6 +156,11 @@ class ContentPost extends Model
         $media = $this->media->first();
         if (!$media) return null;
 
+        // User-picked cover wins over auto-generated thumbnail. Mirrors what
+        // the post will actually look like on IG once published.
+        if ($media->cover_path) {
+            return \Illuminate\Support\Facades\Storage::disk($media->disk)->url($media->cover_path);
+        }
         if ($media->thumbnail_path) {
             return \Illuminate\Support\Facades\Storage::disk($media->disk)->url($media->thumbnail_path);
         }

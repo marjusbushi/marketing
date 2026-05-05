@@ -28,6 +28,7 @@ class ContentMedia extends Model
         'height',
         'duration_seconds',
         'thumbnail_path',
+        'cover_path',
         'alt_text',
         'folder',
         'stage',
@@ -39,6 +40,7 @@ class ContentMedia extends Model
     protected $appends = [
         'url',
         'thumbnail_url',
+        'cover_url',
         'is_video',
         'human_size',
         'item_group_ids',
@@ -109,11 +111,25 @@ class ContentMedia extends Model
 
     public function getThumbnailUrlAttribute(): ?string
     {
+        // Cover (user-picked) wins over auto-generated thumbnail when set.
+        // The order mirrors what Meta sees as the Reel/Video cover.
+        if ($this->cover_path) {
+            return Storage::disk($this->resolvedDisk())->url($this->cover_path);
+        }
         if ($this->thumbnail_path) {
             return Storage::disk($this->resolvedDisk())->url($this->thumbnail_path);
         }
 
         return $this->url;
+    }
+
+    public function getCoverUrlAttribute(): ?string
+    {
+        if ($this->cover_path) {
+            return Storage::disk($this->resolvedDisk())->url($this->cover_path);
+        }
+
+        return null;
     }
 
     public function getIsVideoAttribute(): bool

@@ -103,6 +103,16 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->name('api.media.destroy')
             ->middleware('marketing.permission:' . P::CONTENT_PLANNER_DELETE->value);
 
+        // API: Media cover (Reel cover picker — frame grab or custom upload).
+        // Same edit gate as captions/scheduling because it changes what
+        // followers see on the post.
+        Route::post('/api/media/{id}/cover', [ContentPlannerApiController::class, 'setMediaCover'])
+            ->name('api.media.cover.set')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+        Route::delete('/api/media/{id}/cover', [ContentPlannerApiController::class, 'clearMediaCover'])
+            ->name('api.media.cover.clear')
+            ->middleware('marketing.permission:' . P::CONTENT_PLANNER_EDIT->value);
+
         // API: Media folders + bulk ops (Media Library v2)
         Route::get('/api/media/folders', [ContentPlannerApiController::class, 'listMediaFolders'])
             ->name('api.media.folders.index');

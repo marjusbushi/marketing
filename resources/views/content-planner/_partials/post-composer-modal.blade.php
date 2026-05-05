@@ -738,11 +738,12 @@
     function buildSlideElement(media) {
         const slide = document.createElement('div');
         slide.className = 'cp-slide';
-        slide.style.cssText = 'flex:0 0 100%;width:100%;';
+        slide.dataset.mediaId = String(media.id || '');
+        slide.style.cssText = 'flex:0 0 100%;width:100%;position:relative;';
 
         const isVideo = (media.mime_type || '').startsWith('video/');
         const el = document.createElement(isVideo ? 'video' : 'img');
-        el.src = media.thumbnail_url || media.url;
+        el.src = isVideo ? media.url : (media.thumbnail_url || media.url);
         el.style.cssText = 'width:100%;display:block;' + (isVideo ? '' : 'pointer-events:none;');
         if (isVideo) {
             el.muted = true; el.autoplay = true; el.loop = true; el.playsInline = true;
@@ -751,6 +752,31 @@
             el.draggable = false;
         }
         slide.appendChild(el);
+
+        // Cover picker affordance — only for video. Reels covers what
+        // followers see on the IG grid before the video plays; without
+        // this, Meta auto-picks (often a black first frame).
+        if (isVideo) {
+            const coverBtn = document.createElement('button');
+            coverBtn.type = 'button';
+            coverBtn.className = 'cp-cover-btn';
+            coverBtn.dataset.mediaId = String(media.id || '');
+            coverBtn.style.cssText = 'position:absolute;top:8px;right:8px;background:rgba(15,23,42,0.78);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;backdrop-filter:blur(4px);z-index:5;';
+            const ic = document.createElement('iconify-icon');
+            ic.setAttribute('icon', 'heroicons-outline:photo');
+            ic.setAttribute('width', '12');
+            coverBtn.appendChild(ic);
+            const lbl = document.createElement('span');
+            lbl.textContent = media.cover_path ? 'Cover ✓' : 'Cover';
+            coverBtn.appendChild(lbl);
+            coverBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                openCoverPicker(media.id);
+            });
+            slide.appendChild(coverBtn);
+        }
+
         return slide;
     }
 
@@ -1961,4 +1987,279 @@
         if (onClick) row.onclick = onClick;
         return row;
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Cover picker (Reels) — frame-grab from the existing video OR
+    // upload of a custom JPG/PNG. Posts to /api/media/{id}/cover and
+    // refreshes the slide button + carousel thumbnail. The cover URL
+    // is what we send to Meta as `cover_url` on REELS publish.
+    // ─────────────────────────────────────────────────────────────
+    let coverPickerMediaId = null;
+    let coverPickerCurrentFrameDataUrl = null;
+    let coverPickerCurrentFile = null;
+
+    function openCoverPicker(mediaId) {
+        const media = composerState.mediaItems.find(m => String(m.id) === String(mediaId));
+        if (!media) return;
+        coverPickerMediaId = mediaId;
+        coverPickerCurrentFrameDataUrl = null;
+        coverPickerCurrentFile = null;
+
+        document.getElementById('coverPickerOverlay').classList.remove('hidden');
+        coverPickerSwitchTab('frame');
+
+        const v = document.getElementById('coverPickerVideo');
+        v.crossOrigin = 'anonymous';
+        v.src = media.url;
+        v.currentTime = 0;
+        v.load();
+
+        document.getElementById('coverFrameTime').textContent = '0.00s';
+        document.getElementById('coverFrameSlider').value = 0;
+        const preview = document.getElementById('coverFramePreview');
+        preview.style.display = 'none';
+        const previewImg = document.getElementById('coverFramePreviewImg');
+        previewImg.removeAttribute('src');
+
+        document.getElementById('coverUploadFile').value = '';
+        document.getElementById('coverUploadPreview').style.display = 'none';
+        document.getElementById('coverUploadPreviewImg').removeAttribute('src');
+
+        const clearBtn = document.getElementById('coverPickerClear');
+        clearBtn.style.display = media.cover_path ? 'inline-flex' : 'none';
+
+        const saveBtn = document.getElementById('coverPickerSave');
+        saveBtn.disabled = true;
+    }
+
+    function closeCoverPicker() {
+        document.getElementById('coverPickerOverlay').classList.add('hidden');
+        const v = document.getElementById('coverPickerVideo');
+        try { v.pause(); } catch (e) {}
+        v.removeAttribute('src');
+        v.load();
+        coverPickerMediaId = null;
+        coverPickerCurrentFrameDataUrl = null;
+        coverPickerCurrentFile = null;
+    }
+
+    function coverPickerSwitchTab(tab) {
+        const isFrame = tab === 'frame';
+        document.getElementById('coverTabFrame').classList.toggle('cp-tab-active', isFrame);
+        document.getElementById('coverTabUpload').classList.toggle('cp-tab-active', !isFrame);
+        document.getElementById('coverPaneFrame').style.display = isFrame ? 'block' : 'none';
+        document.getElementById('coverPaneUpload').style.display = isFrame ? 'none' : 'block';
+        // Switching tabs invalidates the staged choice from the other tab.
+        coverPickerCurrentFrameDataUrl = null;
+        coverPickerCurrentFile = null;
+        document.getElementById('coverPickerSave').disabled = true;
+    }
+
+    function coverPickerSliderInput(e) {
+        const v = document.getElementById('coverPickerVideo');
+        if (!isFinite(v.duration) || v.duration <= 0) return;
+        const pct = Number(e.target.value) / 100;
+        const t = Math.max(0, Math.min(v.duration, pct * v.duration));
+        v.currentTime = t;
+        document.getElementById('coverFrameTime').textContent = t.toFixed(2) + 's';
+    }
+
+    function captureCoverFrame() {
+        const v = document.getElementById('coverPickerVideo');
+        if (!v.videoWidth || !v.videoHeight) {
+            alert('Video s\'u ngarkua mirë. Provo përsëri.');
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext('2d');
+        try {
+            ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            coverPickerCurrentFrameDataUrl = dataUrl;
+            coverPickerCurrentFile = null;
+            const preview = document.getElementById('coverFramePreview');
+            const previewImg = document.getElementById('coverFramePreviewImg');
+            previewImg.src = dataUrl;
+            preview.style.display = 'block';
+            document.getElementById('coverPickerSave').disabled = false;
+        } catch (e) {
+            alert('Frame-i s\'u kap: ' + (e.message || 'unknown error') + '. Kontrollo R2 CORS.');
+        }
+    }
+
+    function coverUploadFileChanged(input) {
+        const file = input.files && input.files[0];
+        if (!file) {
+            coverPickerCurrentFile = null;
+            document.getElementById('coverPickerSave').disabled = true;
+            document.getElementById('coverUploadPreview').style.display = 'none';
+            return;
+        }
+        if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+            alert('Vetëm JPG ose PNG.');
+            input.value = '';
+            return;
+        }
+        if (file.size > 8 * 1048576) {
+            alert('File është më i madh se 8 MB.');
+            input.value = '';
+            return;
+        }
+        coverPickerCurrentFile = file;
+        coverPickerCurrentFrameDataUrl = null;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const previewImg = document.getElementById('coverUploadPreviewImg');
+            previewImg.src = ev.target.result;
+            document.getElementById('coverUploadPreview').style.display = 'block';
+            document.getElementById('coverPickerSave').disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function saveCoverFromPicker() {
+        if (!coverPickerMediaId) return;
+        const saveBtn = document.getElementById('coverPickerSave');
+        const originalLbl = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Po ruhet…';
+
+        try {
+            const url = `{{ url('/marketing/planner/api/media') }}/${encodeURIComponent(coverPickerMediaId)}/cover`;
+            let res;
+            if (coverPickerCurrentFrameDataUrl) {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ frame_data_url: coverPickerCurrentFrameDataUrl }),
+                });
+            } else if (coverPickerCurrentFile) {
+                const fd = new FormData();
+                fd.append('cover', coverPickerCurrentFile);
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: fd,
+                });
+            } else {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalLbl;
+                return;
+            }
+
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({ message: 'HTTP ' + res.status }));
+                throw new Error(body.message || 'HTTP ' + res.status);
+            }
+            const data = await res.json();
+            applyCoverUpdateToComposer(data.id, data.cover_path, data.cover_url, data.thumbnail_url);
+            closeCoverPicker();
+        } catch (err) {
+            alert('Cover s\'u ruajt: ' + err.message);
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalLbl;
+        }
+    }
+
+    async function clearCoverFromPicker() {
+        if (!coverPickerMediaId) return;
+        if (!confirm('Hiq cover-in aktual? Meta do të kthehet te frame-i auto.')) return;
+        try {
+            const url = `{{ url('/marketing/planner/api/media') }}/${encodeURIComponent(coverPickerMediaId)}/cover`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                },
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            applyCoverUpdateToComposer(data.id, null, null, data.thumbnail_url);
+            closeCoverPicker();
+        } catch (err) {
+            alert('Cover s\'u hoq: ' + err.message);
+        }
+    }
+
+    function applyCoverUpdateToComposer(mediaId, coverPath, coverUrl, thumbnailUrl) {
+        // Update in-memory state so subsequent renders carry the new cover.
+        const item = composerState.mediaItems.find(m => String(m.id) === String(mediaId));
+        if (item) {
+            item.cover_path = coverPath || null;
+            item.cover_url = coverUrl || null;
+            if (thumbnailUrl) item.thumbnail_url = thumbnailUrl;
+        }
+        // Update the slide's Cover button label without re-rendering the carousel
+        // (preserves the user's current carousel index + video playback state).
+        document.querySelectorAll('.cp-cover-btn[data-media-id="' + String(mediaId) + '"] span').forEach(s => {
+            s.textContent = coverPath ? 'Cover ✓' : 'Cover';
+        });
+    }
 </script>
+
+{{-- Cover Picker Modal — frame slider + custom upload. Sits at root of
+     the composer partial so the z-index stack stays predictable
+     (above composer overlay, below alerts). --}}
+<style>
+    .cp-tab-active { color:#4f46e5; border-bottom-color:#4f46e5 !important; }
+</style>
+<div id="coverPickerOverlay" class="hidden fixed inset-0 z-[10001]" style="background:rgba(15,23,42,0.65);">
+    <div class="absolute inset-0 flex items-center justify-center p-4" onclick="if(event.target===this)closeCoverPicker()">
+        <div class="bg-white rounded-xl shadow-2xl w-[680px] max-w-[95vw] max-h-[92vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                <h3 class="text-sm font-semibold text-slate-800">Zgjidh cover-in e Reels</h3>
+                <button type="button" onclick="closeCoverPicker()" class="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100">×</button>
+            </div>
+
+            <div class="flex border-b border-slate-200">
+                <button type="button" id="coverTabFrame" onclick="coverPickerSwitchTab('frame')" class="cp-tab-active flex-1 py-2.5 text-xs font-medium text-slate-500 border-b-2 border-transparent">Zgjidh nga video</button>
+                <button type="button" id="coverTabUpload" onclick="coverPickerSwitchTab('upload')" class="flex-1 py-2.5 text-xs font-medium text-slate-500 border-b-2 border-transparent">Upload custom</button>
+            </div>
+
+            <div class="flex-1 overflow-auto">
+                <div id="coverPaneFrame" class="p-4">
+                    <div class="bg-black rounded-md overflow-hidden mb-3 flex items-center justify-center" style="max-height:380px;">
+                        <video id="coverPickerVideo" controls muted playsinline crossorigin="anonymous" preload="metadata" style="max-width:100%;max-height:380px;display:block;"></video>
+                    </div>
+                    <div class="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+                        <span>Timestamp</span>
+                        <span id="coverFrameTime" class="ml-auto tabular-nums text-slate-700 font-medium">0.00s</span>
+                    </div>
+                    <input id="coverFrameSlider" type="range" min="0" max="100" step="0.1" value="0" oninput="coverPickerSliderInput(event)" class="w-full mb-3">
+                    <button type="button" onclick="captureCoverFrame()" class="w-full h-9 rounded-md bg-primary-600 text-white text-xs font-semibold hover:bg-primary-700">Përdor këtë frame si cover</button>
+                    <div id="coverFramePreview" class="mt-3" style="display:none;">
+                        <div class="text-[10px] text-slate-500 mb-1 uppercase tracking-wide">Preview</div>
+                        <img id="coverFramePreviewImg" alt="" class="max-w-full rounded-md border border-slate-200">
+                    </div>
+                </div>
+
+                <div id="coverPaneUpload" class="p-4" style="display:none;">
+                    <p class="text-[12px] text-slate-500 mb-3">Ngarko JPG ose PNG (max 8 MB). Aspect ratio i rekomanduar 9:16 për Reels.</p>
+                    <input type="file" id="coverUploadFile" accept="image/jpeg,image/png" onchange="coverUploadFileChanged(this)" class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+                    <div id="coverUploadPreview" class="mt-3" style="display:none;">
+                        <div class="text-[10px] text-slate-500 mb-1 uppercase tracking-wide">Preview</div>
+                        <img id="coverUploadPreviewImg" alt="" class="max-w-full rounded-md border border-slate-200">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
+                <button type="button" id="coverPickerClear" onclick="clearCoverFromPicker()" class="text-xs text-red-600 hover:text-red-800 font-medium" style="display:none;">Hiq cover-in aktual</button>
+                <div class="flex items-center gap-2 ml-auto">
+                    <button type="button" onclick="closeCoverPicker()" class="px-4 h-9 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-md">Mbyll</button>
+                    <button type="button" id="coverPickerSave" onclick="saveCoverFromPicker()" disabled class="px-4 h-9 text-xs font-semibold bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed">Ruaj</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

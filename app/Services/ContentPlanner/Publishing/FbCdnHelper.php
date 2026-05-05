@@ -133,6 +133,51 @@ class FbCdnHelper
     }
 
     /**
+     * Bounce the user-picked cover (a JPG/PNG on R2) through FB so we can
+     * pass an `fbcdn.net` URL as `cover_url` on the IG Reels container.
+     * Same workaround as photos / videos: IG's content_publish fetcher
+     * silently rejects external CDN URLs (including R2) for cover_url too.
+     *
+     * Returns null when the media has no custom cover set — caller falls
+     * back to letting Meta auto-pick the cover.
+     */
+    public function uploadCoverAndGetCdnUrl(ContentMedia $media): ?string
+    {
+        $coverUrl = $media->cover_url;
+        if (! $coverUrl) {
+            return null;
+        }
+
+        [$pageId, $token, $graphUrl] = $this->metaConfig();
+
+        $upload = Http::asForm()->post("{$graphUrl}/{$pageId}/photos", [
+            'access_token' => $token,
+            'url' => $coverUrl,
+            'published' => 'false',
+        ]);
+
+        if ($upload->failed() || ! $upload->json('id')) {
+            $err = MetaErrorSanitizer::redact($upload->json('error.message') ?? 'FB cover upload failed');
+            throw new \RuntimeException("FB cover upload failed: {$err}");
+        }
+
+        $photoId = (string) $upload->json('id');
+        $this->tempIds[] = $photoId;
+
+        $details = Http::get("{$graphUrl}/{$photoId}", [
+            'access_token' => $token,
+            'fields' => 'images',
+        ]);
+
+        $cdnUrl = $details->json('images.0.source');
+        if (! $cdnUrl) {
+            throw new \RuntimeException('FB cover CDN URL not returned');
+        }
+
+        return $cdnUrl;
+    }
+
+    /**
      * Bulk variant for carousels — same trick, one FB upload per child.
      *
      * @param  iterable<ContentMedia>  $items

@@ -96,6 +96,99 @@ class ContentMediaService
     }
 
     /**
+     * Replace the cover with a data-URL frame captured client-side
+     * (canvas.toDataURL on a video element). Format must be image/jpeg
+     * or image/png; the cover ends up alongside the video on R2 at
+     * content-planner/covers/<uuid>.<ext>. Old cover (if any) is purged.
+     *
+     * Returns the refreshed media row so the controller can include the
+     * new `cover_url` in its JSON reply.
+     */
+    public function setCoverFromBase64(ContentMedia $media, string $dataUrl): ContentMedia
+    {
+        if (! preg_match('#^data:image/(jpe?g|png);base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $m)) {
+            throw new \InvalidArgumentException('Cover dataUrl duhet të jetë JPG ose PNG (data:image/...;base64,...).');
+        }
+
+        $ext = $m[1] === 'png' ? 'png' : 'jpg';
+        $bytes = base64_decode($m[2], true);
+        if ($bytes === false || strlen($bytes) === 0) {
+            throw new \InvalidArgumentException('Cover dataUrl është i pavlefshëm (base64 decode dështoi).');
+        }
+
+        $maxBytes = 8 * 1048576;
+        if (strlen($bytes) > $maxBytes) {
+            throw new \InvalidArgumentException('Cover është më i madh se 8 MB.');
+        }
+
+        return $this->storeCoverBytes($media, $bytes, $ext);
+    }
+
+    /**
+     * Replace the cover with a user-uploaded JPG/PNG. Mirrors the
+     * data-URL path (same target on R2, same purge behavior) — exists so
+     * users can drop a polished cover designed in Photoshop/Canva, not
+     * just a frame grab.
+     */
+    public function setCoverFromUpload(ContentMedia $media, UploadedFile $file): ContentMedia
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (! in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+            throw new \InvalidArgumentException('Cover duhet të jetë JPG ose PNG.');
+        }
+        if ($file->getSize() > 8 * 1048576) {
+            throw new \InvalidArgumentException('Cover është më i madh se 8 MB.');
+        }
+
+        $bytes = file_get_contents($file->getRealPath());
+        if ($bytes === false) {
+            throw new \InvalidArgumentException('Cover nuk u lexua nga disku.');
+        }
+
+        return $this->storeCoverBytes($media, $bytes, $ext === 'jpeg' ? 'jpg' : $ext);
+    }
+
+    /**
+     * Drop any existing cover for a media item, falling back to the
+     * auto-generated thumbnail. Useful when the user picks a frame they
+     * dislike and wants to revert to "let Meta auto-pick".
+     */
+    public function clearCover(ContentMedia $media): ContentMedia
+    {
+        if ($media->cover_path) {
+            try {
+                Storage::disk($media->disk ?: $this->disk)->delete($media->cover_path);
+            } catch (\Throwable $e) {
+                Log::info('Cover delete failed (will be GC\'d eventually)', ['path' => $media->cover_path, 'error' => $e->getMessage()]);
+            }
+        }
+        $media->update(['cover_path' => null]);
+        return $media->fresh();
+    }
+
+    protected function storeCoverBytes(ContentMedia $media, string $bytes, string $ext): ContentMedia
+    {
+        $disk = $media->disk ?: $this->disk;
+        $coverDir = 'content-planner/covers/' . now()->format('Y/m');
+        $coverPath = $coverDir . '/' . (string) Str::uuid() . '.' . $ext;
+
+        Storage::disk($disk)->put($coverPath, $bytes);
+
+        $oldCover = $media->cover_path;
+        $media->update(['cover_path' => $coverPath]);
+
+        if ($oldCover) {
+            try {
+                Storage::disk($disk)->delete($oldCover);
+            } catch (\Throwable $e) {
+                Log::info('Old cover purge failed', ['path' => $oldCover, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $media->fresh();
+    }
+
+    /**
      * Pre-flight validation against config-defined limits. Throwing here
      * surfaces the failure to the controller before we touch storage, so
      * the user gets the size/format error before a 500 MB upload hits R2.
