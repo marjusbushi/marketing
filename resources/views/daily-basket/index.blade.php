@@ -3825,6 +3825,7 @@
 
         if (media.is_video) {
             const posterUrl = media.cover_url || media.thumbnail_url || '';
+            console.log('[cover] buildMediaTile video', { mediaId: media.id, posterUrl, cover_url: media.cover_url, thumbnail_url: media.thumbnail_url });
 
             // Image-first render. <video> creates a hardware-accelerated
             // layer that's been observed to occlude sibling overlays even
@@ -3835,9 +3836,10 @@
                 img.className = 'db-media-video';
                 img.src = posterUrl;
                 img.alt = '';
-                img.style.cssText = 'cursor:pointer;';
+                img.style.cssText = 'cursor:pointer; background:#000;';
                 img.dataset.mediaId = String(media.id);
-                img.onerror = () => { console.warn('[cover] image failed to load', posterUrl); };
+                img.onload = () => console.log('[cover] image LOADED', posterUrl, img.naturalWidth + 'x' + img.naturalHeight);
+                img.onerror = (ev) => console.warn('[cover] image FAILED to load', posterUrl, ev);
                 tile.appendChild(img);
 
                 const playIcon = document.createElement('div');
