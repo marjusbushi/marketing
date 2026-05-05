@@ -42,8 +42,45 @@ class MerchCalendarController extends Controller
      * Fetches week detail server-side so the page renders without a
      * subsequent API round-trip.
      */
-    public function collectionDetail(int $id): View
+    public function collectionDetail(int $id, Request $request): View|JsonResponse
     {
+        // ?debug=raw returns the raw DIS payloads side-by-side so the user
+        // can SEE whether the data is missing in DIS (in which case the fix
+        // belongs to DIS) or whether our mapping is wrong. Auth-gated.
+        if ($request->query('debug') === 'raw' && auth()->check()) {
+            $raw = $this->disApi->getWeek($id);
+            $enriched = $this->disApi->getWeekEnriched($id);
+            $perProduct = [];
+            foreach (($raw['item_groups'] ?? []) as $g) {
+                $code = (string) ($g['code'] ?? '');
+                $needle = $code !== '' ? $code : (string) ($g['id'] ?? '');
+                $search = [];
+                if ($needle !== '') {
+                    try {
+                        $search = $this->disApi->searchItemGroups($needle);
+                    } catch (\Throwable $e) {
+                        $search = ['_error' => $e->getMessage()];
+                    }
+                }
+                $perProduct[] = [
+                    'id' => $g['id'] ?? null,
+                    'code' => $g['code'] ?? null,
+                    'name' => $g['name'] ?? null,
+                    'from_getWeek' => $g,
+                    'from_searchItemGroups' => $search,
+                ];
+            }
+
+            return response()->json([
+                'mode' => 'debug_raw',
+                'collection_id' => $id,
+                'getWeek_top_level_keys' => array_keys($raw),
+                'getWeek_item_groups_count' => count($raw['item_groups'] ?? []),
+                'getWeekEnriched_item_groups_count' => count($enriched['item_groups'] ?? []),
+                'per_product' => $perProduct,
+            ], 200, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
         try {
             // Use the enriched variant so item_groups whose stock/variants
             // are missing from /weeks/{id} get back-filled via searchItemGroups
