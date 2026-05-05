@@ -30,6 +30,7 @@ class DailyBasketPostMedia extends Model
         'height',
         'duration_seconds',
         'thumbnail_path',
+        'cover_path',
         'sort_order',
     ];
 
@@ -44,6 +45,7 @@ class DailyBasketPostMedia extends Model
     protected $appends = [
         'url',
         'thumbnail_url',
+        'cover_url',
         'is_video',
     ];
 
@@ -63,11 +65,25 @@ class DailyBasketPostMedia extends Model
 
     public function getThumbnailUrlAttribute(): ?string
     {
+        // User-picked cover wins (mirrors what Meta will show on IG once
+        // the post is handed off + published).
+        if ($this->cover_path) {
+            return Storage::disk($this->resolvedDisk())->url($this->cover_path);
+        }
         if ($this->thumbnail_path) {
             return Storage::disk($this->resolvedDisk())->url($this->thumbnail_path);
         }
 
         return $this->url;
+    }
+
+    public function getCoverUrlAttribute(): ?string
+    {
+        if ($this->cover_path) {
+            return Storage::disk($this->resolvedDisk())->url($this->cover_path);
+        }
+
+        return null;
     }
 
     public function getIsVideoAttribute(): bool

@@ -7,7 +7,7 @@
 </style>
 <div id="coverPickerOverlay" class="hidden fixed inset-0 z-[10001]" style="background:rgba(15,23,42,0.65);">
     <div class="absolute inset-0 flex items-center justify-center p-4" onclick="if(event.target===this)__cpClose()">
-        <div class="bg-white rounded-xl shadow-2xl w-[680px] max-w-[95vw] max-h-[92vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+        <div class="bg-white rounded-xl shadow-2xl w-[820px] max-w-[96vw] max-h-[96vh] flex flex-col" style="height:min(96vh, 760px);" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between px-4 py-3 border-b border-slate-200">
                 <h3 class="text-sm font-semibold text-slate-800">Zgjidh cover-in e Reels</h3>
                 <button type="button" onclick="__cpClose()" class="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100">×</button>
@@ -20,8 +20,8 @@
 
             <div class="flex-1 overflow-auto">
                 <div id="coverPaneFrame" class="p-4">
-                    <div class="bg-black rounded-md overflow-hidden mb-3 flex items-center justify-center" style="max-height:380px;">
-                        <video id="coverPickerVideo" controls muted playsinline crossorigin="anonymous" preload="metadata" style="max-width:100%;max-height:380px;display:block;"></video>
+                    <div class="bg-black rounded-md overflow-hidden mb-3 flex items-center justify-center" style="max-height:62vh;">
+                        <video id="coverPickerVideo" controls muted playsinline crossorigin="anonymous" preload="metadata" style="max-width:100%;max-height:62vh;display:block;"></video>
                     </div>
                     <div class="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
                         <span>Timestamp</span>
@@ -64,9 +64,13 @@
         let stagedDataUrl = null;
         let stagedFile = null;
         let hasExistingCover = false;
+        // Per-invocation endpoint pair. Defaults to the planner endpoint;
+        // daily-basket overrides via media.cover_api_set / cover_api_clear.
+        let activeSetUrl = null;
+        let activeClearUrl = null;
 
         const csrf = '{{ csrf_token() }}';
-        const apiBase = '{{ url('/marketing/planner/api/media') }}';
+        const defaultApiBase = '{{ url('/marketing/planner/api/media') }}';
 
         window.openCoverPicker = function (media) {
             if (!media || !media.id) return;
@@ -74,6 +78,13 @@
             stagedDataUrl = null;
             stagedFile = null;
             hasExistingCover = !!media.cover_path;
+
+            // Each surface (planner vs Shporta Ditore) hits a different
+            // endpoint because the underlying tables (content_media vs
+            // daily_basket_post_media) have separate id spaces. The
+            // caller passes the endpoint pair on the media object.
+            activeSetUrl = media.cover_api_set || (defaultApiBase + '/' + encodeURIComponent(media.id) + '/cover');
+            activeClearUrl = media.cover_api_clear || (defaultApiBase + '/' + encodeURIComponent(media.id) + '/cover');
 
             document.getElementById('coverPickerOverlay').classList.remove('hidden');
             __cpSwitchTab('frame');
@@ -190,7 +201,7 @@
             saveBtn.textContent = 'Po ruhet…';
 
             try {
-                const url = apiBase + '/' + encodeURIComponent(mediaId) + '/cover';
+                const url = activeSetUrl;
                 let res;
                 if (stagedDataUrl) {
                     res = await fetch(url, {
@@ -244,7 +255,7 @@
             if (!mediaId) return;
             if (!confirm('Hiq cover-in aktual? Meta do të kthehet te frame-i auto.')) return;
             try {
-                const url = apiBase + '/' + encodeURIComponent(mediaId) + '/cover';
+                const url = activeClearUrl;
                 const res = await fetch(url, {
                     method: 'DELETE',
                     headers: {

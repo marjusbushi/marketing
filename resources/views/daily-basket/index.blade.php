@@ -3856,7 +3856,12 @@
                 e.stopPropagation();
                 e.preventDefault();
                 if (typeof window.openCoverPicker === 'function') {
-                    window.openCoverPicker(media);
+                    // Daily-basket has its own cover endpoint because
+                    // daily_basket_post_media is a separate table from
+                    // content_media; the picker partial routes through
+                    // these URLs when set on the media object.
+                    const apiSet = '/marketing/daily-basket/api/posts/' + num(post.id) + '/media/' + num(media.id) + '/cover';
+                    window.openCoverPicker({ ...media, cover_api_set: apiSet, cover_api_clear: apiSet });
                 }
             });
             tile.appendChild(coverBtn);

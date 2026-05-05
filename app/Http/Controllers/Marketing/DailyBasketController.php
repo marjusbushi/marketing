@@ -1262,6 +1262,8 @@ class DailyBasketController extends Controller
             'id' => $media->id,
             'url' => $media->url,
             'thumbnail_url' => $media->thumbnail_url,
+            'cover_path' => $media->cover_path,
+            'cover_url' => $media->cover_url,
             'is_video' => $media->is_video,
             'mime_type' => $media->mime_type,
             'size_bytes' => $media->size_bytes,
@@ -1271,6 +1273,146 @@ class DailyBasketController extends Controller
             'duration_seconds' => $media->duration_seconds,
             'sort_order' => $media->sort_order,
         ];
+    }
+
+    /**
+     * Set / replace the Reel cover for a daily-basket video media item.
+     * Mirrors ContentPlannerApiController::setMediaCover but operates on
+     * `daily_basket_post_media` rows. When the underlying file path is
+     * shared with a `content_media` row (the attachFromLibrary path),
+     * the cover is propagated there too so a downstream IG publish from
+     * the planner picks up the same cover_url without an extra step.
+     */
+    public function setMediaCover(Request $request, DailyBasketPost $post, int $mediaId): JsonResponse
+    {
+        $media = $post->media()->whereKey($mediaId)->first();
+        if (! $media) {
+            return response()->json(['message' => 'Media nuk u gjet në këtë post.'], 404);
+        }
+        if (! str_starts_with((string) $media->mime_type, 'video/')) {
+            return response()->json(['message' => 'Cover-i mund të vendoset vetëm te video.'], 422);
+        }
+
+        $data = $request->validate([
+            'frame_data_url' => 'nullable|string|max:12000000',
+            'cover'          => 'nullable|file|mimes:jpg,jpeg,png|max:8192',
+        ]);
+
+        $hasFrame = ! empty($data['frame_data_url']);
+        $hasFile = $request->hasFile('cover');
+        if ($hasFrame === $hasFile) {
+            return response()->json([
+                'message' => 'Dërgo OSE një frame_data_url, OSE një file cover — jo të dyja, jo asnjë.',
+            ], 422);
+        }
+
+        try {
+            $coverPath = $hasFrame
+                ? $this->storeBasketCoverFromDataUrl($media, $data['frame_data_url'])
+                : $this->storeBasketCoverFromUpload($media, $request->file('cover'));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $oldCover = $media->cover_path;
+        $media->update(['cover_path' => $coverPath]);
+
+        if ($oldCover && $oldCover !== $coverPath) {
+            try { Storage::disk($media->disk ?: 'public')->delete($oldCover); } catch (\Throwable $e) { /* leave for GC */ }
+        }
+
+        $this->mirrorBasketCoverToContentMedia($media, $coverPath);
+
+        $media = $media->fresh();
+
+        return response()->json([
+            'id' => $media->id,
+            'cover_path' => $media->cover_path,
+            'cover_url' => $media->cover_url,
+            'thumbnail_url' => $media->thumbnail_url,
+        ]);
+    }
+
+    public function clearMediaCover(DailyBasketPost $post, int $mediaId): JsonResponse
+    {
+        $media = $post->media()->whereKey($mediaId)->first();
+        if (! $media) {
+            return response()->json(['message' => 'Media nuk u gjet në këtë post.'], 404);
+        }
+
+        if ($media->cover_path) {
+            try { Storage::disk($media->disk ?: 'public')->delete($media->cover_path); } catch (\Throwable $e) { /* leave for GC */ }
+        }
+        $media->update(['cover_path' => null]);
+
+        $this->mirrorBasketCoverToContentMedia($media, null);
+
+        $media = $media->fresh();
+
+        return response()->json([
+            'id' => $media->id,
+            'cover_path' => null,
+            'cover_url' => null,
+            'thumbnail_url' => $media->thumbnail_url,
+        ]);
+    }
+
+    private function storeBasketCoverFromDataUrl(DailyBasketPostMedia $media, string $dataUrl): string
+    {
+        if (! preg_match('#^data:image/(jpe?g|png);base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $m)) {
+            throw new \InvalidArgumentException('Cover dataUrl duhet të jetë JPG ose PNG.');
+        }
+        $ext = $m[1] === 'png' ? 'png' : 'jpg';
+        $bytes = base64_decode($m[2], true);
+        if ($bytes === false || strlen($bytes) === 0) {
+            throw new \InvalidArgumentException('Cover dataUrl është i pavlefshëm.');
+        }
+        if (strlen($bytes) > 8 * 1048576) {
+            throw new \InvalidArgumentException('Cover është më i madh se 8 MB.');
+        }
+        return $this->writeBasketCoverBytes($media, $bytes, $ext);
+    }
+
+    private function storeBasketCoverFromUpload(DailyBasketPostMedia $media, $file): string
+    {
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (! in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+            throw new \InvalidArgumentException('Cover duhet të jetë JPG ose PNG.');
+        }
+        if ($file->getSize() > 8 * 1048576) {
+            throw new \InvalidArgumentException('Cover është më i madh se 8 MB.');
+        }
+        $bytes = file_get_contents($file->getRealPath());
+        if ($bytes === false) {
+            throw new \InvalidArgumentException('Cover nuk u lexua nga disku.');
+        }
+        return $this->writeBasketCoverBytes($media, $bytes, $ext === 'jpeg' ? 'jpg' : $ext);
+    }
+
+    private function writeBasketCoverBytes(DailyBasketPostMedia $media, string $bytes, string $ext): string
+    {
+        $disk = $media->disk ?: 'public';
+        $coverDir = 'daily-basket-covers/' . $media->daily_basket_post_id;
+        $coverPath = $coverDir . '/' . (string) Str::uuid() . '.' . $ext;
+        Storage::disk($disk)->put($coverPath, $bytes);
+        return $coverPath;
+    }
+
+    /**
+     * When this basket-media row was attached from the library, both
+     * tables hold the same `path`. Patch the matching content_media so
+     * the IG publish path (which reads ContentMedia.cover_path) picks
+     * up the user's choice without a separate handoff step.
+     */
+    private function mirrorBasketCoverToContentMedia(DailyBasketPostMedia $media, ?string $coverPath): void
+    {
+        if (! $media->path) return;
+        try {
+            ContentMedia::where('path', $media->path)
+                ->update(['cover_path' => $coverPath]);
+        } catch (\Throwable $e) {
+            // Best-effort mirror — the basket-side cover still works.
+        }
     }
 
     // ─── Guards ──────────────────────────────────────────────

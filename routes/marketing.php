@@ -325,6 +325,10 @@ Route::middleware(['auth', EnsureMarketingAccess::class])->group(function () {
             ->name('api.posts.media.reorder');
         Route::delete('/api/posts/{post}/media/{mediaId}', [DailyBasketController::class, 'deletePostMedia'])
             ->name('api.posts.media.destroy');
+        Route::post('/api/posts/{post}/media/{mediaId}/cover', [DailyBasketController::class, 'setMediaCover'])
+            ->name('api.posts.media.cover.set');
+        Route::delete('/api/posts/{post}/media/{mediaId}/cover', [DailyBasketController::class, 'clearMediaCover'])
+            ->name('api.posts.media.cover.clear');
     });
 
     // ─── Settings hub ───────────────────────────────
