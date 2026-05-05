@@ -454,11 +454,14 @@ class DailyBasketController extends Controller
                 'name' => $p['name'] ?? 'Pa emër',
                 'sku' => $p['code'] ?? null,
                 'thumbnail_url' => $p['image_url'] ?? null,
+                'category' => $p['category_name'] ?? null,
                 'price' => round($price, 2),
                 'base_price' => round($base, 2),
                 'has_discount' => $hasDiscount,
                 'stock' => $stock,
                 'sold' => $sold,
+                'sales' => $p['sales'] ?? null,
+                'shell_orphan' => (bool) ($p['shell_orphan'] ?? false),
                 'total_value' => round($price * $stock, 2),
                 'tags' => $tags,
                 'posts_count' => $postsCount,
@@ -556,6 +559,7 @@ class DailyBasketController extends Controller
                     'code' => $g['code'] ?? null,
                     'name' => $g['name'] ?? 'Unnamed',
                     'vendor_name' => $g['vendor_name'] ?? null,
+                    'category_name' => $g['category_name'] ?? null,
                     'image_url' => $g['image_url'] ?? null,
                     'avg_price' => $g['avg_price'] ?? null,
                     'pricelist_price' => $g['pricelist_price'] ?? null,
@@ -565,6 +569,8 @@ class DailyBasketController extends Controller
                     'classification' => $g['classification'] ?? null,
                     'total_stock' => $stock ?? 0,
                     'total_sold' => $sold ?? 0,
+                    'sales' => $g['sales'] ?? null,
+                    'shell_orphan' => (bool) ($g['_shell_orphan'] ?? false),
                     // Per-day assignments — empty array when the product has no
                     // caktime yet. Frontend (#1137 panorama) filters by selected
                     // day; modali i postit i injoron (sheh gjithcka — orientim, jo

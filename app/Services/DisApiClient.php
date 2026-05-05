@@ -226,17 +226,25 @@ class DisApiClient
     }
 
     /**
-     * Get a distribution week and back-fill any item_groups that arrive
-     * with missing stock / variants / price by re-fetching them through
-     * `searchItemGroups`, which the DIS UI uses for `/management/items/items-grouped`
-     * and tends to carry the richer shape. Falls back silently to whatever
-     * getWeek returned if the secondary endpoint fails.
+     * Get a distribution week and back-fill "shell" item_groups using their
+     * real sibling within the same response.
      *
-     * Why this matters: in production we observe item_groups that show
-     * `0 var · 0 stk · 0 L` in marketing while DIS UI shows real numbers —
-     * the merch-calendar/weeks endpoint omits those columns for items
-     * with certain inventory statuses ("Distributed", etc.). This method
-     * patches around that without waiting on a DIS-side API change.
+     * The DIS data model has two flavors of item_groups:
+     *   - Shells: numeric codes like "1718982" — carry the photoshoot image
+     *     but have no stock/variants/sales of their own.
+     *   - Real siblings: prefixed codes like "Kanatjere1718982",
+     *     "Tshirt1718974", "Chino1718560" — the actual sellable SKU group
+     *     that holds total_stock / variations_count / total_sold / sales.
+     *
+     * When a user assigns a shell to a date in Merch Calendar, getWeek
+     * returns BOTH the shell (with empty data + image) and (sometimes) the
+     * sibling (with full data + no image). We merge the sibling's data
+     * into the shell so the rail/grid shows one row with photo + numbers,
+     * and we drop the duplicate sibling.
+     *
+     * If the sibling isn't included in the same week (user never linked it),
+     * we leave the shell as-is and tag it `_shell_orphan: true` so the UI
+     * can render a "te dhenat mungojne" hint instead of silent zeros.
      */
     public function getWeekEnriched(int $id): array
     {
@@ -246,64 +254,108 @@ class DisApiClient
             return $week;
         }
 
-        $needsEnrichment = function (array $g): bool {
-            $stock = self::pickNum($g, ['total_stock', 'available_stock', 'stock_total', 'available_qty', 'stock', 'quantity', 'total_qty']);
-            $variants = self::pickNum($g, ['variations_count', 'variants_count', 'variation_count', 'variants', 'items_count']);
-            $base = self::pickPositive($g, ['rate', 'avg_price', 'price', 'unit_price', 'pricelist_price']);
-
-            return ($stock <= 0 && $variants <= 0) || $base <= 0;
-        };
-
-        $enriched = [];
-        foreach ($groups as $g) {
-            if (! $needsEnrichment($g)) {
-                $enriched[] = $g;
-                continue;
-            }
-
+        // Index by code for O(1) sibling lookup.
+        $byCode = [];
+        foreach ($groups as $idx => $g) {
             $code = (string) ($g['code'] ?? '');
-            $id = (string) ($g['id'] ?? '');
-            $needle = $code !== '' ? $code : $id;
-            if ($needle === '') {
-                $enriched[] = $g;
-                continue;
-            }
-
-            try {
-                $matches = $this->searchItemGroups($needle);
-            } catch (\Throwable $e) {
-                report($e);
-                $enriched[] = $g;
-                continue;
-            }
-
-            $match = null;
-            foreach ($matches as $m) {
-                if ((string) ($m['id'] ?? '') === $id || (string) ($m['code'] ?? '') === $code) {
-                    $match = $m;
-                    break;
-                }
-            }
-
-            if ($match === null) {
-                $enriched[] = $g;
-                continue;
-            }
-
-            // Fields from $match fill in missing/zero values in $g.
-            // Existing non-empty fields in $g win — preserves whatever
-            // getWeek already produced (assigned_dates especially).
-            foreach ($match as $key => $value) {
-                if (! array_key_exists($key, $g) || $g[$key] === null || $g[$key] === '' || $g[$key] === 0 || $g[$key] === '0') {
-                    $g[$key] = $value;
-                }
-            }
-            $enriched[] = $g;
+            if ($code !== '') $byCode[$code] = $idx;
         }
 
-        $week['item_groups'] = $enriched;
+        $isShell = function (array $g): bool {
+            // Shell = empty stock AND empty variants AND empty price AND
+            // numeric-only code. Numeric-only because "Kanatjere1718982"
+            // shouldn't be treated as a shell even if its numbers are 0.
+            $code = (string) ($g['code'] ?? '');
+            if (! preg_match('/^\d+$/', $code)) return false;
+            $stock = self::pickNum($g, ['total_stock', 'available_stock', 'stock_total', 'available_qty', 'stock', 'quantity', 'total_qty']);
+            $variants = self::pickNum($g, ['variations_count', 'variants_count', 'variation_count', 'variants', 'items_count']);
+            $price = self::pickPositive($g, ['rate', 'avg_price', 'price', 'unit_price', 'pricelist_price']);
+
+            return $stock <= 0 && $variants <= 0 && $price <= 0;
+        };
+
+        // Find sibling of a shell. Sibling code matches /^[A-Za-z]+<shellCode>$/.
+        $findSibling = function (string $shellCode) use (&$groups, $byCode): ?int {
+            $pattern = '/^[A-Za-z]+'.preg_quote($shellCode, '/').'$/';
+            foreach ($byCode as $code => $idx) {
+                if ($code === $shellCode) continue;
+                if (preg_match($pattern, $code)) return $idx;
+            }
+            return null;
+        };
+
+        $removed = [];
+        foreach ($groups as $i => $g) {
+            if (! $isShell($g)) continue;
+
+            $shellCode = (string) ($g['code'] ?? '');
+            $siblingIdx = $findSibling($shellCode);
+
+            if ($siblingIdx === null) {
+                // Category B — sibling not in this collection. Tag it so the
+                // UI can show "Të dhënat mungojnë (sibling jashtë koleksionit)".
+                $groups[$i]['_shell_orphan'] = true;
+                continue;
+            }
+
+            $sibling = $groups[$siblingIdx];
+
+            // Merge data fields from sibling into shell. Shell wins on
+            // identity (id, code, name, image_url) — we want to keep the
+            // shell's photo and the user's chosen "look" identity. Sibling
+            // wins on stock/sales/variants/price/category/vendor.
+            $dataFields = [
+                'avg_price', 'pricelist_price', 'rate', 'price',
+                'total_stock', 'available_stock', 'stock_total',
+                'variations_count', 'variants_count', 'variants',
+                'total_sold', 'sales',
+                'vendor_name', 'category_name',
+            ];
+            foreach ($dataFields as $f) {
+                if (array_key_exists($f, $sibling) && $sibling[$f] !== null && $sibling[$f] !== '' && $sibling[$f] !== 0) {
+                    $groups[$i][$f] = $sibling[$f];
+                }
+            }
+            // Sibling's name is more useful than the numeric shell name,
+            // but only when shell name === shell code (i.e. unset).
+            $shellName = (string) ($g['name'] ?? '');
+            if ($shellName === '' || $shellName === $shellCode) {
+                $groups[$i]['name'] = $sibling['name'] ?? $shellName;
+            }
+            // Union assigned_dates (dedupe by id) so a user that assigned
+            // the sibling separately doesn't lose those dates.
+            $groups[$i]['assigned_dates'] = self::mergeAssignedDates(
+                $g['assigned_dates'] ?? [],
+                $sibling['assigned_dates'] ?? []
+            );
+            $groups[$i]['_merged_sibling'] = $sibling['code'] ?? null;
+
+            $removed[$siblingIdx] = true;
+        }
+
+        $week['item_groups'] = array_values(array_filter(
+            $groups,
+            fn ($_, $idx) => empty($removed[$idx]),
+            ARRAY_FILTER_USE_BOTH
+        ));
 
         return $week;
+    }
+
+    /**
+     * Union two assigned_dates arrays, dedupe by id.
+     */
+    private static function mergeAssignedDates(array $a, array $b): array
+    {
+        $byId = [];
+        foreach ([$a, $b] as $list) {
+            foreach ($list as $row) {
+                $id = $row['id'] ?? null;
+                if ($id === null) continue;
+                $byId[$id] = $row;
+            }
+        }
+        return array_values($byId);
     }
 
     /**

@@ -1918,7 +1918,12 @@
         }
         metaParts.push((p.stock || 0) + ' pcs');
         if (Number(p.sold) > 0) metaParts.push(Number(p.sold) + ' shitur');
+        if (p.shell_orphan) metaParts.push('⚠ pa sibling');
         meta.textContent = metaParts.join(' · ');
+        if (p.shell_orphan) {
+            meta.title = 'Ky është një "shell" pa sibling në koleksion. Shto prefiks-produktin (Tshirt/Kanatjere/etj.) te koleksioni në DIS që të shfaqen të dhënat.';
+            meta.style.color = '#dc2626';
+        }
         body.append(name, meta);
         card.appendChild(body);
 

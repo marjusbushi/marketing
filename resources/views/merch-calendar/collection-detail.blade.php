@@ -717,6 +717,13 @@
             stock.appendChild(el('br'));
             stock.appendChild(el('span', 'cd-sold', stkSold + ' shitur'));
         }
+        if (g._shell_orphan) {
+            stock.appendChild(el('br'));
+            const warn = el('span', null, '⚠ pa sibling');
+            warn.style.cssText = 'color:#dc2626; font-weight:600; font-size:9px;';
+            warn.title = 'Ky është "shell" pa sibling-un e konfiguruar te koleksioni. Shto prefiks-produktin (Tshirt/Kanatjere/etj.) te DIS që të shfaqen të dhënat.';
+            stock.appendChild(warn);
+        }
         priceRow.appendChild(stock);
 
         body.appendChild(priceRow);
