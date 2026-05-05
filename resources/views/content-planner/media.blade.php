@@ -157,7 +157,14 @@
         <iconify-icon icon="heroicons-outline:cloud-arrow-up" width="36" class="text-slate-300 mx-auto block"></iconify-icon>
         <p class="text-sm text-slate-600 mt-3 font-medium">Drop files here or <span class="text-primary-600 font-semibold">browse</span></p>
         <p class="text-[11px] text-slate-400 mt-1">Images up to 50MB · Videos up to 500MB · MP4, MOV, AVI, MKV, WEBM, M4V, HEIC, etj.</p>
-        <input id="fileInput" type="file" accept="image/*,video/*" multiple class="hidden" onchange="handleFiles(this.files)">
+        {{-- accept lists both MIME wildcards AND explicit extensions because
+             Windows + Chrome occasionally hides files (e.g. .mov, .heic) when
+             only the wildcard is provided — the OS reports a quirky / generic
+             mime that does not match video/* or image/*. The server validator
+             is the source of truth (extension-first); this attribute only
+             filters what the picker shows. --}}
+        <input id="fileInput" type="file" multiple class="hidden" onchange="handleFiles(this.files)"
+               accept="image/*,video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v,.flv,.wmv,.3gp,.mpg,.mpeg,.mts,.m2ts,.ts,.ogv,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.bmp,.tiff,.tif,.avif">
     </div>
 
     {{-- Upload progress (multi-file, real %) --}}
