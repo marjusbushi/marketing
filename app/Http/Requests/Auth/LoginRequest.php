@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -35,20 +36,35 @@ class LoginRequest extends FormRequest
 
     /**
      * Authenticate the user against the shared DIS users table.
+     *
+     * Pranon email parësor OSE work_email — i njëjti njeri shpesh ka adresën
+     * personale gmail si login dhe @zeroabsolute.com si email pune. Mirror i
+     * sjelljes së DIS / HRMS LoginRequest.
      */
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+        $entered = $this->input('email');
+        $password = $this->input('password');
+        $remember = $this->boolean('remember');
 
-            throw ValidationException::withMessages([
-                'credentials' => 'Email-i ose fjalekalimi nuk eshte i sakte.',
-            ]);
+        if (Auth::attempt(['email' => $entered, 'password' => $password], $remember)) {
+            RateLimiter::clear($this->throttleKey());
+            return;
         }
 
-        RateLimiter::clear($this->throttleKey());
+        $user = User::where('work_email', $entered)->first();
+        if ($user && Auth::attempt(['email' => $user->email, 'password' => $password], $remember)) {
+            RateLimiter::clear($this->throttleKey());
+            return;
+        }
+
+        RateLimiter::hit($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'credentials' => 'Email-i ose fjalekalimi nuk eshte i sakte.',
+        ]);
     }
 
     public function ensureIsNotRateLimited(): void
